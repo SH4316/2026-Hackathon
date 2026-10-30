@@ -5,6 +5,7 @@ import { chromium } from "playwright";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { makeDocx, makeHwpx, makeOdt, makePptx, makeXlsx } from "./zip.mjs";
 
 const EXT = path.resolve(import.meta.dirname, "..");
 const OUT = path.resolve(import.meta.dirname, "shots");
@@ -385,12 +386,57 @@ check("Korean PDF: finds the resident number with its page", korModal.includes("
 await page.getByRole("button", { name: "첨부 취소" }).click();
 await page.waitForTimeout(500);
 
+// 16. 글자로 된 문서(Word·Excel·PowerPoint·한글 hwpx·OpenDocument): PDF 처럼 민감한 위치를 알려 주고 묻는다
+const KEY = "aws_access_key_id = AKIAIOSFODNN7EXAMPLE";
+const docs = {
+  "memo.docx": [makeDocx(["Weekly memo", `Deploy ${KEY}`]), "문단 2", "AWS Access Key"],
+  "list.xlsx": [makeXlsx([["name", "note"], ["Kim", KEY]], "Sheet1"), "Sheet1!B2", "AWS Access Key"],
+  "deck.pptx": [makePptx([["Title"], [`Appendix ${KEY}`]]), "슬라이드 2", "AWS Access Key"],
+  "hangul.hwpx": [makeHwpx(["인사 기록", "고객 홍길동 주민등록번호 900101-1234567"]), "문단 2", "주민등록번호"],
+  "notes.odt": [makeOdt(["intro", `Deploy ${KEY}`]), "문단 2", "AWS Access Key"],
+};
+for (const [name, [buf, where, kind]] of Object.entries(docs)) {
+  const fp = path.join(tmp, name);
+  fs.writeFileSync(fp, buf);
+  const base = await logCount();
+  await page.setInputFiles("#file", fp);
+  await modal.waitFor({ timeout: 20000 });
+  const t = await modal.innerText();
+  check(`${name}: shows where the sensitive value is (${where})`, t.includes(name) && t.includes(where) && t.includes(kind), t.replace(/\s+/g, " ").slice(0, 90));
+  check(`${name}: not attached while asking`, (await logCount()) === base);
+  if (name === "memo.docx") await page.screenshot({ path: `${OUT}/13-docx-review.png` });
+  await page.getByRole("button", { name: "첨부 취소" }).click();
+  await page.waitForTimeout(500);
+}
+// 깨끗한 문서는 묻지 않고 "검사 완료"
+const cleanDocx = path.join(tmp, "clean.docx"); fs.writeFileSync(cleanDocx, makeDocx(["Weekly minutes", "Goal: finish documentation"]));
+const baseDoc = await logCount();
+await page.setInputFiles("#file", cleanDocx);
+await page.waitForFunction(() => /검사 완료/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 20000 }).catch(() => {});
+const docNote = await badge.locator(".wnotice").textContent().catch(() => "");
+check("clean docx: analyzed, attached without asking", docNote.includes("Word") && !(await modal.isVisible()) && (await logCount()) === baseDoc + 1, docNote.slice(0, 70));
+// 읽을 수 없는 문서: 구형 .doc · 암호가 걸린(OLE) 문서 · 깨진 파일
+const legacy = path.join(tmp, "old.doc"); fs.writeFileSync(legacy, Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]));
+await page.setInputFiles("#file", legacy);
+await modal.waitFor({ timeout: 10000 });
+const legacyText = await modal.innerText();
+check("legacy .doc: unreadable question names the format", legacyText.includes("Word(.doc)") && legacyText.includes("안전한지 알 수 없습니다") && legacyText.includes("그래도 진행"), legacyText.replace(/\s+/g, " ").slice(0, 100));
+await page.getByRole("button", { name: "첨부 취소" }).click();
+await page.waitForTimeout(400);
+const lockedDocx = path.join(tmp, "locked.docx"); fs.writeFileSync(lockedDocx, Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]));
+await page.setInputFiles("#file", lockedDocx);
+await modal.waitFor({ timeout: 10000 });
+check("password-protected docx: unreadable question", (await modal.innerText()).includes("암호"), "");
+await page.getByRole("button", { name: "첨부 취소" }).click();
+await page.waitForTimeout(400);
+
 // 옵션을 켜면 읽을 수 없는 파일은 묻지 않고 바로 막는다
+const baseOpt = await logCount();
 await sw0.evaluate(() => chrome.storage.local.set({ blockUnscannableFiles: true }));
 await page.waitForTimeout(400);
 await page.setInputFiles("#file", mp3);
 await page.waitForFunction(() => /막았습니다/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 8000 }).catch(() => {});
-check("block-unreadable option: blocked without asking", !(await modal.isVisible()) && (await logCount()) === base15 + 2);
+check("block-unreadable option: blocked without asking", !(await modal.isVisible()) && (await logCount()) === baseOpt);
 await sw0.evaluate(() => chrome.storage.local.set({ blockUnscannableFiles: false }));
 
 // 팝업 확인은 서버가 꺼진 상태를 기준으로 하므로 다시 닫힌 포트로 돌려 둔다
@@ -405,7 +451,7 @@ await popup.goto(`chrome-extension://${extId}/popup.html`);
 await popup.waitForTimeout(800);
 await popup.screenshot({ path: `${OUT}/6-popup.png` });
 check("popup shows server down", (await popup.locator("#status").textContent()).includes("연결 안 됨"));
-check("popup shows the extension version", (await popup.locator("#ver").textContent()).includes("0.2.0"));
+check("popup shows the extension version", (await popup.locator("#ver").textContent()).includes("0.3.0"));
 } catch (e) {
   results.push("ERROR " + e.message.split("\n")[0]);
   await page.screenshot({ path: `${OUT}/error.png` });
