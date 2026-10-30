@@ -1,7 +1,7 @@
 # 탐지 룰 형식 목록
 
 Prompt Guard 검사 서버(`server/`)와 JS 라이브러리(`packages/prompt-guard-rules`)가 같은 결과를 내는 탐지 규칙과, 대시보드에서 추가하는 규칙의 형식을 정리한 문서입니다.
-기준: 룰셋 `rules-0.2.0`, 정책 `2026-10-31.draft4`.
+기준: 룰셋 `rules-0.2.1`, 정책 `2026-10-31.draft4`.
 
 ## 1. 판정 흐름
 
@@ -38,7 +38,7 @@ Prompt Guard 검사 서버(`server/`)와 JS 라이브러리(`packages/prompt-gua
 | `kr_passport` | passport | `[MSRODG]` + 8자리 또는 3자리+영문+4자리, 영숫자 경계 | | `M12345678` | |
 | `kr_driver_license` | driver_license | `지역(11~28)-2-6-2` | | `11-22-123456-01` | |
 | `id_number_ctx` | id_number | 키워드(학번·사번·군번·회원/고객/수험/학생번호, `ID`·`No.`·`Number`·`#`, 앞에 student·employee·roll·pin 등) + `:`/`#` + 영숫자 5~20자 | 값에 숫자 4개 이상 | `Roll No. : 932353568953`, `학번: 2024123456`, `Group id  :  027693` | `ID: ABCDEFG`, `사번 EMP-2231`(구분 기호 없음) |
-| `long_digit_id` | id_number | 구분자 없는 8~16자리 숫자. 앞이 영숫자·`_`·`.`·`=`·`&`·`?`·`#`·`-`, 뒤가 영숫자·`.`·`/`·`-` 면 제외 | 8자리가 유효한 YYYYMMDD(1900~2099)면 제외 | `943063077874`, `20241399` | `20240229`(날짜), URL 속 `Expires=1596153600` |
+| `long_digit_id` | id_number | 구분자 없는 8~16자리 숫자. 앞이 영숫자·`_`·`.`·`=`·`&`·`?`·`#`·`-`·통화 기호(`$ ₩ € £ ¥`), 뒤가 영숫자·`.`·`/`·`-` 이거나 **공백 + 단위**(원·달러·억·만·명·개·건·회·%·km·kg·users 등)면 제외 | 제외: 유효한 YYYYMMDD 날짜(1900~2099), 같은 숫자 반복(`11111111`), 연속 숫자(`123456789`·`987654321`), 끝이 `0000` 인 어림수, 유닉스 시각(10자리 1.4×10⁹~2×10⁹, 13자리 1.4×10¹²~2×10¹², 2014~2033년) | `943063077874`, `20241399`, `2023101512345` | `20240229`, `1500000000 원`, `51000000 명`, `100000000`, `1700000000`, `₩123456789`, URL 속 `Expires=1596153600` |
 | `us_street_address` | street_address | 번지 1~6자리 + 대문자 단어 1~3개 + USPS 접미사(Street·Ave·Bypass·Centers 등) [+ Apt/Suite 호수] [+ `도시, 주 우편번호`] | | `591 Smith Centers Apt. 656, Joshuamouth, RI 95963` | `90 Thousand Sq. Kilometers` |
 | `kr_road_address` | street_address | [시·도] + 시·군·구 + 도로명(…대로·로·길) + 건물번호 [+ 번길] | | `서울특별시 종로구 세종대로 110`, `강남구 테헤란로 152` | `경로 3`(시·군·구 없음) |
 | `profile_url` | url_personal | 소셜·프로필 URL: facebook·instagram·twitter·x·tiktok·github·threads `.com/…`, `linkedin.com/in/`, `youtube.com/(channel·c·user·@)`, `medium.com/@`, behance, dribbble (스킴 생략·잘린 `tps://` 허용) | | `linkedin.com/in/mmartinez` | `youtube.com/watch?v=…`(영상 링크) |
