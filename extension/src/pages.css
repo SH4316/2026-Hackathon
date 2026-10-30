@@ -1,0 +1,37 @@
+:root {
+  --bg: #ffffff; --fg: #1d1d1f; --muted: #5f6368; --line: #e3e3e8;
+  --ok: #1b7f3b; --ok-bg: #e7f5ec; --err: #c62828; --err-bg: #fdecea; --primary: #1a5fd0;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f2023; --fg: #ececf1; --muted: #a0a4ab; --line: #34363b;
+    --ok: #81c995; --ok-bg: #1e3326; --err: #ff8a80; --err-bg: #3a1f1e; --primary: #8ab4f8;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+}
+body.popup { width: 300px; }
+body.options { max-width: 520px; margin: 0 auto; padding: 24px 16px; }
+h1 { font-size: 16px; margin: 0 0 12px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0; }
+.muted { color: var(--muted); margin: 4px 0 8px; }
+.small { font-size: 12px; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--line); }
+.pill[data-state="ok"] { background: var(--ok-bg); color: var(--ok); }
+.pill[data-state="error"] { background: var(--err-bg); color: var(--err); }
+label { display: block; margin-top: 12px; font-weight: 600; }
+label.toggle { font-weight: 400; }
+input[type="url"], input[type="password"] {
+  display: block; width: 100%; margin-top: 4px; padding: 8px 10px; font: inherit;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg);
+}
+button {
+  font: inherit; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+}
+button[type="submit"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+.actions { display: flex; gap: 8px; align-items: center; margin-top: 16px; flex-wrap: wrap; }

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Prompt Guard 설정</title>
+  <link rel="stylesheet" href="src/pages.css">
+</head>
+<body class="options">
+  <h1>Prompt Guard 설정</h1>
+  <form id="form">
+    <label>검사 서버 주소
+      <input id="serverUrl" type="url" required placeholder="http://127.0.0.1:8000">
+    </label>
+    <p class="muted small">같은 PC면 루프백(127.0.0.1), 다른 서버면 조직 내부의 HTTPS 주소를 사용하세요.</p>
+    <label>API 키
+      <input id="apiKey" type="password" autocomplete="off" placeholder="서버의 PG_API_KEYS 중 하나">
+    </label>
+    <p class="muted small">이 브라우저의 확장프로그램 저장소에만 보관됩니다. 서버가 인증을 끈 개발 모드라면 비워 두세요.</p>
+    <label class="row toggle">
+      <span>검사 사용</span>
+      <input id="enabled" type="checkbox">
+    </label>
+    <div class="actions">
+      <button type="submit">저장</button>
+      <button id="test" type="button">연결 테스트</button>
+      <span id="msg" class="muted" role="status"></span>
+    </div>
+  </form>
+  <script src="src/options.js"></script>
+</body>
+</html>
