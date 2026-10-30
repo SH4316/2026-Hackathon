@@ -2,7 +2,11 @@ package com.example.securitydashboard.connector;
 
 import com.example.securitydashboard.connector.model.Connector;
 import com.example.securitydashboard.connector.model.CreateConnector;
+import com.example.securitydashboard.connector.model.CreateEnrollment;
 import com.example.securitydashboard.connector.model.CreatedConnector;
+import com.example.securitydashboard.connector.model.Enrollment;
+import com.example.securitydashboard.connector.model.RedeemEnrollment;
+import com.example.securitydashboard.connector.model.RedeemedEnrollment;
 import com.example.securitydashboard.connector.model.DetectorSettings;
 import com.example.securitydashboard.connector.model.UpdateDetectorSettings;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,7 +52,7 @@ class ConnectorController {
   ResponseEntity<CreatedConnector> create(
       @RequestBody(required = false) CreateConnector input, HttpServletRequest request) {
     String base = ServletUriComponentsBuilder.fromContextPath(request).build().toUriString();
-    var created = service.create(input == null ? new CreateConnector(null, null) : input, base);
+    var created = service.create(input == null ? new CreateConnector(null, null, null) : input, base);
     return ResponseEntity.created(URI.create("/api/v1/connectors/" + created.connector().id()))
         .body(created);
   }
@@ -66,6 +70,27 @@ class ConnectorController {
   @GetMapping("/connectors/{id}")
   Map<String, Object> check(@PathVariable String id) {
     return Map.of("id", id, "connected", true);
+  }
+
+  @Tag(name = "사용자")
+  @Operation(
+      summary = "확장프로그램 연결 코드 발급",
+      description =
+          "그 사람의 일회용 코드(XXXX-XXXX)를 발급합니다. 코드는 이 응답에서만 볼 수 있습니다. 검사 서버 주소가 등록된 연결이"
+              + " 있으면 connectionInfo(<검사 서버 주소>#<code>)를 함께 돌려줍니다. 사용자는 확장 설정의 대시보드 연결에 넣습니다.")
+  @PostMapping("/people/{id}/enrollments")
+  ResponseEntity<Enrollment> enroll(
+      @PathVariable String id, @RequestBody(required = false) CreateEnrollment input) {
+    return ResponseEntity.status(201).body(service.createEnrollment(id, input));
+  }
+
+  @Operation(
+      summary = "연결 코드 사용(검사 서버용)",
+      description = "연결 인증이 필요합니다. 없음·만료·이미 사용한 코드는 모두 404 ENROLLMENT_INVALID입니다.")
+  @PostMapping("/enrollments/redeem")
+  RedeemedEnrollment redeem(@RequestBody RedeemEnrollment input, HttpServletRequest request) {
+    return service.redeem(
+        input == null ? null : input.code(), (String) request.getAttribute(ConnectorAuthFilter.CONNECTOR_ID));
   }
 
   @Operation(

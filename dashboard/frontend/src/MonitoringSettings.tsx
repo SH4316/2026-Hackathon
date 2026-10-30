@@ -60,12 +60,14 @@ function Connectors() {
     const form = e.currentTarget;
     const d = new FormData(form);
     const dashboardUrl = String(d.get("dashboardUrl") ?? "").trim();
+    const serverUrl = String(d.get("serverUrl") ?? "").trim();
     setPending(true);
     setError("");
     try {
       const value = await api.createConnector({
         name: String(d.get("name")).trim(),
         ...(dashboardUrl ? { dashboardUrl } : {}),
+        ...(serverUrl ? { serverUrl } : {}),
       });
       setCreated(value);
       setCopied(false);
@@ -136,6 +138,19 @@ function Connectors() {
               입력하세요.
             </small>
           </label>
+          <label className="connector-form-wide">
+            <span>사용자가 확장에 넣을 검사 서버 주소 (선택)</span>
+            <input
+              name="serverUrl"
+              type="url"
+              placeholder="https://guard.example.org"
+              disabled={pending}
+            />
+            <small>
+              입력하면 사람 화면에서 발급하는 연결 정보에 이 주소가 함께 들어가,
+              사용자는 한 줄만 붙여 넣으면 됩니다.
+            </small>
+          </label>
           <button className="button button-primary" disabled={pending}>
             연결 URL 만들기
           </button>
@@ -186,7 +201,9 @@ function Connectors() {
                 <span>
                   <span className="setting-label">{c.name}</span>
                   <span className="setting-description">
-                    {c.id} · 발급 {formatDateTime(c.createdAt)} ·{" "}
+                    {c.id}
+                    {c.serverUrl ? " · " + c.serverUrl : ""} · 발급{" "}
+                    {formatDateTime(c.createdAt)} ·{" "}
                     {c.revokedAt
                       ? "해지 " + formatDateTime(c.revokedAt)
                       : c.lastUsedAt

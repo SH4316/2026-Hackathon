@@ -206,6 +206,8 @@ export interface ApiErrorResponse {
 export interface Connector {
   id: string;
   name: string;
+  /** 사용자가 확장에 넣을 검사 서버 주소(선택) */
+  serverUrl: string | null;
   createdAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
@@ -214,6 +216,14 @@ export interface Connector {
 export interface CreatedConnector {
   connector: Connector;
   connectionUrl: string;
+}
+
+/** 사람별 확장 연결 코드. connectionInfo = "<검사 서버 주소>#<code>"(주소가 등록된 연결이 있을 때) */
+export interface Enrollment {
+  code: string;
+  personId: string;
+  expiresAt: string;
+  connectionInfo: string | null;
 }
 
 export type ReportText = "masked" | "full" | "off";

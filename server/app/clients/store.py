@@ -133,17 +133,27 @@ class ClientStore:
                 (_hash(normalize_code(code)),)).fetchone()
             if not row or datetime.fromisoformat(row[1]) <= now:
                 raise EnrollmentInvalid
-            token = TOKEN_PREFIX + secrets.token_urlsafe(32)
-            client = Client(client_id=str(uuid.uuid4()), label=row[0], client_type=client_type,
-                            device_name=device_name, created_at=_iso(now), last_seen_at=None, revoked_at=None,
-                            person_id=row[2])
             self._conn.execute("UPDATE enrollments SET used_at = ? WHERE code_hash = ?",
                                (_iso(now), _hash(normalize_code(code))))
-            self._conn.execute("INSERT INTO clients (client_id, token_hash, label, client_type, device_name,"
-                               " created_at, person_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                               (client.client_id, _hash(token), client.label, client.client_type,
-                                client.device_name, client.created_at, client.person_id))
-            self._conn.commit()
+            return self._insert_client(row[0], client_type, device_name, row[2], now)
+
+    def create_client(self, label: str, client_type: str, device_name: str | None,
+                      person_id: str | None) -> tuple[Client, str]:
+        """대시보드가 발급·확인한 연결 코드로 등록할 때(코드는 대시보드가 이미 사용 처리함)."""
+        with self._lock:
+            return self._insert_client(label[:60], client_type, device_name, person_id, _now())
+
+    def _insert_client(self, label: str, client_type: str, device_name: str | None, person_id: str | None,
+                       now: datetime) -> tuple[Client, str]:
+        token = TOKEN_PREFIX + secrets.token_urlsafe(32)
+        client = Client(client_id=str(uuid.uuid4()), label=label, client_type=client_type,
+                        device_name=device_name, created_at=_iso(now), last_seen_at=None, revoked_at=None,
+                        person_id=person_id)
+        self._conn.execute("INSERT INTO clients (client_id, token_hash, label, client_type, device_name,"
+                           " created_at, person_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (client.client_id, _hash(token), client.label, client.client_type,
+                            client.device_name, client.created_at, client.person_id))
+        self._conn.commit()
         return client, token
 
     def authenticate(self, token: str) -> Client | None:

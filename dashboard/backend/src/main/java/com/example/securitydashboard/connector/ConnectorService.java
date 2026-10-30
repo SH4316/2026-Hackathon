@@ -4,8 +4,11 @@ import com.example.securitydashboard.common.ApiException;
 import com.example.securitydashboard.common.InputValidation;
 import com.example.securitydashboard.connector.model.Connector;
 import com.example.securitydashboard.connector.model.CreateConnector;
+import com.example.securitydashboard.connector.model.CreateEnrollment;
 import com.example.securitydashboard.connector.model.CreatedConnector;
 import com.example.securitydashboard.connector.model.DetectorSettings;
+import com.example.securitydashboard.connector.model.Enrollment;
+import com.example.securitydashboard.connector.model.RedeemedEnrollment;
 import com.example.securitydashboard.connector.model.UpdateDetectorSettings;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -14,6 +17,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -38,6 +42,8 @@ public class ConnectorService {
   private static final Set<String> REPORT_TEXT = Set.of("masked", "full", "off");
   private static final Set<String> TAG_ACTIONS = Set.of("warn", "mask", "block");
   private static final int MAX_TAG_MAP = 500;
+  // 헷갈리는 문자(0/O, 1/I/L)를 뺀 대문자·숫자. 검사 서버의 등록 코드(server/app/clients/store.py)와 같은 형식.
+  private static final String CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   private final ConnectorRepository repository;
   private final Clock clock;
   private final TransactionTemplate transaction;
@@ -52,13 +58,15 @@ public class ConnectorService {
   CreatedConnector create(CreateConnector input, String requestBaseUrl) {
     String name = InputValidation.name(input == null ? null : input.name(), "name");
     String base = baseUrl(input.dashboardUrl() == null || input.dashboardUrl().isBlank()
-        ? requestBaseUrl : input.dashboardUrl());
+        ? requestBaseUrl : input.dashboardUrl(), "dashboardUrl");
+    String serverUrl = input.serverUrl() == null || input.serverUrl().isBlank()
+        ? null : baseUrl(input.serverUrl(), "serverUrl");
     String id = "c_" + token(9);
     String secret = "sk_" + token(32);
     var now = clock.instant();
-    repository.insert(id, name, hash(secret), now);
+    repository.insert(id, name, serverUrl, hash(secret), now);
     return new CreatedConnector(
-        new Connector(id, name, now, null, null), base + CONNECTOR_PATH + id + "#" + secret);
+        new Connector(id, name, serverUrl, now, null, null), base + CONNECTOR_PATH + id + "#" + secret);
   }
 
   List<Connector> list() {
@@ -83,6 +91,35 @@ public class ConnectorService {
     var id = repository.activeIdByHash(hash(secret));
     id.ifPresent(value -> repository.touch(value, clock.instant()));
     return id;
+  }
+
+  /** 사람별 확장프로그램 연결 코드(일회용). */
+  Enrollment createEnrollment(String personId, CreateEnrollment input) {
+    InputValidation.validateId(personId, "personId");
+    int ttl = input == null || input.ttlMinutes() == null ? 24 * 60 : input.ttlMinutes();
+    if (ttl < 5 || ttl > 7 * 24 * 60) throw ApiException.invalid("ttlMinutes", "5~10080분이어야 합니다.");
+    if (!repository.personExists(personId))
+      throw new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "등록되지 않은 사용자입니다.");
+    StringBuilder raw = new StringBuilder();
+    for (int i = 0; i < 8; i++) raw.append(CODE_ALPHABET.charAt(random.nextInt(CODE_ALPHABET.length())));
+    String code = raw.substring(0, 4) + "-" + raw.substring(4);
+    var now = clock.instant();
+    var expires = now.plus(Duration.ofMinutes(ttl));
+    repository.insertEnrollment(hash(raw.toString()), personId, now, expires);
+    String info = repository.latestServerUrl().map(url -> url + "#" + code).orElse(null);
+    return new Enrollment(code, personId, expires, info);
+  }
+
+  /** 검사 서버(연결 인증됨)가 사용자가 입력한 코드를 사용 처리한다. 없음·만료·사용됨은 구분하지 않는다. */
+  RedeemedEnrollment redeem(String code, String connectorId) {
+    String normalized = code == null ? "" : code.toUpperCase().replaceAll("[^A-Z0-9]", "");
+    return repository
+        .redeem(hash(normalized), connectorId, clock.instant())
+        .map(row -> new RedeemedEnrollment(row[0], row[1]))
+        .orElseThrow(
+            () ->
+                new ApiException(
+                    HttpStatus.NOT_FOUND, "ENROLLMENT_INVALID", "연결 코드가 올바르지 않거나 만료되었습니다."));
   }
 
   public DetectorSettings settings() {
@@ -128,18 +165,19 @@ public class ConnectorService {
     return out;
   }
 
-  private static String baseUrl(String value) {
+  private static String baseUrl(String value, String field) {
     try {
       var uri = new URI(value.trim());
       if (!Set.of("http", "https").contains(String.valueOf(uri.getScheme()).toLowerCase())
           || uri.getHost() == null
           || uri.getQuery() != null
           || uri.getFragment() != null
-          || uri.getUserInfo() != null)
-        throw ApiException.invalid("dashboardUrl", "http(s) 주소만 입력할 수 있습니다.");
+          || uri.getUserInfo() != null
+          || value.length() > 500)
+        throw ApiException.invalid(field, "http(s) 주소만 입력할 수 있습니다.");
       return uri.toString().replaceAll("/+$", "");
     } catch (URISyntaxException exception) {
-      throw ApiException.invalid("dashboardUrl", "http(s) 주소만 입력할 수 있습니다.");
+      throw ApiException.invalid(field, "http(s) 주소만 입력할 수 있습니다.");
     }
   }
 

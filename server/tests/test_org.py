@@ -34,6 +34,7 @@ class FakeDashboard:
     def __init__(self, secret=None):
         self.secret = secret          # 있으면 검사 서버 엔드포인트에 Bearer 요구(연결 URL)
         self.settings = None          # 있으면 /api/v1/detector-settings 응답
+        self.codes: dict[str, str] = {}  # 대시보드가 발급한 사람별 연결 코드(정규화) → 사람 ID
         self.auth_headers: list[str | None] = []
         self.config = config()
         self.people = {"person-1": {"id": "person-1", "name": "홍길동"}}
@@ -51,6 +52,13 @@ class FakeDashboard:
             "/api/v1/connectors/")
         if self.secret and guarded and auth != f"Bearer {self.secret}":
             return httpx.Response(401, json={"code": "CONNECTOR_AUTH_REQUIRED"})
+        if path == "/api/v1/enrollments/redeem":
+            if not self.secret or auth != f"Bearer {self.secret}":
+                return httpx.Response(401, json={"code": "CONNECTOR_AUTH_REQUIRED"})
+            code = "".join(ch for ch in json.loads(request.content)["code"].upper() if ch.isalnum())
+            pid = self.codes.pop(code, None)
+            return (httpx.Response(200, json={"personId": pid, "name": self.people[pid]["name"]}) if pid
+                    else httpx.Response(404, json={"code": "ENROLLMENT_INVALID"}))
         if path.startswith("/api/v1/connectors/"):
             return httpx.Response(200, json={"id": path.rsplit("/", 1)[1], "connected": True})
         if path == "/api/v1/detector-settings":
@@ -304,3 +312,26 @@ def test_dashboard_settings_take_precedence():
     s = c.get("/v1/admin/org/settings", headers=ADMIN).json()
     assert (s["source"], s["version"], s["report_text"]) == ("dashboard", 3, "full")
     assert c.put("/v1/admin/org/settings", json={"report_text": "off"}, headers=ADMIN).status_code == 409
+
+
+def test_dashboard_issued_code_enrolls_once_as_that_person():
+    dash = FakeDashboard(secret="sk_secretvalue")
+    dash.codes["WXYZ2345"] = "person-1"
+    c, _ = org_client(dash, model=FakeModel(), url=CONNECTION)
+    r = c.post("/v1/auth/enroll", json={"code": "wxyz-2345", "client_type": "browser_extension"})
+    assert r.status_code == 201
+    e = r.json()
+    assert (e["person_id"], e["label"], e["managed"]) == ("person-1", "홍길동", True)
+    tok = {"X-API-Key": e["token"]}
+    c.post("/v1/inspect", json=body("사번 EMP-123456"), headers=tok)
+    assert dash.events[-1]["person_id"] == "person-1"
+    assert c.post("/v1/auth/enroll", json={"code": "WXYZ-2345", "client_type": "cli"}).status_code == 400
+    dash.down = True
+    assert c.post("/v1/auth/enroll", json={"code": "ABCD-EFGH", "client_type": "cli"}).status_code == 503
+
+
+def test_dashboard_code_needs_connection_url():
+    dash = FakeDashboard()
+    dash.codes["WXYZ2345"] = "person-1"
+    c, _ = org_client(dash, model=FakeModel())  # 주소만(연결 URL 아님)
+    assert c.post("/v1/auth/enroll", json={"code": "WXYZ-2345", "client_type": "cli"}).status_code == 400

@@ -3538,6 +3538,10 @@ textarea::placeholder {
 .connector-form .button {
   margin-top: 24px;
 }
+.connector-form .connector-form-wide {
+  grid-column: 1 / 3;
+  grid-row: 2;
+}
 .connector-form small,
 .detector-grid small,
 .connector-created small {
@@ -3682,6 +3686,10 @@ label.detector-check {
   }
   .connector-form .button {
     margin-top: 0;
+  }
+  .connector-form .connector-form-wide {
+    grid-column: auto;
+    grid-row: auto;
   }
   .connector-url {
     flex-direction: column;

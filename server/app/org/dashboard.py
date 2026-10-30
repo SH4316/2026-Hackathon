@@ -4,6 +4,7 @@
 - 사람 확인: GET  /api/v1/people/{id}
 - 판정 기록: POST /api/v1/detector-events   (CONTRACT.md "Detector HTTP ingestion")
 - 조직 설정: GET  /api/v1/detector-settings  (대시보드 '감시 연동' 화면에서 편집)
+- 연결 코드: POST /api/v1/enrollments/redeem (대시보드 사람 화면에서 발급한 확장 연결 코드 사용 처리)
 
 연결: 대시보드 '감시 연동'에서 발급한 연결 URL(<대시보드 주소>/api/v1/connectors/<id>#<secret>)을 PG_DASHBOARD_CONNECTION 에
 넣는다. 주소와 비밀값을 나눠 Authorization: Bearer <secret> 으로 요청한다(비밀값이 경로·로그에 남지 않게).
@@ -143,6 +144,21 @@ class DashboardClient:
             except ValueError:
                 code = None
         return PostResult(r.status_code, code)
+
+    async def redeem(self, code: str) -> dict | None:
+        """대시보드가 발급한 사람별 연결 코드를 사용 처리한다. 유효하면 {personId, name}, 아니면 None."""
+        if not self.connection.connector_id:
+            return None  # 연결 URL 없이(주소만) 연결된 대시보드는 코드 확인을 할 수 없다
+        try:
+            async with self._client() as c:
+                r = await c.post(self.base_url + "/enrollments/redeem", json={"code": code})
+        except httpx.HTTPError as exc:
+            raise DashboardUnavailable(type(exc).__name__) from None
+        if r.status_code == 404:
+            return None
+        if r.status_code != 200:
+            raise DashboardUnavailable(self._error(r))
+        return r.json()
 
     async def check(self) -> str | None:
         """연결 URL 확인. 문제가 없으면 None, 있으면 오류 코드."""

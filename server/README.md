@@ -169,6 +169,12 @@ python -m prompt_guard inspect                                  # 대화형 입�
 
 ### 사용자 등록
 
+**대시보드에서(권장):** 사람 상세 화면 → **확장프로그램 연결 → 연결 코드 발급**. 대시보드가 일회용 코드를 발급하고,
+사용자가 확장에 넣으면 이 서버가 대시보드에 코드 사용을 요청(`POST /api/v1/enrollments/redeem`, 연결 인증)해
+그 사람으로 개인 토큰을 발급합니다. 연결 URL(`PG_DASHBOARD_CONNECTION`)로 연결된 경우에만 동작합니다.
+
+**이 서버의 관리 API로:**
+
 ```bash
 # 대시보드에 등록된 사람(person_id)으로 등록 코드 발급. label 을 비우면 대시보드의 이름을 씀
 curl -X POST $SERVER/v1/admin/enrollments -H "X-Admin-Key: $ADMIN" -H "Content-Type: application/json" \

@@ -4,6 +4,7 @@ import type {
   Connector,
   CreatedConnector,
   DetectorSettings,
+  Enrollment,
   CreateVersionInput,
   Filters,
   Metrics,
@@ -173,8 +174,15 @@ export const api = {
   createConnector(input: {
     name: string;
     dashboardUrl?: string;
+    serverUrl?: string;
   }): Promise<CreatedConnector> {
     return request("/connectors", json("POST", input));
+  },
+  createEnrollment(personId: string, ttlMinutes?: number): Promise<Enrollment> {
+    return request(
+      `/people/${resourceId(personId)}/enrollments`,
+      json("POST", ttlMinutes ? { ttlMinutes } : {}),
+    );
   },
   revokeConnector(id: string): Promise<void> {
     return request(`/connectors/${resourceId(id)}`, { method: "DELETE" });

@@ -39,6 +39,7 @@ import { Trend, MetricTree, ServiceChart, PolicyChart } from "./charts";
 import { MetricSettings } from "./MetricSettings";
 import { JevSettings } from "./JevSettings";
 import { MonitoringSettings } from "./MonitoringSettings";
+import { PersonEnrollment } from "./PersonEnrollment";
 import { SavedSearches, SavedSearchDetail } from "./SavedSearches";
 import type { Person, Filters } from "./types";
 const navigation: {
@@ -697,6 +698,7 @@ function PersonDetail() {
         description={"사람 ID: " + id}
         action={<RefreshButton {...r} />}
       />
+      <PersonEnrollment personId={id} />
       <div className="search-toolbar">
         <VersionSelect state={state} />
       </div>

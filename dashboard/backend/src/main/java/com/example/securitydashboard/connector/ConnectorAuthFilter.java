@@ -19,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <ul>
  *   <li>GET /api/v1/classifier-config, /api/v1/detector-events/**: 연결을 한 번이라도 발급했으면 유효한 연결 필요
  *   <li>GET /api/v1/connectors/{id}: 항상 그 연결의 비밀값 필요(연결 확인)
+ *   <li>POST /api/v1/enrollments/redeem: 항상 유효한 연결 필요(사람별 연결 코드 사용)
  * </ul>
  *
  * 대시보드 화면이 쓰는 나머지 API는 기존처럼 로컬 무인증입니다.
@@ -53,9 +54,13 @@ class ConnectorAuthFilter extends OncePerRequestFilter {
         || path.startsWith("/api/v1/detector-events/");
   }
 
+  private static boolean alwaysProtected(HttpServletRequest request) {
+    return request.getMethod().equals("POST") && path(request).equals("/api/v1/enrollments/redeem");
+  }
+
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    return checkedConnector(request) == null && !detectorEndpoint(request);
+    return checkedConnector(request) == null && !detectorEndpoint(request) && !alwaysProtected(request);
   }
 
   @Override
@@ -63,7 +68,7 @@ class ConnectorAuthFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
     String expected = checkedConnector(request);
-    if (expected == null && !connectors.authRequired()) {
+    if (expected == null && !alwaysProtected(request) && !connectors.authRequired()) {
       chain.doFilter(request, response);
       return;
     }

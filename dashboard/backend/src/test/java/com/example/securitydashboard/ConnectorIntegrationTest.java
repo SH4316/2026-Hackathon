@@ -41,6 +41,8 @@ class ConnectorIntegrationTest {
   @BeforeEach
   @AfterEach
   void reset() {
+    jdbc.update("DELETE FROM person_enrollments");
+    jdbc.update("DELETE FROM people WHERE id LIKE 'enroll-test-%'");
     jdbc.update("DELETE FROM detector_connectors");
     jdbc.update(
         "UPDATE detector_settings SET report_text='masked',tag_action='mask',jev_enabled=TRUE,"
@@ -148,5 +150,47 @@ class ConnectorIntegrationTest {
     body.put("reportText", "off");
     body.put("tagMap", java.util.Map.of("email", "bad id!"));
     call(put("/api/v1/detector-settings"), body, 400);
+  }
+
+  @Test
+  void personEnrollmentCodesAreIssuedHereAndRedeemedOnceByAConnectedServer() throws Exception {
+    jdbc.update("INSERT INTO people(id,name) VALUES('enroll-test-1','홍길동')");
+    call(post("/api/v1/people/nobody-here/enrollments"), null, 404);
+    call(post("/api/v1/people/enroll-test-1/enrollments"), java.util.Map.of("ttlMinutes", 1), 400);
+
+    // 검사 서버 주소가 등록된 연결이 없으면 코드만
+    JsonNode bare = call(post("/api/v1/people/enroll-test-1/enrollments"), null, 201);
+    assertThat(bare.path("code").asText()).matches("[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4}");
+    assertThat(bare.path("connectionInfo").isNull()).isTrue();
+
+    JsonNode created = call(post("/api/v1/connectors"),
+        java.util.Map.of("name", "본사", "serverUrl", "https://guard.example.org/"), 201);
+    assertThat(created.at("/connector/serverUrl").asText()).isEqualTo("https://guard.example.org");
+    String bearer = "Bearer " + secret(created.path("connectionUrl").asText());
+    JsonNode issued = call(post("/api/v1/people/enroll-test-1/enrollments"), null, 201);
+    String code = issued.path("code").asText();
+    assertThat(issued.path("connectionInfo").asText()).isEqualTo("https://guard.example.org#" + code);
+    assertThat(issued.path("personId").asText()).isEqualTo("enroll-test-1");
+    assertThat(jdbc.queryForList("SELECT code_hash FROM person_enrollments", String.class))
+        .noneMatch(h -> h.contains(code.replace("-", "")));
+
+    // 연결 인증이 없으면 거부, 있으면 한 번만 사용(대소문자·구분자 무관)
+    call(post("/api/v1/enrollments/redeem"), java.util.Map.of("code", code), 401);
+    JsonNode redeemed = call(post("/api/v1/enrollments/redeem").header("Authorization", bearer),
+        java.util.Map.of("code", code.toLowerCase().replace("-", " ")), 200);
+    assertThat(redeemed.path("personId").asText()).isEqualTo("enroll-test-1");
+    assertThat(redeemed.path("name").asText()).isEqualTo("홍길동");
+    assertThat(call(post("/api/v1/enrollments/redeem").header("Authorization", bearer),
+            java.util.Map.of("code", code), 404).path("code").asText())
+        .isEqualTo("ENROLLMENT_INVALID");
+    assertThat(jdbc.queryForObject("SELECT used_by FROM person_enrollments WHERE used_at IS NOT NULL", String.class))
+        .isEqualTo(created.at("/connector/id").asText());
+
+    // 만료된 코드
+    String expired = bare.path("code").asText();
+    jdbc.update("UPDATE person_enrollments SET expires_at='2000-01-01' WHERE used_at IS NULL");
+    call(post("/api/v1/enrollments/redeem").header("Authorization", bearer),
+        java.util.Map.of("code", expired), 404);
+    call(post("/api/v1/connectors"), java.util.Map.of("name", "x", "serverUrl", "ftp://x"), 400);
   }
 }

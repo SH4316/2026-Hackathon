@@ -23,6 +23,7 @@ class ConnectorRepository {
           new Connector(
               rs.getString("id"),
               rs.getString("name"),
+              rs.getString("server_url"),
               JdbcRows.instant(rs, "created_at"),
               JdbcRows.instant(rs, "last_used_at"),
               JdbcRows.instant(rs, "revoked_at"));
@@ -34,18 +35,66 @@ class ConnectorRepository {
     this.json = json;
   }
 
-  void insert(String id, String name, String secretHash, Instant createdAt) {
+  void insert(String id, String name, String serverUrl, String secretHash, Instant createdAt) {
     jdbc.update(
-        "INSERT INTO detector_connectors(id,name,secret_hash,created_at) VALUES(?,?,?,?)",
+        "INSERT INTO detector_connectors(id,name,server_url,secret_hash,created_at) VALUES(?,?,?,?,?)",
         id,
         name,
+        serverUrl,
         secretHash,
         Timestamp.from(createdAt));
   }
 
+  /** 검사 서버 주소가 등록된 가장 최근의 유효한 연결. */
+  Optional<String> latestServerUrl() {
+    return jdbc
+        .queryForList(
+            "SELECT server_url FROM detector_connectors WHERE revoked_at IS NULL AND server_url IS NOT NULL"
+                + " ORDER BY created_at DESC, id LIMIT 1",
+            String.class)
+        .stream()
+        .findFirst();
+  }
+
+  boolean personExists(String personId) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM people WHERE id=?)", Boolean.class, personId));
+  }
+
+  void insertEnrollment(String codeHash, String personId, Instant createdAt, Instant expiresAt) {
+    jdbc.update(
+        "INSERT INTO person_enrollments(code_hash,person_id,created_at,expires_at) VALUES(?,?,?,?)",
+        codeHash,
+        personId,
+        Timestamp.from(createdAt),
+        Timestamp.from(expiresAt));
+  }
+
+  /** 사용 가능한 코드면 한 번만 사용 처리하고 사람 ID와 이름을 돌려준다. */
+  Optional<String[]> redeem(String codeHash, String connectorId, Instant at) {
+    int updated =
+        jdbc.update(
+            "UPDATE person_enrollments SET used_at=?,used_by=? WHERE code_hash=? AND used_at IS NULL"
+                + " AND expires_at>?",
+            Timestamp.from(at),
+            connectorId,
+            codeHash,
+            Timestamp.from(at));
+    if (updated == 0) return Optional.empty();
+    return jdbc
+        .query(
+            "SELECT p.id,p.name FROM person_enrollments e JOIN people p ON p.id=e.person_id"
+                + " WHERE e.code_hash=?",
+            (rs, i) -> new String[] {rs.getString("id"), rs.getString("name")},
+            codeHash)
+        .stream()
+        .findFirst();
+  }
+
   List<Connector> list() {
     return jdbc.query(
-        "SELECT id,name,created_at,last_used_at,revoked_at FROM detector_connectors"
+        "SELECT id,name,server_url,created_at,last_used_at,revoked_at FROM detector_connectors"
             + " ORDER BY created_at DESC, id",
         CONNECTOR);
   }
