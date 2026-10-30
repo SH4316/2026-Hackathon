@@ -78,3 +78,26 @@ test("sanitize never returns a restoration mapping", () => {
   assert.equal(s.sanitized_text, "[EMAIL_1]");
   assert.ok(!JSON.stringify(s).includes("kim@example.com"));
 });
+
+test("fetchRuleBundle uses ETag and returns not_modified on 304", async () => {
+  const { fetchRuleBundle } = await import("../src/index.js");
+  const calls = [];
+  const fake = async (url, { headers }) => {
+    calls.push(headers);
+    if (headers["If-None-Match"] === '"rs-3-p"') return { status: 304, ok: false, headers: new Map() };
+    return { status: 200, ok: true, headers: new Map([["ETag", '"rs-3-p"']]), json: async () => ({ ruleset_version: 3 }) };
+  };
+  const first = await fetchRuleBundle("http://x/", { apiKey: "k", fetchImpl: fake });
+  assert.equal(first.status, "updated");
+  assert.equal(first.bundle.ruleset_version, 3);
+  const second = await fetchRuleBundle("http://x", { apiKey: "k", etag: first.etag, fetchImpl: fake });
+  assert.equal(second.status, "not_modified");
+  assert.equal(calls[1]["X-API-Key"], "k");
+});
+
+test("custom rule cannot redefine a built-in type", () => {
+  assert.throws(() => createGuard({ ruleset: {
+    ruleset_version: 1, modules: { custom_rules: true }, context_detectors: [],
+    custom_rules: [{ id: "email", kind: "keywords", keywords: ["x"], label: "x", token: "X" }],
+  } }));
+});

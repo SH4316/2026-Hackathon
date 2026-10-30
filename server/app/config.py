@@ -30,12 +30,17 @@ class Settings:
     max_body_bytes: int = 256 * 1024
 
     model_mode: ModelMode = ModelMode.DISABLED
+    model_api: str = "ollama"  # ollama | openai(llama.cpp server·vLLM 등 OpenAI 호환 로컬 서버)
+    model_api_key: str = ""    # OpenAI 호환 로컬 서버가 키를 요구할 때만
     model_base_url: str = "http://model:11434"
     model_name: str = ""
     model_timeout_s: float = 20.0
     model_max_concurrency: int = 2
 
     audit_db_path: Path = Path("data/audit.sqlite3")
+    ruleset_db_path: Path = Path("data/ruleset.sqlite3")
+    # 대시보드용 관리 키(규칙·탐지기 편집). 일반 API 키와 분리한다.
+    admin_keys: list[str] = field(default_factory=list)
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -46,9 +51,13 @@ class Settings:
             max_text_chars=int(os.getenv("PG_MAX_TEXT_CHARS", "50000")),
             max_body_bytes=int(os.getenv("PG_MAX_BODY_BYTES", str(256 * 1024))),
             model_mode=ModelMode(os.getenv("PG_MODEL_MODE", "disabled")),
+            model_api=os.getenv("PG_MODEL_API", "ollama"),
+            model_api_key=os.getenv("PG_MODEL_API_KEY", ""),
             model_base_url=os.getenv("PG_MODEL_BASE_URL", "http://model:11434"),
             model_name=os.getenv("PG_MODEL_NAME", ""),
             model_timeout_s=float(os.getenv("PG_MODEL_TIMEOUT_S", "20")),
             model_max_concurrency=int(os.getenv("PG_MODEL_MAX_CONCURRENCY", "2")),
             audit_db_path=Path(os.getenv("PG_AUDIT_DB_PATH", "data/audit.sqlite3")),
+            ruleset_db_path=Path(os.getenv("PG_RULESET_DB_PATH", "data/ruleset.sqlite3")),
+            admin_keys=_env_list("PG_ADMIN_KEYS"),
         )

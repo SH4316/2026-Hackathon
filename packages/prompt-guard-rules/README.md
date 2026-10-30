@@ -32,6 +32,22 @@ guard.sanitize("담당자 kim@example.com").sanitized_text; // "담당자 [EMAIL
 
 위치(`span`)는 code point(`start`/`end`, Python 기준)와 UTF-16(`start_utf16`/`end_utf16`, JS `slice` 기준)을 함께 줍니다.
 
+### 대시보드에서 바꾼 규칙 받기
+
+서버 `/v1/rules/bundle` 은 대시보드에서 추가한 사용자 규칙(키워드·정규식)과 유형 정책을 버전(ETag)과 함께 배포합니다.
+
+```js
+import { createGuard, fetchRuleBundle } from "@prompt-guard/rules";
+
+let state = { etag: null, guard: createGuard() };           // 기본: 초기 ruleset
+const r = await fetchRuleBundle("http://127.0.0.1:8000", { apiKey, etag: state.etag });
+if (r.status === "updated") state = { etag: r.etag, guard: createGuard({ ruleset: r.bundle }) };
+state.guard.skippedRules; // JS 에서 컴파일하지 못한 규칙(정상이면 빈 배열)
+```
+
+문맥 탐지기(로컬 모델)는 서버에서만 동작합니다. `distribute: false` 규칙은 묶음에 없으므로 서버에서만 탐지됩니다.
+자세한 내용: `server/docs/detection-modules.md`
+
 ## 서버와 같은 판정 유지
 
 규칙은 두 언어에 있으므로 어긋나지 않게 아래 장치를 둡니다.

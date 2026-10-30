@@ -22,7 +22,10 @@ sys.path.insert(0, str(SERVER))
 
 from app.audit.events import AuditStore  # noqa: E402
 from app.config import Settings  # noqa: E402
+from app.api.routes import client_bundle  # noqa: E402
 from app.policy.engine import Policy  # noqa: E402
+from app.registry.schema import RuleSetBody  # noqa: E402
+from app.registry.store import StaticRuleSet  # noqa: E402
 from app.schemas import InspectRequest  # noqa: E402
 from app.services.pipeline import Pipeline  # noqa: E402
 
@@ -30,6 +33,38 @@ PACKAGE = SERVER.parent / "packages" / "prompt-guard-rules"
 POLICY_OUT = PACKAGE / "data" / "policy.js"
 VECTORS_OUT = PACKAGE / "test" / "golden-vectors.json"
 VECTOR_TODAY = date(2026, 11, 1)  # 근거 만료 판단을 고정
+
+# 대시보드에서 사용자 규칙을 추가한 상황(JS 라이브러리가 배포 묶음으로 같은 판정을 내는지 확인)
+FIXTURE_RULESET = RuleSetBody.model_validate({
+    "custom_rules": [
+        {"id": "project_codename", "kind": "keywords", "label": "프로젝트 코드명", "category": "confidential",
+         "severity": "high", "action": "mask", "token": "PROJECT", "keywords": ["블루문", "Blue Moon", "BM-7"]},
+        {"id": "employee_id", "kind": "regex", "label": "사번", "severity": "medium", "action": "mask",
+         "token": "EMP_ID", "pattern": r"(?<![A-Z0-9])EMP-\d{6}(?!\d)", "case_sensitive": True,
+         "reason": "사번 형식"},
+        {"id": "deal_code", "kind": "regex", "label": "거래 코드", "severity": "high", "action": "block",
+         "token": "DEAL", "pattern": r"\bDEAL-[a-z]{3}\b"},
+        {"id": "disabled_rule", "kind": "keywords", "label": "꺼진 규칙", "token": "OFF",
+         "keywords": ["꺼진키워드"], "enabled": False},
+    ],
+    "context_detectors": [
+        {"id": "unpublished_research", "label": "미공개 연구 결과", "action": "block", "token": "RESEARCH",
+         "criteria": "미공개 실험 결과", "examples": ["수율이 93%로 나왔다"]},
+    ],
+})
+FIXTURE_VERSION = 7
+FIXTURE_CASES: list[tuple[str, str, str | None]] = [
+    ("custom_keyword", "블루문 프로젝트 일정 정리해 줘", None),
+    ("custom_keyword_case", "blue moon 과 BLUE MOON, bm-7 모두", None),
+    ("custom_keyword_repeat", "블루문은 블루문이고 Blue Moon 이다", None),
+    ("custom_regex", "사번 EMP-123456 의 휴가 기록", None),
+    ("custom_regex_case_sensitive", "사번 emp-123456 은 소문자", None),
+    ("custom_regex_boundary_korean", "코드 DEAL-abc입니다 와 DEAL-xyz 끝", None),
+    ("custom_block_not_sanitizable", "거래 DEAL-xyz 와 kim@example.com", None),
+    ("custom_overlap_builtin", "블루문 담당 bluemoon@example.com", None),
+    ("custom_disabled", "꺼진키워드는 탐지하지 않음", None),
+    ("custom_with_destination", "BM-7 서버 10.1.2.3", "deepseek/consumer"),
+]
 
 # 모두 합성 값이다. 실제 비밀·개인정보를 넣지 않는다.
 CASES: list[tuple[str, str, str | None]] = [
@@ -97,12 +132,15 @@ def _strip(resp: dict) -> dict:
     return resp
 
 
-async def _vectors() -> list[dict]:
+def _pipeline(ruleset_source=None) -> Pipeline:
     settings = Settings(auth_disabled=True, policy_path=SERVER / "policies/default.yaml")
-    pipeline = Pipeline(settings, Policy.load(settings.policy_path), AuditStore(Path(":memory:")),
-                        today=lambda: VECTOR_TODAY)
+    return Pipeline(settings, Policy.load(settings.policy_path), AuditStore(Path(":memory:")),
+                    today=lambda: VECTOR_TODAY, ruleset_source=ruleset_source)
+
+
+async def _vectors(pipeline: Pipeline, cases) -> list[dict]:
     out = []
-    for name, text, dest in CASES:
+    for name, text, dest in cases:
         ctx: dict = {"client_type": "cli"}
         if dest:
             provider, channel = dest.split("/")
@@ -122,10 +160,13 @@ def _policy_bundle() -> dict:
     policies = SERVER / "policies"
     raw = yaml.safe_load((policies / "default.yaml").read_text(encoding="utf-8"))
     dest = yaml.safe_load((policies / raw.pop("destinations_file")).read_text(encoding="utf-8"))
+    raw.pop("detectors_seed_file", None)
     for spec in dest["profiles"].values():
         spec["verified_at"] = spec["verified_at"].isoformat()
-    return {"_generated_from": "server/policies/default.yaml, destinations.yaml",
-            **raw, "destinations": dest}
+    # 기본 ruleset(대시보드 수정 전 초기값)을 서버 배포 묶음과 같은 형식으로 넣는다.
+    ruleset = client_bundle(_pipeline())
+    return {"_generated_from": "server/policies/default.yaml, destinations.yaml, detectors.yaml",
+            **raw, "destinations": dest, "ruleset": ruleset}
 
 
 def _dump(obj) -> str:
@@ -133,8 +174,12 @@ def _dump(obj) -> str:
 
 
 def build() -> dict[Path, str]:
+    fixture = _pipeline(StaticRuleSet(FIXTURE_RULESET, version=FIXTURE_VERSION))
     vectors = {"_generated_by": "server/scripts/export_rules_bundle.py",
-               "today": VECTOR_TODAY.isoformat(), "cases": asyncio.run(_vectors())}
+               "today": VECTOR_TODAY.isoformat(),
+               "cases": asyncio.run(_vectors(_pipeline(), CASES)),
+               "fixture_ruleset": client_bundle(fixture),
+               "fixture_cases": asyncio.run(_vectors(fixture, FIXTURE_CASES))}
     policy_js = ("// 자동 생성 파일: server/scripts/export_rules_bundle.py 로 갱신한다. 직접 수정하지 않는다.\n"
                  "export default " + _dump(_policy_bundle()).rstrip("\n") + ";\n")
     return {POLICY_OUT: policy_js, VECTORS_OUT: _dump(vectors)}

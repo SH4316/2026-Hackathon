@@ -1,7 +1,7 @@
 // 자동 생성 파일: server/scripts/export_rules_bundle.py 로 갱신한다. 직접 수정하지 않는다.
 export default {
-  "_generated_from": "server/policies/default.yaml, destinations.yaml",
-  "version": "2026-10-31.draft2",
+  "_generated_from": "server/policies/default.yaml, destinations.yaml, detectors.yaml",
+  "version": "2026-10-31.draft3",
   "model_required": false,
   "default": {
     "category": "uncategorized",
@@ -140,36 +140,6 @@ export default {
       "severity": "info",
       "action": "allow",
       "token": "CVE"
-    },
-    "unpublished_research": {
-      "category": "confidential",
-      "severity": "high",
-      "action": "block",
-      "token": "RESEARCH"
-    },
-    "trade_secret": {
-      "category": "confidential",
-      "severity": "high",
-      "action": "block",
-      "token": "SECRET_DOC"
-    },
-    "internal_project": {
-      "category": "confidential",
-      "severity": "medium",
-      "action": "mask",
-      "token": "PROJECT"
-    },
-    "sensitive_personal": {
-      "category": "sensitive_personal",
-      "severity": "high",
-      "action": "mask",
-      "token": "SENSITIVE"
-    },
-    "third_party_record": {
-      "category": "third_party",
-      "severity": "high",
-      "action": "block",
-      "token": "RECORD"
     }
   },
   "destinations": {
@@ -398,5 +368,84 @@ export default {
         }
       }
     }
+  },
+  "ruleset": {
+    "ruleset_version": 1,
+    "policy_version": "2026-10-31.draft3",
+    "updated_at": "1970-01-01T00:00:00+00:00",
+    "modules": {
+      "custom_rules": true,
+      "context_model": true
+    },
+    "custom_rules": [
+      {
+        "id": "confidential_marker",
+        "label": "기밀 표식",
+        "category": "confidential",
+        "severity": "high",
+        "action": "warn",
+        "token": "CONFIDENTIAL_MARK",
+        "enabled": true,
+        "kind": "keywords",
+        "keywords": [
+          "대외비",
+          "사내한",
+          "극비",
+          "Confidential",
+          "Internal Only",
+          "Do Not Distribute"
+        ],
+        "pattern": null,
+        "case_sensitive": false,
+        "reason": "문서에 기밀 표식 문구가 있음"
+      }
+    ],
+    "context_detectors": [
+      {
+        "id": "unpublished_research",
+        "label": "미공개 연구 결과",
+        "category": "confidential",
+        "severity": "high",
+        "action": "block",
+        "token": "RESEARCH",
+        "enabled": true
+      },
+      {
+        "id": "internal_project",
+        "label": "내부 프로젝트 정보",
+        "category": "confidential",
+        "severity": "medium",
+        "action": "mask",
+        "token": "PROJECT",
+        "enabled": true
+      },
+      {
+        "id": "trade_secret",
+        "label": "영업비밀",
+        "category": "confidential",
+        "severity": "high",
+        "action": "block",
+        "token": "SECRET_DOC",
+        "enabled": true
+      },
+      {
+        "id": "sensitive_personal",
+        "label": "민감한 개인정보",
+        "category": "sensitive_personal",
+        "severity": "high",
+        "action": "mask",
+        "token": "SENSITIVE",
+        "enabled": true
+      },
+      {
+        "id": "third_party_record",
+        "label": "제3자 원본 데이터",
+        "category": "third_party",
+        "severity": "high",
+        "action": "block",
+        "token": "RECORD",
+        "enabled": true
+      }
+    ]
   }
 };
