@@ -24,6 +24,7 @@ import {
   Pagination,
   PersonName,
   PolicyBadge,
+  SendActionBadge,
   ServiceLabel,
   TagChip,
   WorkspaceProvider,
@@ -39,6 +40,9 @@ import {
 import { Trend, MetricTree, ServiceChart, PolicyChart } from "./charts";
 import { MetricSettings } from "./MetricSettings";
 import { JevSettings } from "./JevSettings";
+import { GuardSettings } from "./GuardSettings";
+import { GuardBanner } from "./GuardBanner";
+import { EventAttachments } from "./EventAttachments";
 import { SavedSearches, SavedSearchDetail } from "./SavedSearches";
 import type { Person, Filters } from "./types";
 const navigation: {
@@ -52,6 +56,7 @@ const navigation: {
   { to: "/people", label: "사람 관리", icon: "people" },
   { to: "/settings/metrics", label: "메트릭 설정", icon: "tree" },
   { to: "/settings/jev", label: "Jev 설정", icon: "code" },
+  { to: "/settings/guard", label: "검사 서버 관리", icon: "shield" },
   { to: "/saved-searches", label: "저장된 검색", icon: "save" },
 ];
 export default function App() {
@@ -161,6 +166,7 @@ function Shell() {
             <Route path="/people/:id" element={<PersonDetail />} />
             <Route path="/settings/metrics" element={<MetricSettings />} />
             <Route path="/settings/jev" element={<JevSettings />} />
+            <Route path="/settings/guard" element={<GuardSettings />} />
             <Route path="/saved-searches" element={<SavedSearches />} />
             <Route path="/saved-searches/:id" element={<SavedSearchDetail />} />
             <Route
@@ -217,6 +223,7 @@ function Overview() {
         description="Prompt 탐지량과 태그별 변화를 한눈에 확인하세요."
         action={<RefreshButton {...r} />}
       />
+      <GuardBanner />
       <div className="overview-toolbar">
         <RangeControls state={state} />
         <Link className="text-link" to={link({})}>
@@ -886,7 +893,13 @@ function EventDetail() {
               )}
             </Panel>
           </div>
+          {(e.fileCount > 0 || e.imageCount > 0) && (
+            <EventAttachments eventId={e.id} />
+          )}
           <Panel title="연동 정보">
+            <div className="guard-send-info">
+              전송 방식 <SendActionBadge action={e.sendAction} />
+            </div>
             <dl className="ingestion-info">
               <div>
                 <dt>수집 시스템 / 이벤트</dt>

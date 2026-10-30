@@ -78,6 +78,7 @@ class DetectorEventService {
         event.service(),
         event.model(),
         event.policyStateId(),
+        event.sendAction(),
         envelope.tagMap(),
         envelope.files(),
         images);

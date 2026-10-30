@@ -766,6 +766,53 @@ class FlywayMigrationIntegrationTest {
         .isNull();
   }
 
+  @Test
+  void v9AddsNullableSendActionWithoutChangingExistingEventsOrPayloads() {
+    var source = migrationSource();
+    var previous =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .cleanDisabled(false)
+            .target("8")
+            .load();
+    previous.clean();
+    previous.migrate();
+    var jdbc = new JdbcTemplate(source);
+    jdbc.update("INSERT INTO people(id,name) VALUES('demo','데모 사용자')");
+    jdbc.update(
+        "INSERT INTO config_versions(id,name,status,revision,created_at,published_at)"
+            + " VALUES('demo','데모 정책','PUBLISHED',0,'2026-10-30','2026-10-30')");
+    jdbc.update(
+        "INSERT INTO"
+            + " security_events(id,source_id,event_id,person_id,version_id,prompt,occurred_at,received_at,service)"
+            + " VALUES(991,'demo','demo','demo','demo','데모 원문','2026-10-30','2026-10-30','demo')");
+    jdbc.update(
+        "INSERT INTO detector_events(event_id,envelope,content_hash) VALUES(991,?,?)",
+        "{\"files\":[{\"name\":\"데모.pdf\"}],\"result\":{}}",
+        "a".repeat(64));
+    var before = snapshotVersionedData(jdbc);
+    var next =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .target("9")
+            .load();
+    assertThat(next.migrate().migrationsExecuted).isEqualTo(1);
+    var after = snapshotVersionedData(jdbc);
+    for (var event : after.get("security_events")) {
+      assertThat(event).containsEntry("send_action", null);
+      event.remove("send_action");
+    }
+    assertThat(after).usingRecursiveComparison().isEqualTo(before);
+    jdbc.update("UPDATE security_events SET send_action='forced' WHERE id=991");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT send_action FROM security_events WHERE id=991", String.class))
+        .isEqualTo("forced");
+    assertThat(next.migrate().migrationsExecuted).isZero();
+  }
+
   private DriverManagerDataSource migrationSource() {
     String url = System.getenv("TEST_MIGRATION_DB_URL");
     if (!url.matches("jdbc:mysql://[^/]+/[A-Za-z0-9_]+_test(?:\\?.*)?"))

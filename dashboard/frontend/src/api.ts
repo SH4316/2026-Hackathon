@@ -1,5 +1,6 @@
 import type {
   ApiErrorResponse,
+  DetectorAttachments,
   ConfigVersion,
   CreateVersionInput,
   Filters,
@@ -195,6 +196,9 @@ export const api = {
     return request(`/events${buildQuery(filters, { page, size: 20 })}`, {
       signal,
     });
+  },
+  detectorEvent(id: number, signal?: AbortSignal): Promise<DetectorAttachments> {
+    return request(`/detector-events/${resourceId(id)}`, { signal });
   },
   event(id: number | string, signal?: AbortSignal): Promise<SecurityEvent> {
     return request(`/events/${resourceId(id)}`, { signal });
