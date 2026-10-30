@@ -53,10 +53,29 @@ class Action(str, Enum):
     ALLOW = "allow"
 
 
+_ID = r"^[a-z0-9_]{1,32}$"
+
+
+class DestinationIn(BaseModel):
+    """전송할 외부 AI. 분류값일 뿐이며 정책을 완화하는 근거가 되지 않는다."""
+
+    provider: str | None = Field(default=None, pattern=_ID)   # anthropic, openai, google ...
+    channel: str | None = Field(default=None, pattern=_ID)    # consumer, enterprise, api, api_free, cloud, self_hosted
+
+
 class RequestContext(BaseModel):
     task_type: str | None = Field(default=None, max_length=64)
     # 분류값일 뿐 권한·예외 근거가 아니다.
     client_type: ClientType
+    destination: DestinationIn | None = None
+
+
+class DestinationOut(BaseModel):
+    provider: str
+    channel: str
+    tier: str
+    verified: bool
+    basis: str | None
 
 
 class InspectRequest(BaseModel):
@@ -96,6 +115,7 @@ class InspectResponse(BaseModel):
     signal: Signal
     findings: list[Finding]
     policy_version: str
+    destination: DestinationOut
     detector_versions: dict[str, str]
     notices: list[str] = []
 
@@ -116,5 +136,6 @@ class SanitizeResponse(BaseModel):
     changes: list[Change]
     remaining_findings: list[Finding]
     policy_version: str
+    destination: DestinationOut
     detector_versions: dict[str, str]
     notices: list[str] = []
