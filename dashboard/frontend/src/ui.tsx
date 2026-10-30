@@ -284,7 +284,7 @@ export function VersionBadge({
 }
 export function TagChip({
   name,
-  color = "#5776c6",
+  color = "#3B82F6",
 }: {
   name: string;
   color?: string;
