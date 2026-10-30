@@ -11,19 +11,19 @@ function configuration(): ConfigVersion {
     id: "published_jev", name: "선택한 트리", status: "PUBLISHED", isActive: true,
     revision: 7, createdAt: "2026-10-29T15:00:00Z", publishedAt: "2026-10-29T16:00:00Z",
     tags: [
-      { id: "parent", name: "고객 정보", description: "", examples: [], guidance: "별도 판단 맥락", jevThreshold: 0, pythonRegex: String.raw`(?i)\bprivate\b`, color: "#123456", parentId: null, order: 0 },
-      { id: "child", name: "이메일", description: "", examples: [], guidance: "", jevThreshold: null, pythonRegex: "", color: "#234567", parentId: "parent", order: 0 },
+      { id: "parent", enabled: true, name: "고객 정보", description: "", examples: [], guidance: "별도 판단 맥락", jevThreshold: 0, pythonRegex: String.raw`(?i)\bprivate\b`, color: "#123456", parentId: null, order: 0 },
+      { id: "child", enabled: true, name: "이메일", description: "", examples: [], guidance: "", jevThreshold: null, pythonRegex: "", color: "#234567", parentId: "parent", order: 0 },
     ],
     jevPrompts: [
-      { id: "jev_1", name: "연락처 검사", prompt: "  저장한 판단 기준 😀\n  ", tagIds: ["parent", "child"] },
-      { id: "jev_2", name: "다른 검사", prompt: "동일한 태그를 출력합니다.", tagIds: ["child"] },
+      { id: "jev_1", enabled: true, name: "연락처 검사", prompt: "  저장한 판단 기준 😀\n  ", tagIds: ["parent", "child"] },
+      { id: "jev_2", enabled: true, name: "다른 검사", prompt: "동일한 태그를 출력합니다.", tagIds: ["child"] },
     ],
     policyStates: [],
   };
 }
 
 function saved(config: ConfigVersion, promptId: string, input: SaveJevPromptInput): ConfigVersion {
-  const prompt = { id: promptId, name: input.name, prompt: input.prompt, tagIds: input.outputs.map((output) => output.tagId) };
+  const prompt = { id: promptId, enabled: input.enabled ?? config.jevPrompts.find((item) => item.id === promptId)?.enabled ?? true, name: input.name, prompt: input.prompt, tagIds: input.outputs.map((output) => output.tagId) };
   return {
     ...config, revision: input.revision + 1,
     jevPrompts: config.jevPrompts.some((item) => item.id === promptId)
@@ -63,7 +63,7 @@ describe("independent Jev settings", () => {
     fireEvent.click(screen.getByRole("button", { name: "판단 저장" }));
     await waitFor(() => expect(save).toHaveBeenCalledOnce());
     expect(save).toHaveBeenCalledWith(config.id, "jev_1", {
-      revision: 7, name: "연락처 검사", prompt: text,
+      revision: 7, enabled: true, name: "연락처 검사", prompt: text,
       outputs: [{ tagId: "parent", threshold: 0.123456 }, { tagId: "child", threshold: null }],
     });
     await waitFor(() => expect(screen.getByRole<HTMLButtonElement>("button", { name: "판단 저장" }).disabled).toBe(true));
@@ -87,7 +87,7 @@ describe("independent Jev settings", () => {
     fireEvent.click(screen.getByRole("button", { name: "판단 저장" }));
     await waitFor(() => expect(create).toHaveBeenCalledOnce());
     expect(create).toHaveBeenCalledWith(config.id, {
-      revision: 7, name: "새 독립 검사", prompt: "",
+      revision: 7, enabled: true, name: "새 독립 검사", prompt: "",
       outputs: [{ tagId: "parent", threshold: 0 }, { tagId: "child", threshold: null }],
     });
     await screen.findByText("Jev 판단을 저장했습니다. 선택한 트리 버전에만 적용됩니다.");
@@ -163,7 +163,7 @@ describe("independent Jev settings", () => {
   it("hides the previous editable settings while a history-selected version is loading", async () => {
     const first = configuration();
     const second = { ...configuration(), id: "published_other", name: "다른 트리", isActive: false,
-      jevPrompts: [{ id: "jev_other", name: "다른 버전 검사", prompt: "다른 버전의 판단 기준", tagIds: ["child"] }],
+      jevPrompts: [{ id: "jev_other", enabled: true, name: "다른 버전 검사", prompt: "다른 버전의 판단 기준", tagIds: ["child"] }],
     };
     let resolve!: (value: ConfigVersion) => void;
     const pending = new Promise<ConfigVersion>((complete) => { resolve = complete; });

@@ -20,6 +20,8 @@ export interface DateRange {
 }
 
 export interface Tag {
+  /** Detection participation for this tag only; children keep their own state. */
+  enabled: boolean;
   id: string;
   name: string;
   description: string;
@@ -53,6 +55,8 @@ export interface VersionSummary {
 }
 
 export interface JevPrompt {
+  /** Whether consumers may execute this judgment when an output tag is enabled. */
+  enabled: boolean;
   id: string;
   name: string;
   /** Preserved verbatim, up to 12000 Unicode code points. */
@@ -68,6 +72,8 @@ export interface JevOutputInput {
 }
 
 export interface SaveJevPromptInput {
+  /** Omitted/null preserves existing state on update; creation defaults to true. */
+  enabled?: boolean | null;
   revision: number;
   name: string;
   prompt: string;
@@ -85,16 +91,21 @@ export interface CreateVersionInput {
   baseVersionId?: string;
 }
 
+/** Omitted/null enabled preserves existing tags and defaults new tags to true. */
+export type SaveTagInput = Omit<Tag, "enabled"> & { enabled?: boolean | null };
+
 export interface SaveVersionInput {
   revision: number;
   name: string;
-  tags: Tag[];
+  tags: SaveTagInput[];
   policyStates: PolicyDefinition[];
 }
 
 /** Mutable details for one tag in one version; tree structure stays unchanged. */
-export type SaveTagDetailsInput = Omit<Tag, "id" | "parentId" | "order"> & {
+export type SaveTagDetailsInput = Omit<Tag, "id" | "parentId" | "order" | "enabled"> & {
   revision: number;
+  /** Omitted/null preserves the stored state. */
+  enabled?: boolean | null;
 };
 
 export interface Person {

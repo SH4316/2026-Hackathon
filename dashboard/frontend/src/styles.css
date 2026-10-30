@@ -2,7 +2,7 @@
    SafePrompt Design System — dashboard/styles.css
    Brand System v1.2 | Deep Navy Dark base
    ============================================================ */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 
 :root {
   font-family:
@@ -12,52 +12,52 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  color: #F1F5F9;
-  background: #0B0F19;
+  color: #f1f5f9;
+  background: #0b0f19;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 
   /* ── 배경 토큰 ── */
-  --bg-main:   #0B0F19;
-  --bg-card:   #0F172A;
-  --bg-sub:    #1E293B;
-  --bg-input:  #0F172A;
+  --bg-main: #0b0f19;
+  --bg-card: #0f172a;
+  --bg-sub: #1e293b;
+  --bg-input: #0f172a;
 
   /* ── 텍스트 토큰 ── */
-  --text:   #F1F5F9;
-  --muted:  #94A3B8;
-  --subtle: #1E293B;
-  --hint:   #64748B;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --subtle: #1e293b;
+  --hint: #64748b;
 
   /* ── 테두리 ── */
-  --border:      #334155;
-  --border-faint:#1E293B;
+  --border: #334155;
+  --border-faint: #1e293b;
 
   /* ── 브랜드 색상 (Trust Blue) ── */
-  --blue:       #3B82F6;
-  --blue-hover: #2563EB;
-  --blue-wash:  rgba(59, 130, 246, 0.12);
+  --blue: #3b82f6;
+  --blue-hover: #2563eb;
+  --blue-wash: rgba(59, 130, 246, 0.12);
 
   /* ── 신호등 3색 (Semantic Traffic Lights) ── */
-  --signal-red:         #EF4444;
-  --signal-red-bg:      rgba(239, 68, 68, 0.12);
-  --signal-red-border:  rgba(239, 68, 68, 0.3);
+  --signal-red: #ef4444;
+  --signal-red-bg: rgba(239, 68, 68, 0.12);
+  --signal-red-border: rgba(239, 68, 68, 0.3);
 
-  --signal-yellow:        #F59E0B;
-  --signal-yellow-bg:     rgba(245, 158, 11, 0.12);
+  --signal-yellow: #f59e0b;
+  --signal-yellow-bg: rgba(245, 158, 11, 0.12);
   --signal-yellow-border: rgba(245, 158, 11, 0.3);
 
-  --signal-green:        #10B981;
-  --signal-green-bg:     rgba(16, 185, 129, 0.12);
+  --signal-green: #10b981;
+  --signal-green-bg: rgba(16, 185, 129, 0.12);
   --signal-green-border: rgba(16, 185, 129, 0.3);
 
   /* ── Tech Cyan ── */
-  --cyan: #06B6D4;
+  --cyan: #06b6d4;
 
   /* ── 레거시 호환 (기존 코드에서 참조하는 변수명 유지) ── */
-  --teal:  #10B981;
-  --amber: #F59E0B;
+  --teal: #10b981;
+  --amber: #f59e0b;
   --radius: 12px;
 }
 * {
@@ -193,10 +193,10 @@ strong {
   height: 41px;
   display: grid;
   place-items: center;
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 11px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .brand-name {
   font-size: 17px;
@@ -249,17 +249,6 @@ strong {
   background: var(--blue-wash);
   color: var(--blue);
   font-weight: 650;
-}
-.nav-soon {
-  font-size: 10px;
-  padding: 2px 5px;
-  border: 1px solid #e0e5ed;
-  color: #626d7a;
-  background: #fff;
-  margin-left: auto;
-  border-radius: 4px;
-  white-space: nowrap;
-  font-weight: 450;
 }
 .sidebar-bottom {
   margin-top: auto;
@@ -391,8 +380,8 @@ main:focus {
     border-color 0.15s;
 }
 .button:hover {
-  background: #2D3748;
-  border-color: #4A5568;
+  background: #2d3748;
+  border-color: #4a5568;
   color: var(--text);
 }
 .button-primary {
@@ -413,7 +402,7 @@ main:focus {
 .button-primary:disabled {
   background: rgba(59, 130, 246, 0.3);
   border-color: rgba(59, 130, 246, 0.3);
-  color: rgba(255,255,255,0.5);
+  color: rgba(255, 255, 255, 0.5);
 }
 .button-small {
   min-width: 31px;
@@ -537,7 +526,7 @@ input::placeholder {
 }
 input:hover,
 select:hover {
-  border-color: #4A5568;
+  border-color: #4a5568;
 }
 input:focus,
 select:focus {
@@ -733,19 +722,19 @@ select {
 }
 /* 신호등 3색을 카테고리 심각도에 매핑 */
 .category-PERSONAL_DATA {
-  --category: #F59E0B;
+  --category: #f59e0b;
   --category-wash: rgba(245, 158, 11, 0.12);
-  --category-ink: #F59E0B;
+  --category-ink: #f59e0b;
 }
 .category-CREDENTIAL {
-  --category: #EF4444;
+  --category: #ef4444;
   --category-wash: rgba(239, 68, 68, 0.12);
-  --category-ink: #EF4444;
+  --category-ink: #ef4444;
 }
 .category-CONFIDENTIAL {
-  --category: #06B6D4;
+  --category: #06b6d4;
   --category-wash: rgba(6, 182, 212, 0.12);
-  --category-ink: #06B6D4;
+  --category-ink: #06b6d4;
 }
 .category-dot {
   display: inline-block;
@@ -1164,10 +1153,10 @@ a.person-cell:hover .cell-primary {
 }
 @keyframes skeleton-pulse {
   from {
-    background-color: #1E293B;
+    background-color: #1e293b;
   }
   to {
-    background-color: #2D3748;
+    background-color: #2d3748;
   }
 }
 .error-state {
@@ -1584,10 +1573,6 @@ dd {
     padding-left: 11px;
     padding-right: 10px;
   }
-  .nav-soon {
-    font-size: 10px;
-    padding: 1px 4px;
-  }
   main {
     padding: 25px 22px;
   }
@@ -1704,9 +1689,6 @@ dd {
   }
   .nav-link svg {
     width: 16px;
-  }
-  .nav-soon {
-    display: none;
   }
   .topbar {
     height: 45px;
@@ -3298,17 +3280,6 @@ textarea::placeholder {
   }
 }
 
-.monitoring-catalog {
-  max-height: 430px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  margin-top: 15px;
-}
-.monitoring-catalog > .settings-fields {
-  border: 0;
-  border-radius: 0;
-}
-
 /* Jev definitions and their version-scoped output tags. */
 .jev-version-note,
 .jev-threshold-note {
@@ -3491,9 +3462,6 @@ textarea::placeholder {
   }
 }
 @media (max-width: 760px) {
-  .sidebar nav > .nav-link:last-child:nth-child(3n + 1) {
-    grid-column: 1 / -1;
-  }
   .jev-settings-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3518,4 +3486,217 @@ textarea::placeholder {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+/* Configuration forms inherit the current main theme without changing other pages. */
+.configuration-page
+  :is(
+    h1,
+    h2,
+    h3,
+    label,
+    .editor-node,
+    .policy-editor-node,
+    .jev-prompt-option
+  ) {
+  color: var(--text);
+}
+.configuration-page
+  :is(.version-workbar, .metric-editor, .jev-settings-layout, textarea) {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+.configuration-page
+  :is(.editor-tree, .editor-tabs, .python-regex-field, .editor-detail-footer) {
+  border-color: var(--border);
+}
+.configuration-page :is(.tree-help, .tag-id-box) {
+  background: var(--bg-sub);
+  border-color: var(--border);
+}
+.configuration-page
+  :is(
+    .editor-tree-row:hover,
+    .policy-editor-node:hover,
+    .jev-prompt-option:hover
+  ) {
+  background: var(--bg-sub);
+}
+.configuration-page
+  :is(
+    .editor-tree-row.selected,
+    .policy-editor-node.selected,
+    .jev-prompt-option.selected
+  ) {
+  background: var(--blue-wash);
+  border-color: var(--blue);
+}
+.configuration-page
+  :is(
+    .editor-tree-row.selected .editor-node,
+    .editor-tabs button.active,
+    .jev-prompt-option.selected
+  ) {
+  color: var(--blue);
+}
+.configuration-page
+  :is(
+    label small,
+    .tag-detail-scope,
+    .new-tag-save-note,
+    .version-meta-info,
+    .version-timestamp,
+    .tag-rule-hint,
+    .tag-rule-footer,
+    .tree-help,
+    .tag-id-box > span,
+    .tag-id-box code,
+    .color-field code,
+    .editor-bottom,
+    .editor-no-items,
+    .editor-tabs button,
+    .editor-detail-footer > div > span,
+    .remove-note
+  ) {
+  color: var(--muted);
+}
+.configuration-page textarea {
+  color: var(--text);
+  caret-color: var(--blue);
+}
+.configuration-page :is(input, textarea)::placeholder {
+  color: var(--muted);
+}
+.configuration-page .danger-text {
+  color: #fca5a5;
+}
+.configuration-page .unsaved-label {
+  color: #fbbf24;
+}
+.configuration-page .editor-node > span {
+  overflow-wrap: anywhere;
+}
+.enabled-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.enabled-setting-copy {
+  min-width: 0;
+}
+.enabled-setting-copy strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.enabled-setting-copy p {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+  max-width: 65ch;
+}
+.enabled-setting-control {
+  min-height: 44px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.enabled-setting-control span {
+  min-width: 64px;
+}
+.enabled-setting-control input {
+  appearance: none;
+  width: 38px;
+  height: 22px;
+  min-height: 22px;
+  padding: 2px;
+  margin: 0;
+  border: 1px solid var(--muted);
+  border-radius: 12px;
+  background: var(--bg-sub);
+  cursor: pointer;
+}
+.enabled-setting-control input::before {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 140ms ease-out;
+}
+.enabled-setting-control input:checked {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+.enabled-setting-control input:checked::before {
+  transform: translateX(16px);
+}
+.enabled-setting-control input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.enabled-setting-control input:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+.usage-badge {
+  display: inline-block;
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--muted);
+  background: var(--bg-sub);
+  font-size: 10px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.editor-node .usage-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.jev-output-tag .usage-badge {
+  margin: 4px 0;
+}
+@media (max-width: 760px) {
+  .enabled-setting {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .enabled-setting-control input::before {
+    transition: none;
+  }
+}
+
+.configuration-page .button-primary:not(:disabled) {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+}
+.configuration-page .button-primary:not(:disabled):hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+.configuration-page
+  :is(
+    .editor-tree-row.selected .editor-node,
+    .jev-prompt-option.selected,
+    .editor-tabs button.active,
+    .text-link,
+    .jev-tag-detail-link,
+    .api-links a
+  ) {
+  color: #60a5fa;
+}
+.configuration-page
+  :is(.editor-bottom > span, .panel-header p, .api-links code) {
+  color: var(--muted);
 }

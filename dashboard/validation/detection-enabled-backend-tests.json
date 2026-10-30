@@ -1,0 +1,118 @@
+{
+  "generatedAt": "2026-10-30T20:56:29.865785+00:00",
+  "status": "passed",
+  "command": "./gradlew test --no-daemon",
+  "workingDirectory": "dashboard/backend",
+  "environment": {
+    "database": "MySQL 8.4.7",
+    "java": "openjdk version \"21.0.12.1\" 2026-08-18",
+    "gradle": "8.14.3",
+    "apiSchema": "enabled_flags_api_test",
+    "migrationSchema": "enabled_flags_migration_test",
+    "isolation": "New schemas created for this validation; pre-existing schemas were not reset."
+  },
+  "totals": {
+    "tests": 79,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "name": "com.example.securitydashboard.DetectionEnabledIntegrationTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.DetectorEventIntegrationTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.FlywayMigrationIntegrationTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.JevPromptIntegrationTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.MySqlApiIntegrationTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.TagDetailsIntegrationTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.TagHistoryIntegrationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.configuration.ConfigurationServiceTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.event.CanonicalEventTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.query.DashboardQueryServiceTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.query.EventFilterTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.savedsearch.SavedSearchServiceTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "coverage": [
+    "Existing and newly inserted tag/prompt rows default to enabled after V8; fresh V8 does not seed configuration or history.",
+    "Explicit false persists; omitted/null flags preserve existing false in tag details, Jev prompt updates, and full draft PUT.",
+    "New tags and Jev prompts default to true for omitted/null flags; parent and child flags remain independent.",
+    "Published updates affect only the selected version; clones preserve enabled flags and remain isolated.",
+    "Classifier response includes disabled tags and prompts with output links, raw prompt, shared threshold, and Python regex retained.",
+    "Stale enabled updates reject revision conflicts; nonboolean flags reject without mutation.",
+    "Disabling settings preserves events, captured tags, detector replay, saved search membership, metrics, and tag closure; legacy and detector ingestion continue."
+  ],
+  "log": "/tmp/dashboard-runtime/enabled-flags-backend-tests.log",
+  "junitResults": "dashboard/backend/build/test-results/test",
+  "gradleResult": "BUILD SUCCESSFUL in 17s"
+}

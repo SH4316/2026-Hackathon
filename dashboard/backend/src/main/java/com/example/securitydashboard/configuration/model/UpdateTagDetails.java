@@ -13,4 +13,5 @@ public record UpdateTagDetails(
     String guidance,
     BigDecimal jevThreshold,
     String pythonRegex,
-    String color) {}
+    String color,
+    Boolean enabled) {}

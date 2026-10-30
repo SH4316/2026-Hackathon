@@ -13,4 +13,5 @@ public record Tag(
     String pythonRegex,
     String color,
     String parentId,
-    Integer order) {}
+    Integer order,
+    boolean enabled) {}

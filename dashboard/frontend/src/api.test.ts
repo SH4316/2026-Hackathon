@@ -88,6 +88,23 @@ describe("V2 query contract", () => {
 });
 
 describe("configuration version lifecycle", () => {
+  it.each([false, null, undefined])("preserves enabled=%s in optional tag and Jev mutation payloads", async (enabled) => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}")));
+    vi.stubGlobal("fetch", fetchMock);
+    const tag = { id: "tag_1", name: "고객 정보", description: "", examples: [], guidance: "", jevThreshold: null, pythonRegex: "", color: "#123456", parentId: null, order: 0, ...(enabled === undefined ? {} : { enabled }) };
+    const { id: _id, parentId: _parent, order: _order, ...details } = tag;
+    const prompt = { revision: 4, name: "연락처 검사", prompt: "", outputs: [{ tagId: tag.id, threshold: null }], ...(enabled === undefined ? {} : { enabled }) };
+    await api.saveVersion("draft_1", { revision: 4, name: "설정", tags: [tag], policyStates: [] });
+    await api.saveTagDetails("published_1", tag.id, { revision: 4, ...details });
+    await api.createJevPrompt("published_1", prompt);
+    await api.saveJevPrompt("published_1", "jev_1", prompt);
+    const payloads = fetchMock.mock.calls.map(([, options]) => JSON.parse(options.body));
+    for (const body of [payloads[0].tags[0], ...payloads.slice(1)]) {
+      if (enabled === undefined) expect(body).not.toHaveProperty("enabled");
+      else expect(body.enabled).toBe(enabled);
+    }
+  });
+
   it("saves only mutable tag details in the selected version with its current revision", async () => {
     const saved = { id: "published/a", status: "PUBLISHED", revision: 6 };
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(saved)));
@@ -187,6 +204,7 @@ describe("configuration version lifecycle", () => {
       tags: [
         {
           id: "parent",
+          enabled: false,
           name: "고객 정보",
           description: "",
           examples: [],
@@ -199,6 +217,7 @@ describe("configuration version lifecycle", () => {
         },
         {
           id: "child",
+          enabled: true,
           name: "고객 이름",
           description: "",
           examples: [],
@@ -210,7 +229,7 @@ describe("configuration version lifecycle", () => {
           order: 0,
         },
       ],
-      jevPrompts: [{ id: "jev_1", name: "고객 정보 검사", prompt: "  판단 기준 😀\n두 번째 줄\n  ", tagIds: ["parent", "child"] }],
+      jevPrompts: [{ id: "jev_1", enabled: false, name: "고객 정보 검사", prompt: "  판단 기준 😀\n두 번째 줄\n  ", tagIds: ["parent", "child"] }],
       policyStates: [],
     };
     const fetchMock = vi
