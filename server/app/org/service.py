@@ -87,15 +87,17 @@ class OrgService:
                 threshold = rules.thresholds.get(score.tag_id)
                 if threshold is None or score.score < threshold:
                     continue  # 임계값 미설정 태그는 판정하지 않는다
-                if not score.spans:
+                spans = ((0, len(text)),) if score.whole_input and text else score.spans
+                if not spans:
                     out.unlocated = True
                     if "org_jev_unlocated" not in out.notices:
                         out.notices.append("org_jev_unlocated")
-                for start, end in score.spans:
+                scope = "입력 전체 분류" if score.whole_input else "조직 Jev 판정"
+                for start, end in spans:
                     out.candidates.append(Candidate(
                         type=rules.type_of[score.tag_id], rule_id=f"org-jev:{p.id}:{score.tag_id}",
                         start=start, end=end, confidence=Confidence.MEDIUM, detector="model",
-                        reason=f"{rules.tag_names[score.tag_id]}(조직 Jev 판정 {score.score:.2f})"))
+                        reason=f"{rules.tag_names[score.tag_id]}({scope} {score.score:.2f})"))
         return out
 
     def _fail(self, code: str) -> None:

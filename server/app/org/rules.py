@@ -1,7 +1,7 @@
 """대시보드 활성 설정 → 이 서버에서 실행할 조직 규칙.
 
 - 태그별 pythonRegex: Python re 로 실행. 일치 구간이 그 태그의 탐지다.
-- Jev 프롬프트: 로컬 모델(decider)이 출력 태그별 점수(0~1)와 근거 구간을 내고,
+- Jev 프롬프트: 로컬 모델이 출력 태그별 점수(0~1)를 내고(Decider 는 입력 전체 분류),
   태그의 jevThreshold 가 설정된 경우에만 `점수 >= 임계값` 이면 탐지로 본다(미설정 태그는 판정하지 않음).
 - 태그 ID 가 서버의 기존 탐지 유형과 겹치면 유형 이름을 `org_<태그 ID>` 로 바꾸고, 대시보드 기록에는 tag_map 으로 되돌린다.
 """
@@ -83,7 +83,8 @@ def check_regex(source: str) -> re.Pattern[str]:
 
 
 def compile_org(config: dict, reserved_types: set[str], jev_enabled: bool = True) -> OrgRules:
-    tags = config.get("tags") or []
+    # 부모·자식 태그의 enabled 는 각 태그에 독립적으로 적용한다. 이전 설정은 기본 활성이다.
+    tags = [t for t in config.get("tags") or [] if t.get("enabled", True)]
     names = {t["id"]: t.get("name") or t["id"] for t in tags}
     type_of = {tag: (f"org_{tag}" if tag in reserved_types else tag) for tag in names}
     thresholds = {t["id"]: float(t["jevThreshold"]) for t in tags if t.get("jevThreshold") is not None}
@@ -99,6 +100,8 @@ def compile_org(config: dict, reserved_types: set[str], jev_enabled: bool = True
             rules.skipped[t["id"]] = str(exc)
     if jev_enabled:
         for p in config.get("jevPrompts") or []:
+            if not p.get("enabled", True):
+                continue
             outputs = {tag: names[tag] for tag in p.get("tagIds") or [] if tag in names}
             if (p.get("prompt") or "").strip() and outputs:
                 rules.jev.append(JevPrompt(p["id"], p.get("name") or p["id"], p["prompt"], outputs))
