@@ -114,6 +114,16 @@ CPU 모델 판정은 연결 확인보다 오래 걸릴 수 있습니다. `/v1/in
 
 서버와 Decider 이미지는 접근 로그를 끄므로 `docker compose logs --tail=80 server decider`에 POST 기록이 없는 것만으로 요청이 도착하지 않았다고 판단할 수 없습니다. `Unsupported upgrade request`는 HTTP 업그레이드 관련 경고이며 검사 API 자체는 WebSocket을 사용하지 않습니다. Nginx·터널을 거친다면 동일 요청을 서버의 공개 포트로 직접 보내 비교하세요.
 
+실행 중인 실제 서버에 합성 예시를 보내려면 저장소 루트에서 다음 테스트를 실행합니다(Node.js 24). `--server`를 검사 서버 주소로 바꾸세요. `.env`의 `PG_API_KEY` 또는 `PG_API_KEYS`의 첫 키를 사용하며 키와 원문은 결과에 출력하지 않습니다.
+
+```bash
+node --env-file=.env scripts/check-inspection.mjs \
+  --server http://127.0.0.1:8000 \
+  --output /tmp/safeprompt-inspection-results.json
+```
+
+서버 생존·잘못된 인증 거부·인증과 규칙/모델 준비·일반 문장 draft/submit 허용·이메일과 공식 AWS 예시 키 차단·정제 후 재검사 등 7개 항목을 순서대로 확인합니다. 확장과 같은 요청 함수와 시간 제한을 사용하고 각 응답의 `request_id`·`input_version`·완료 상태·신호·탐지 유형 및 응답 시간을 검증합니다. 하나라도 실패하면 종료 코드 1을 반환합니다. 실제 브라우저의 입력·전송 경로 검증은 `npm run e2e:server`로 별도 실행합니다.
+
 ## SafePrompt 위젯 (입력창 신호등)
 
 입력창 위에 붙는 신호등 위젯입니다. 색은 [BRAND_GUIDELINES.md](../BRAND_GUIDELINES.md)의 토큰을 따르고, 시스템 테마(다크/라이트)에 맞춰 바뀝니다.
