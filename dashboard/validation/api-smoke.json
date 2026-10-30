@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T15:19:27.590930+00:00",
+  "baseUrl": "http://127.0.0.1:8081",
+  "sourceId": "smoke-54307d154de0",
+  "personId": "smoke-54307d154de0",
+  "eventId": 65,
+  "checks": [
+    "health, person registration and duplicate rejection",
+    "12 concurrent duplicate requests, canonical replay and conflict",
+    "metrics, category/policy/service filters, UTC offsets, Seoul buckets and [from,to) bounds",
+    "event/person details, pagination, literal search and zero-event people",
+    "invalid payloads/filters, unknown fields, future timestamps and 404 errors"
+  ]
+}

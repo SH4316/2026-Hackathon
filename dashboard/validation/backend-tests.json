@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T15:16:13.120106+00:00",
+  "database": "MySQL Community Server 8.4.7",
+  "databasePort": 33306,
+  "testSchema": "ai_security_dashboard_test",
+  "java": "21.0.12.1",
+  "suites": [
+    {
+      "name": "com.example.securitydashboard.CanonicalEventTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.EventFilterTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.example.securitydashboard.MySqlApiIntegrationTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "totals": {
+    "tests": 13,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T15:20:32.579Z",
+  "baseUrl": "http://127.0.0.1:8081",
+  "personId": "browser-mvv4cuj6",
+  "detailUrl": "http://127.0.0.1:8081/events/61?category=PERSONAL_DATA",
+  "checks": [
+    "overview loads from real API, navigation and explicit refresh; no idle polling",
+    "category drill-down, event detail, direct-route reload and person history",
+    "history pagination advances and returns while updating the URL",
+    "invalid/reversed dates, empty events, filter reset and combined service/category/policy filters",
+    "person registration, success feedback, search, zero events and duplicate form error",
+    "monitoring settings and save remain disabled and send no request",
+    "recoverable network error, retry and missing-detail error state",
+    "mobile navigation remains usable at 390px width"
+  ],
+  "uncaughtErrors": []
+}

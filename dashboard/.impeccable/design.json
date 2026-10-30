@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-30T15:20:59.081934+00:00",
+  "title": "Design System: AI 보안 관제",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "chart-tooltip",
+        "value": "0 5px 16px #172b4d0d",
+        "purpose": "차트 툴팁에만 사용"
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-transition",
+        "value": "150ms",
+        "purpose": "입력과 버튼 상태 전환"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-desktop",
+        "value": "1280px"
+      },
+      {
+        "name": "single-column-panels",
+        "value": "1000px"
+      },
+      {
+        "name": "mobile-navigation",
+        "value": "760px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "조회와 사람 등록의 기본 동작",
+      "html": "<button class=\"ds-primary\">조회</button>",
+      "css": ".ds-primary {font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--blue,#365fc5);color:#fff;border:1px solid var(--blue,#365fc5);border-radius:6px;padding:9px 13px;min-height:35px;font-size:12px;font-weight:550;line-height:1.5;white-space:nowrap;cursor:pointer;transition:background-color .15s,border-color .15s}.ds-primary:hover {background:var(--blue-hover,#274ca9);border-color:var(--blue-hover,#274ca9)}.ds-primary:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}.ds-primary:disabled{background:#c7d3ec;border-color:#c7d3ec;color:#465e8c;cursor:not-allowed}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "description": "명시적인 새로고침과 보조 동작",
+      "html": "<button class=\"ds-secondary\">새로고침</button>",
+      "css": ".ds-secondary{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:#465570;border:1px solid #dce3ed;border-radius:6px;padding:9px 13px;min-height:35px;font-size:12px;font-weight:550;line-height:1.5;white-space:nowrap;cursor:pointer;transition:background-color .15s,border-color .15s}.ds-secondary:hover{background:#f4f7fc;border-color:#b8c7df}.ds-secondary:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}.ds-secondary:disabled{background:#f0f3f7;border-color:#e1e7ef;color:#616c7b;cursor:not-allowed}"
+    },
+    {
+      "name": "Filter input",
+      "kind": "input",
+      "description": "조회 조건 입력",
+      "html": "<label class=\"ds-field\">사람 ID<input placeholder=\"전체 사람\"></label>",
+      "css": ".ds-field{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;flex-direction:column;gap:6px;color:#53627a;font-size:12px;font-weight:500;line-height:1.6;min-width:0}.ds-field input{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;width:100%;min-width:0;height:35px;padding:7px 9px;background:#fff;color:#3d4b64;border:1px solid #dfe5ee;border-radius:5px;font-size:12px;font-weight:400;line-height:1.6;transition:border-color .15s;caret-color:var(--blue,#365fc5)}.ds-field input::placeholder{color:#616d7e;opacity:1}.ds-field input:hover{border-color:#b8c5d9}.ds-field input:focus{outline:2px solid #d3dffb;outline-offset:0;border-color:#7090d4}"
+    },
+    {
+      "name": "Active navigation",
+      "kind": "nav",
+      "description": "현재 작업 위치",
+      "html": "<a class=\"ds-nav\" href=\"#\" aria-current=\"page\">전체 현황</a>",
+      "css": ".ds-nav{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:12px;min-height:45px;padding:11px 14px;background:#edf2fc;color:#365fc5;border-radius:7px;font-size:13px;font-weight:650;line-height:1.6;text-decoration:none;transition:background-color .15s,color .15s}.ds-nav:hover{background:#edf2fc;color:#365fc5}.ds-nav:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}"
+    },
+    {
+      "name": "Unknown policy",
+      "kind": "chip",
+      "description": "미확인 상태는 위험 확정과 구분",
+      "html": "<span class=\"ds-badge\">설정 미확인</span>",
+      "css": ".ds-badge{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;gap:5px;padding:3px 7px;background:#eff2f7;color:#5e6b81;border-radius:4px;font-size:11px;font-weight:500;line-height:1.7;white-space:nowrap}.ds-badge:before{content:\"\";width:5px;height:5px;background:currentColor;border-radius:50%}"
+    },
+    {
+      "name": "Information panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "단일 의미를 갖는 집계 구획",
+      "html": "<section class=\"ds-panel\"><header class=\"ds-panel-header\"><div><h2>항목별 감지</h2><p>개인정보 · 인증정보 · 내부기밀</p></div></header></section>",
+      "css": ".ds-panel{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;background:#fff;border:1px solid var(--border,#e4e9f0);border-radius:var(--radius,12px);color:var(--text,#243148);min-width:0;line-height:1.6}.ds-panel-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:21px 24px 0}.ds-panel h2{margin:0;font-size:15px;font-weight:650;letter-spacing:-.025em;line-height:1.5}.ds-panel p{margin:4px 0 0;font-size:11px;color:#616d7c}"
+    }
+  ],
+  "narrative": {
+    "northStar": "명확한 운영 기록",
+    "overview": "밝은 작업 환경에서 숫자와 기록을 반복해서 확인하는 관리자 도구다. 중립적인 표면과 한 가지 파란 강조색으로 탐색·조회 동작을 표시하고, 정책 상태는 작은 배지로 구분한다. 사진과 장식적 일러스트를 사용하지 않는다.",
+    "keyCharacteristics": [],
+    "rules": [],
+    "dos": [
+      "Do 이벤트 건수, 감지 수량, 정책 상태를 각각 이름과 단위로 구분한다.",
+      "Do 모바일에서는 표 자체만 가로 스크롤하고 페이지 전체 너비를 늘리지 않는다.",
+      "Do 샘플 데이터의 이름에 데모임을 표시한다."
+    ],
+    "donts": [
+      "Don't 대화 원문이나 민감정보 값을 화면에 추가하지 않는다.",
+      "Don't 설정 미확인과 정책 정보 없음, 학습 허용과 정책 위반을 같은 의미로 표시하지 않는다.",
+      "Don't 설정 페이지에 실제 저장이나 활성화 동작을 추가하지 않는다."
+    ]
+  }
+}
