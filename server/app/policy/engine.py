@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 
@@ -119,6 +119,7 @@ class Policy:
     types: dict[str, TypePolicy]
     default: TypePolicy
     destinations: DestinationPolicy
+    detectors_seed_path: Path | None = None
 
     @classmethod
     def load(cls, path: Path) -> Policy:
@@ -126,8 +127,17 @@ class Policy:
         default = _type_policy("UNKNOWN", raw.get("default", {}))
         types = {name: _type_policy(name, spec) for name, spec in raw.get("types", {}).items()}
         destinations = DestinationPolicy.load(path.parent / raw["destinations_file"])
+        seed = raw.get("detectors_seed_file")
         return cls(version=str(raw["version"]), model_required=bool(raw.get("model_required", False)),
-                   types=types, default=default, destinations=destinations)
+                   types=types, default=default, destinations=destinations,
+                   detectors_seed_path=path.parent / seed if seed else None)
+
+    def with_custom_types(self, custom: dict[str, TypePolicy]) -> Policy:
+        """대시보드 항목(사용자 규칙·문맥 탐지기)의 유형 정책을 더한다. 내장 유형은 덮어쓰지 않는다."""
+        clash = set(custom) & set(self.types)
+        if clash:
+            raise ValueError(f"내장 유형과 겹침: {sorted(clash)}")
+        return replace(self, types={**self.types, **custom})
 
     def for_type(self, type_: str) -> TypePolicy:
         return self.types.get(type_, self.default)

@@ -25,6 +25,11 @@
       <input id="blockUnscannableFiles" type="checkbox">
     </label>
     <p class="muted small">텍스트·코드·PDF(글자 있는 것)는 내용을 검사해 민감정보가 있으면 항상 막습니다. 끄면 분석할 수 없는 파일은 경고만 하고 첨부됩니다.</p>
+    <label class="row toggle">
+      <span>테스트 모드(실제 전송 안 함, 진단 패널 표시)</span>
+      <input id="testMode" type="checkbox">
+    </label>
+    <p class="muted small">실제 AI 사이트에서 입력창·전송 버튼 감지와 가로채기를 확인할 때 켭니다. 켜져 있는 동안은 검사를 통과해도 보내지 않습니다.</p>
     <div class="actions">
       <button type="submit">저장</button>
       <button id="test" type="button">연결 테스트</button>

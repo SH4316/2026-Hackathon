@@ -17,3 +17,17 @@ for (const c of vectors.cases) {
     assert.deepEqual(guard.sanitize(c.text, { destination: c.destination }), c.sanitize);
   });
 }
+
+// 대시보드에서 사용자 규칙을 추가한 ruleset(서버 배포 묶음 형식)으로도 같은 판정인지
+const fixtureGuard = createGuard({ ruleset: vectors.fixture_ruleset, today: () => vectors.today });
+test("fixture ruleset compiles every rule in JS", () => {
+  assert.deepEqual(fixtureGuard.skippedRules, []);
+});
+for (const c of vectors.fixture_cases) {
+  test(`ruleset inspect parity: ${c.name}`, () => {
+    assert.deepEqual(fixtureGuard.inspect(c.text, { destination: c.destination }), c.inspect);
+  });
+  test(`ruleset sanitize parity: ${c.name}`, () => {
+    assert.deepEqual(fixtureGuard.sanitize(c.text, { destination: c.destination }), c.sanitize);
+  });
+}

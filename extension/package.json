@@ -6,7 +6,10 @@
     "vendor": "node scripts/vendor-rules.mjs",
     "vendor:check": "node scripts/vendor-rules.mjs --check",
     "test": "node --test tests/*.test.mjs",
-    "e2e": "node tests/e2e.mjs"
+    "e2e": "node tests/e2e.mjs",
+    "real-sites:login": "node tests/real-sites.mjs --login",
+    "real-sites": "node tests/real-sites.mjs",
+    "real-sites:full": "node tests/real-sites.mjs --full"
   },
   "devDependencies": {
     "playwright": "1.52.0"

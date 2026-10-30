@@ -52,6 +52,18 @@ export class Policy {
     this.orgContracts = new Set((d.org_contracts ?? []).map((c) => `${c.provider}/${c.channel}`));
   }
 
+  /** 대시보드 항목(사용자 규칙·문맥 탐지기)의 유형 정책을 더한 새 Policy. 내장 유형은 덮어쓰지 않는다. */
+  withCustomTypes(items) {
+    const p = Object.create(Policy.prototype);
+    Object.assign(p, this);
+    p.types = { ...this.types };
+    for (const i of items) {
+      if (Object.hasOwn(this.types, i.id)) throw new Error(`내장 유형과 겹침: ${i.id}`);
+      p.types[i.id] = typePolicy(i.id, i);
+    }
+    return p;
+  }
+
   forType(type) {
     return this.types[type] ?? this.default;
   }

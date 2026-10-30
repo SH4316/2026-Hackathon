@@ -11,7 +11,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -20,7 +20,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -33,7 +34,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -42,7 +43,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -77,7 +79,7 @@
             "replacement": "[PHONE_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -86,7 +88,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -105,7 +108,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -114,7 +117,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -149,7 +153,7 @@
             "replacement": "[PHONE_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -158,7 +162,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -177,7 +182,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -186,7 +191,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -221,7 +227,7 @@
             "replacement": "[PHONE_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -230,7 +236,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -249,7 +256,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -258,7 +265,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -293,7 +301,7 @@
             "replacement": "[EMAIL_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -302,7 +310,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -321,7 +330,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -330,7 +339,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -401,7 +411,7 @@
             "replacement": "[EMAIL_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -410,7 +420,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -434,7 +445,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -443,7 +454,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -478,7 +490,7 @@
             "replacement": "[RRN_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -487,7 +499,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -506,7 +519,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -515,7 +528,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -550,7 +564,7 @@
             "replacement": "[RRN_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -559,7 +573,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -578,7 +593,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -587,7 +602,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -603,7 +619,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -612,7 +628,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -625,7 +642,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -634,7 +651,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -669,7 +687,7 @@
             "replacement": "[PASSPORT_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -678,7 +696,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -697,7 +716,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -706,7 +725,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -741,7 +761,7 @@
             "replacement": "[DRIVER_LICENSE_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -750,7 +770,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -769,7 +790,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -778,7 +799,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -813,7 +835,7 @@
             "replacement": "[CARD_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -822,7 +844,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -841,7 +864,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -850,7 +873,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -866,7 +890,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -875,7 +899,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -888,7 +913,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -897,7 +922,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -932,7 +958,7 @@
             "replacement": "[ACCOUNT_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -941,7 +967,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -960,7 +987,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -969,7 +996,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1004,7 +1032,7 @@
             "replacement": "[AWS_KEY_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1013,7 +1041,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1032,7 +1061,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1041,7 +1070,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1076,7 +1106,7 @@
             "replacement": "[GITHUB_TOKEN_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1085,7 +1115,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1104,7 +1135,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1113,7 +1144,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1148,7 +1180,7 @@
             "replacement": "[JWT_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1157,7 +1189,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1176,7 +1209,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1185,7 +1218,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1201,7 +1235,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1210,7 +1244,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1223,7 +1258,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1232,7 +1267,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1267,7 +1303,7 @@
             "replacement": "[PRIVATE_KEY_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1276,7 +1312,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1295,7 +1332,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1304,7 +1341,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1339,7 +1377,7 @@
             "replacement": "[PRIVATE_KEY_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1348,7 +1386,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1367,7 +1406,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1376,7 +1415,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1411,7 +1451,7 @@
             "replacement": "[PASSWORD_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1420,7 +1460,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1439,7 +1480,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1448,7 +1489,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1483,7 +1525,7 @@
             "replacement": "[PASSWORD_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1492,7 +1534,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1511,7 +1554,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1520,7 +1563,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1555,7 +1599,7 @@
             "replacement": "[SECRET_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1564,7 +1608,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1583,7 +1628,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1592,7 +1637,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1627,7 +1673,7 @@
             "replacement": "[URL_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1636,7 +1682,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1655,7 +1702,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1664,7 +1711,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1699,7 +1747,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1708,7 +1756,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1740,7 +1789,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1749,7 +1798,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1784,7 +1834,7 @@
             "replacement": "[INTERNAL_HOST_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1793,7 +1843,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1812,7 +1863,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1821,7 +1872,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1856,7 +1908,7 @@
             "replacement": "[INTERNAL_IP_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1865,7 +1917,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1884,7 +1937,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1893,7 +1946,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1928,7 +1982,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1937,7 +1991,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -1969,7 +2024,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -1978,7 +2033,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2013,7 +2069,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2022,7 +2078,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2054,7 +2111,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2063,7 +2120,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2079,7 +2137,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2088,7 +2146,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2101,7 +2160,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2110,7 +2169,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2145,7 +2205,7 @@
             "replacement": "[INTERNAL_CIDR_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2154,7 +2214,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2173,7 +2234,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2182,7 +2243,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2217,7 +2279,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2226,7 +2288,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2258,7 +2321,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2267,7 +2330,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2283,7 +2347,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2292,7 +2356,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2305,7 +2370,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2314,7 +2379,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2349,7 +2415,7 @@
             "replacement": "[INTERNAL_IP_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2358,7 +2424,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2377,7 +2444,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2386,7 +2453,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2421,7 +2489,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2430,7 +2498,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2462,7 +2531,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2471,7 +2540,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2506,7 +2576,7 @@
             "replacement": "[INTERNAL_IP_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2515,7 +2585,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2534,7 +2605,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2543,7 +2614,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2578,7 +2650,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2587,7 +2659,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2619,7 +2692,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2628,7 +2701,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2663,7 +2737,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2672,7 +2746,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2704,7 +2779,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2713,7 +2788,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2748,7 +2824,7 @@
             "replacement": "[INTERNAL_IP_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2757,7 +2833,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2776,7 +2853,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2785,7 +2862,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2801,7 +2879,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2810,7 +2888,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2823,7 +2902,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2832,7 +2911,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2867,7 +2947,7 @@
             "replacement": "[MAC_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2876,7 +2956,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2895,7 +2976,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2904,7 +2985,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2939,7 +3021,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2948,7 +3030,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -2980,7 +3063,7 @@
             "replacement": null
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -2989,7 +3072,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3005,7 +3089,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3014,7 +3098,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3027,7 +3112,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3036,7 +3121,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3052,7 +3138,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3061,7 +3147,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3074,7 +3161,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3083,7 +3170,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3099,7 +3187,7 @@
         "decision": "allow",
         "signal": "green",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3108,7 +3196,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3121,7 +3210,7 @@
         "signal": "green",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3130,7 +3219,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3165,7 +3255,7 @@
             "replacement": "[EMAIL_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3174,7 +3264,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3193,7 +3284,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3202,7 +3293,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3237,7 +3329,7 @@
             "replacement": "[PASSWORD_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3246,7 +3338,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3265,7 +3358,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3274,7 +3367,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3327,7 +3421,7 @@
             "replacement": "[EMAIL_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3336,7 +3430,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3360,7 +3455,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3369,7 +3464,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3440,7 +3536,7 @@
             "replacement": "[INTERNAL_IP_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3449,7 +3545,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3478,7 +3575,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3487,7 +3584,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3525,7 +3623,7 @@
             "replacement": "[INTERNAL_IP_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "openai",
           "channel": "consumer",
@@ -3534,7 +3632,8 @@
           "basis": "ChatGPT 소비자 학습 정책 확인 불가(403)"
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": []
       },
@@ -3551,7 +3650,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "openai",
           "channel": "consumer",
@@ -3560,7 +3659,8 @@
           "basis": "ChatGPT 소비자 학습 정책 확인 불가(403)"
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": []
       }
@@ -3596,7 +3696,7 @@
             "replacement": "[INTERNAL_IP_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "openai",
           "channel": "api",
@@ -3605,7 +3705,8 @@
           "basis": "opt-in 없이는 학습 안 함, 남용 모니터링 로그 최대 30일"
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_channel_unverified"
@@ -3624,7 +3725,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "openai",
           "channel": "api",
@@ -3633,7 +3734,8 @@
           "basis": "opt-in 없이는 학습 안 함, 남용 모니터링 로그 최대 30일"
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_channel_unverified"
@@ -3652,7 +3754,7 @@
         "decision": "warn",
         "signal": "yellow",
         "findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "deepseek",
           "channel": "consumer",
@@ -3661,7 +3763,8 @@
           "basis": "PRC 처리·저장 명시([충돌]), 비식별 후 개선에 사용, 고정 보관 기간 없음"
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": []
       },
@@ -3672,7 +3775,7 @@
         "signal": "yellow",
         "changes": [],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "deepseek",
           "channel": "consumer",
@@ -3681,7 +3784,8 @@
           "basis": "PRC 처리·저장 명시([충돌]), 비식별 후 개선에 사용, 고정 보관 기간 없음"
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": []
       }
@@ -3717,7 +3821,7 @@
             "replacement": "[CVE_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "moonshot",
           "channel": "api",
@@ -3726,7 +3830,8 @@
           "basis": "학습 사용 여부·서버 위치가 문서 간 [충돌]"
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": []
       },
@@ -3743,7 +3848,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "moonshot",
           "channel": "api",
@@ -3752,7 +3857,8 @@
           "basis": "학습 사용 여부·서버 위치가 문서 간 [충돌]"
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": []
       }
@@ -3788,7 +3894,7 @@
             "replacement": "[EMAIL_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3797,7 +3903,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3816,7 +3923,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "unknown",
           "channel": "unknown",
@@ -3825,7 +3932,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_unknown"
@@ -3863,7 +3971,7 @@
             "replacement": "[EMAIL_n]"
           }
         ],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "openai",
           "channel": "unknown",
@@ -3872,7 +3980,8 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_channel_unknown"
@@ -3891,7 +4000,7 @@
           }
         ],
         "remaining_findings": [],
-        "policy_version": "2026-10-31.draft2",
+        "policy_version": "2026-10-31.draft3",
         "destination": {
           "provider": "openai",
           "channel": "unknown",
@@ -3900,11 +4009,970 @@
           "basis": null
         },
         "detector_versions": {
-          "rules": "rules-0.1.0"
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-1"
         },
         "notices": [
           "destination_channel_unknown"
         ]
+      }
+    }
+  ],
+  "fixture_ruleset": {
+    "ruleset_version": 7,
+    "policy_version": "2026-10-31.draft3",
+    "updated_at": "1970-01-01T00:00:00+00:00",
+    "modules": {
+      "custom_rules": true,
+      "context_model": true
+    },
+    "custom_rules": [
+      {
+        "id": "project_codename",
+        "label": "프로젝트 코드명",
+        "category": "confidential",
+        "severity": "high",
+        "action": "mask",
+        "token": "PROJECT",
+        "enabled": true,
+        "kind": "keywords",
+        "keywords": [
+          "블루문",
+          "Blue Moon",
+          "BM-7"
+        ],
+        "pattern": null,
+        "case_sensitive": false,
+        "reason": ""
+      },
+      {
+        "id": "employee_id",
+        "label": "사번",
+        "category": "custom",
+        "severity": "medium",
+        "action": "mask",
+        "token": "EMP_ID",
+        "enabled": true,
+        "kind": "regex",
+        "keywords": [],
+        "pattern": "(?<![A-Z0-9])EMP-\\d{6}(?!\\d)",
+        "case_sensitive": true,
+        "reason": "사번 형식"
+      },
+      {
+        "id": "deal_code",
+        "label": "거래 코드",
+        "category": "custom",
+        "severity": "high",
+        "action": "block",
+        "token": "DEAL",
+        "enabled": true,
+        "kind": "regex",
+        "keywords": [],
+        "pattern": "\\bDEAL-[a-z]{3}\\b",
+        "case_sensitive": false,
+        "reason": ""
+      },
+      {
+        "id": "disabled_rule",
+        "label": "꺼진 규칙",
+        "category": "custom",
+        "severity": "high",
+        "action": "mask",
+        "token": "OFF",
+        "enabled": false,
+        "kind": "keywords",
+        "keywords": [
+          "꺼진키워드"
+        ],
+        "pattern": null,
+        "case_sensitive": false,
+        "reason": ""
+      }
+    ],
+    "context_detectors": [
+      {
+        "id": "unpublished_research",
+        "label": "미공개 연구 결과",
+        "category": "custom",
+        "severity": "high",
+        "action": "block",
+        "token": "RESEARCH",
+        "enabled": true
+      }
+    ]
+  },
+  "fixture_cases": [
+    {
+      "name": "custom_keyword",
+      "text": "블루문 프로젝트 일정 정리해 줘",
+      "destination": null,
+      "inspect": {
+        "status": "complete",
+        "decision": "block",
+        "signal": "red",
+        "findings": [
+          {
+            "finding_id": "f1",
+            "type": "project_codename",
+            "category": "confidential",
+            "rule_id": "custom:project_codename",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "mask",
+            "span": {
+              "start": 0,
+              "end": 3,
+              "start_utf16": 0,
+              "end_utf16": 3
+            },
+            "reason": "프로젝트 코드명",
+            "replacement": "[PROJECT_n]"
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "[PROJECT_1] 프로젝트 일정 정리해 줘",
+        "decision": "allow",
+        "signal": "green",
+        "changes": [
+          {
+            "type": "project_codename",
+            "token": "[PROJECT_1]",
+            "count": 1
+          }
+        ],
+        "remaining_findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      }
+    },
+    {
+      "name": "custom_keyword_case",
+      "text": "blue moon 과 BLUE MOON, bm-7 모두",
+      "destination": null,
+      "inspect": {
+        "status": "complete",
+        "decision": "block",
+        "signal": "red",
+        "findings": [
+          {
+            "finding_id": "f1",
+            "type": "project_codename",
+            "category": "confidential",
+            "rule_id": "custom:project_codename",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "mask",
+            "span": {
+              "start": 0,
+              "end": 9,
+              "start_utf16": 0,
+              "end_utf16": 9
+            },
+            "reason": "프로젝트 코드명",
+            "replacement": "[PROJECT_n]"
+          },
+          {
+            "finding_id": "f2",
+            "type": "project_codename",
+            "category": "confidential",
+            "rule_id": "custom:project_codename",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "mask",
+            "span": {
+              "start": 12,
+              "end": 21,
+              "start_utf16": 12,
+              "end_utf16": 21
+            },
+            "reason": "프로젝트 코드명",
+            "replacement": "[PROJECT_n]"
+          },
+          {
+            "finding_id": "f3",
+            "type": "project_codename",
+            "category": "confidential",
+            "rule_id": "custom:project_codename",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "mask",
+            "span": {
+              "start": 23,
+              "end": 27,
+              "start_utf16": 23,
+              "end_utf16": 27
+            },
+            "reason": "프로젝트 코드명",
+            "replacement": "[PROJECT_n]"
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "[PROJECT_1] 과 [PROJECT_2], [PROJECT_3] 모두",
+        "decision": "allow",
+        "signal": "green",
+        "changes": [
+          {
+            "type": "project_codename",
+            "token": "[PROJECT_1]",
+            "count": 1
+          },
+          {
+            "type": "project_codename",
+            "token": "[PROJECT_2]",
+            "count": 1
+          },
+          {
+            "type": "project_codename",
+            "token": "[PROJECT_3]",
+            "count": 1
+          }
+        ],
+        "remaining_findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      }
+    },
+    {
+      "name": "custom_keyword_repeat",
+      "text": "블루문은 블루문이고 Blue Moon 이다",
+      "destination": null,
+      "inspect": {
+        "status": "complete",
+        "decision": "block",
+        "signal": "red",
+        "findings": [
+          {
+            "finding_id": "f1",
+            "type": "project_codename",
+            "category": "confidential",
+            "rule_id": "custom:project_codename",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "mask",
+            "span": {
+              "start": 0,
+              "end": 3,
+              "start_utf16": 0,
+              "end_utf16": 3
+            },
+            "reason": "프로젝트 코드명",
+            "replacement": "[PROJECT_n]"
+          },
+          {
+            "finding_id": "f2",
+            "type": "project_codename",
+            "category": "confidential",
+            "rule_id": "custom:project_codename",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "mask",
+            "span": {
+              "start": 5,
+              "end": 8,
+              "start_utf16": 5,
+              "end_utf16": 8
+            },
+            "reason": "프로젝트 코드명",
+            "replacement": "[PROJECT_n]"
+          },
+          {
+            "finding_id": "f3",
+            "type": "project_codename",
+            "category": "confidential",
+            "rule_id": "custom:project_codename",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "mask",
+            "span": {
+              "start": 11,
+              "end": 20,
+              "start_utf16": 11,
+              "end_utf16": 20
+            },
+            "reason": "프로젝트 코드명",
+            "replacement": "[PROJECT_n]"
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "[PROJECT_1]은 [PROJECT_1]이고 [PROJECT_2] 이다",
+        "decision": "allow",
+        "signal": "green",
+        "changes": [
+          {
+            "type": "project_codename",
+            "token": "[PROJECT_1]",
+            "count": 2
+          },
+          {
+            "type": "project_codename",
+            "token": "[PROJECT_2]",
+            "count": 1
+          }
+        ],
+        "remaining_findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      }
+    },
+    {
+      "name": "custom_regex",
+      "text": "사번 EMP-123456 의 휴가 기록",
+      "destination": null,
+      "inspect": {
+        "status": "complete",
+        "decision": "block",
+        "signal": "red",
+        "findings": [
+          {
+            "finding_id": "f1",
+            "type": "employee_id",
+            "category": "custom",
+            "rule_id": "custom:employee_id",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "medium",
+            "action": "mask",
+            "span": {
+              "start": 3,
+              "end": 13,
+              "start_utf16": 3,
+              "end_utf16": 13
+            },
+            "reason": "사번 형식",
+            "replacement": "[EMP_ID_n]"
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "사번 [EMP_ID_1] 의 휴가 기록",
+        "decision": "allow",
+        "signal": "green",
+        "changes": [
+          {
+            "type": "employee_id",
+            "token": "[EMP_ID_1]",
+            "count": 1
+          }
+        ],
+        "remaining_findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      }
+    },
+    {
+      "name": "custom_regex_case_sensitive",
+      "text": "사번 emp-123456 은 소문자",
+      "destination": null,
+      "inspect": {
+        "status": "complete",
+        "decision": "allow",
+        "signal": "green",
+        "findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "사번 emp-123456 은 소문자",
+        "decision": "allow",
+        "signal": "green",
+        "changes": [],
+        "remaining_findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      }
+    },
+    {
+      "name": "custom_regex_boundary_korean",
+      "text": "코드 DEAL-abc입니다 와 DEAL-xyz 끝",
+      "destination": null,
+      "inspect": {
+        "status": "complete",
+        "decision": "block",
+        "signal": "red",
+        "findings": [
+          {
+            "finding_id": "f1",
+            "type": "deal_code",
+            "category": "custom",
+            "rule_id": "custom:deal_code",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "block",
+            "span": {
+              "start": 17,
+              "end": 25,
+              "start_utf16": 17,
+              "end_utf16": 25
+            },
+            "reason": "거래 코드",
+            "replacement": null
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "코드 DEAL-abc입니다 와 DEAL-xyz 끝",
+        "decision": "block",
+        "signal": "red",
+        "changes": [],
+        "remaining_findings": [
+          {
+            "finding_id": "f1",
+            "type": "deal_code",
+            "category": "custom",
+            "rule_id": "custom:deal_code",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "block",
+            "span": {
+              "start": 17,
+              "end": 25,
+              "start_utf16": 17,
+              "end_utf16": 25
+            },
+            "reason": "거래 코드",
+            "replacement": null
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      }
+    },
+    {
+      "name": "custom_block_not_sanitizable",
+      "text": "거래 DEAL-xyz 와 kim@example.com",
+      "destination": null,
+      "inspect": {
+        "status": "complete",
+        "decision": "block",
+        "signal": "red",
+        "findings": [
+          {
+            "finding_id": "f1",
+            "type": "deal_code",
+            "category": "custom",
+            "rule_id": "custom:deal_code",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "block",
+            "span": {
+              "start": 3,
+              "end": 11,
+              "start_utf16": 3,
+              "end_utf16": 11
+            },
+            "reason": "거래 코드",
+            "replacement": null
+          },
+          {
+            "finding_id": "f2",
+            "type": "email",
+            "category": "personal",
+            "rule_id": "email",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "medium",
+            "action": "mask",
+            "span": {
+              "start": 14,
+              "end": 29,
+              "start_utf16": 14,
+              "end_utf16": 29
+            },
+            "reason": "이메일 주소 형식",
+            "replacement": "[EMAIL_n]"
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "거래 DEAL-xyz 와 [EMAIL_1]",
+        "decision": "block",
+        "signal": "red",
+        "changes": [
+          {
+            "type": "email",
+            "token": "[EMAIL_1]",
+            "count": 1
+          }
+        ],
+        "remaining_findings": [
+          {
+            "finding_id": "f1",
+            "type": "deal_code",
+            "category": "custom",
+            "rule_id": "custom:deal_code",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "block",
+            "span": {
+              "start": 3,
+              "end": 11,
+              "start_utf16": 3,
+              "end_utf16": 11
+            },
+            "reason": "거래 코드",
+            "replacement": null
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      }
+    },
+    {
+      "name": "custom_overlap_builtin",
+      "text": "블루문 담당 bluemoon@example.com",
+      "destination": null,
+      "inspect": {
+        "status": "complete",
+        "decision": "block",
+        "signal": "red",
+        "findings": [
+          {
+            "finding_id": "f1",
+            "type": "project_codename",
+            "category": "confidential",
+            "rule_id": "custom:project_codename",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "mask",
+            "span": {
+              "start": 0,
+              "end": 3,
+              "start_utf16": 0,
+              "end_utf16": 3
+            },
+            "reason": "프로젝트 코드명",
+            "replacement": "[PROJECT_n]"
+          },
+          {
+            "finding_id": "f2",
+            "type": "email",
+            "category": "personal",
+            "rule_id": "email",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "medium",
+            "action": "mask",
+            "span": {
+              "start": 7,
+              "end": 27,
+              "start_utf16": 7,
+              "end_utf16": 27
+            },
+            "reason": "이메일 주소 형식",
+            "replacement": "[EMAIL_n]"
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "[PROJECT_1] 담당 [EMAIL_1]",
+        "decision": "allow",
+        "signal": "green",
+        "changes": [
+          {
+            "type": "project_codename",
+            "token": "[PROJECT_1]",
+            "count": 1
+          },
+          {
+            "type": "email",
+            "token": "[EMAIL_1]",
+            "count": 1
+          }
+        ],
+        "remaining_findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      }
+    },
+    {
+      "name": "custom_disabled",
+      "text": "꺼진키워드는 탐지하지 않음",
+      "destination": null,
+      "inspect": {
+        "status": "complete",
+        "decision": "allow",
+        "signal": "green",
+        "findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "꺼진키워드는 탐지하지 않음",
+        "decision": "allow",
+        "signal": "green",
+        "changes": [],
+        "remaining_findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "unknown",
+          "channel": "unknown",
+          "tier": "elevated",
+          "verified": false,
+          "basis": null
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": [
+          "destination_unknown"
+        ]
+      }
+    },
+    {
+      "name": "custom_with_destination",
+      "text": "BM-7 서버 10.1.2.3",
+      "destination": {
+        "provider": "deepseek",
+        "channel": "consumer"
+      },
+      "inspect": {
+        "status": "complete",
+        "decision": "block",
+        "signal": "red",
+        "findings": [
+          {
+            "finding_id": "f1",
+            "type": "project_codename",
+            "category": "confidential",
+            "rule_id": "custom:project_codename",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "high",
+            "action": "mask",
+            "span": {
+              "start": 0,
+              "end": 4,
+              "start_utf16": 0,
+              "end_utf16": 4
+            },
+            "reason": "프로젝트 코드명",
+            "replacement": "[PROJECT_n]"
+          },
+          {
+            "finding_id": "f2",
+            "type": "internal_ip",
+            "category": "infrastructure",
+            "rule_id": "ipv4",
+            "detector": "rule",
+            "confidence": "high",
+            "severity": "medium",
+            "action": "mask",
+            "span": {
+              "start": 8,
+              "end": 16,
+              "start_utf16": 8,
+              "end_utf16": 16
+            },
+            "reason": "IPv4 주소/CIDR",
+            "replacement": "[INTERNAL_IP_n]"
+          }
+        ],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "deepseek",
+          "channel": "consumer",
+          "tier": "restricted",
+          "verified": false,
+          "basis": "PRC 처리·저장 명시([충돌]), 비식별 후 개선에 사용, 고정 보관 기간 없음"
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": []
+      },
+      "sanitize": {
+        "status": "complete",
+        "sanitized_text": "[PROJECT_1] 서버 [INTERNAL_IP_1]",
+        "decision": "warn",
+        "signal": "yellow",
+        "changes": [
+          {
+            "type": "project_codename",
+            "token": "[PROJECT_1]",
+            "count": 1
+          },
+          {
+            "type": "internal_ip",
+            "token": "[INTERNAL_IP_1]",
+            "count": 1
+          }
+        ],
+        "remaining_findings": [],
+        "policy_version": "2026-10-31.draft3",
+        "destination": {
+          "provider": "deepseek",
+          "channel": "consumer",
+          "tier": "restricted",
+          "verified": false,
+          "basis": "PRC 처리·저장 명시([충돌]), 비식별 후 개선에 사용, 고정 보관 기간 없음"
+        },
+        "detector_versions": {
+          "rules": "rules-0.1.0",
+          "ruleset": "rs-7"
+        },
+        "notices": []
       }
     }
   ]
