@@ -1,0 +1,16 @@
+# Requires Docker Compose 2.24.4 or later for !override.
+services:
+  backend:
+    extends:
+      file: compose.yaml
+      service: backend
+    ports: !override
+      - "${APP_BIND_IP:-0.0.0.0}:${APP_PORT:-8080}:8080"
+
+  mysql:
+    extends:
+      file: compose.yaml
+      service: mysql
+
+volumes:
+  mysql-data:

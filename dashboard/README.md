@@ -14,7 +14,7 @@ Docker로 전체 앱을 실행할 때는 **Docker Engine와 Docker Compose v2만
 
 `backend/`는 API, 집계, DB 마이그레이션과 정적 화면 제공을 담당합니다. `frontend/`는 같은 출처의 `/api/v1`을 호출합니다. Compose는 `backend`와 `mysql`을 실행하며, React 화면은 백엔드 JAR에서 제공하므로 별도 프런트엔드 컨테이너가 필요하지 않습니다. 개발 중에는 Vite가 `/api` 요청을 `127.0.0.1:8080`으로 프록시합니다.
 
-인증이 없는 로컬 시연 범위이며 호스트에 공개하는 주소는 앱 `127.0.0.1:8080`, MySQL `127.0.0.1:3306`입니다. 클라우드 배포, 로그인·권한, 감지 엔진, 확장 프로그램 연동, 실제 정책 변경은 포함하지 않습니다.
+인증이 없는 로컬 시연 범위이며 기본 Compose가 호스트에 공개하는 주소는 앱 `127.0.0.1:8080`, MySQL `127.0.0.1:3306`입니다. 아래 개발용 Compose는 앱의 LAN 접속을 허용할 수 있습니다. 클라우드 배포, 로그인·권한, 감지 엔진, 확장 프로그램 연동, 실제 정책 변경은 포함하지 않습니다.
 
 ## 빠른 시작: Docker로 전체 앱 실행
 
@@ -39,6 +39,37 @@ python3 scripts/seed_demo.py
 이름에 **데모**가 붙은 사용자 4명과 서울 기준 최근 완료된 6일의 이벤트 48개를 등록합니다. 같은 날짜의 같은 이벤트는 재실행 시 중복 생성되지 않습니다. 원문 대화나 실제 민감정보는 포함하지 않습니다. 화면의 새로고침 버튼으로 반영합니다.
 
 전체 앱을 멈추려면 `docker compose stop`, 다시 시작하려면 `docker compose up -d --wait`를 실행합니다. `docker compose down` 후에도 `mysql-data` 볼륨은 유지됩니다. **`docker compose down -v`는 DB 데이터도 삭제**하므로 초기화가 필요할 때만 사용합니다.
+
+## 개발용 Compose: 앱 접속 IP·포트 설정
+
+`compose-dev.yml`은 기본 구성의 앱 호스트 공개 주소만 바꾸며, [Docker Compose 2.24.4 이상](https://docs.docker.com/reference/compose-file/merge/#replace-value)이 필요합니다. `dashboard/`에서 `.env`를 준비한 뒤 이 파일 하나를 지정합니다. 기존 기본 Compose와 같은 프로젝트·DB 볼륨을 사용하므로, 기본 구성으로 실행 중이면 먼저 `docker compose stop backend`를 실행합니다.
+
+```bash
+# .env가 없을 때만 실행
+cp .env.example .env
+docker compose -f compose-dev.yml up --build -d --wait
+```
+
+기본값은 앱 `0.0.0.0:8080`이며 다른 기기에서도 호스트의 LAN IP로 접속할 수 있습니다. 예를 들어 호스트 IP가 `192.168.0.20`이면 브라우저 주소는 `http://192.168.0.20:8080`입니다. `0.0.0.0`은 수신 주소이므로 브라우저 접속 주소로 사용하지 않습니다.
+
+`.env`의 `APP_BIND_IP`·`APP_PORT`로 값을 유지하거나, 실행할 때 셸 변수로 덮어씁니다. 지정할 IP는 호스트에 할당된 주소여야 합니다.
+
+```bash
+APP_BIND_IP=192.168.0.20 APP_PORT=8081 \
+docker compose -f compose-dev.yml up --build -d --wait
+```
+
+위 예의 접속 주소는 `http://192.168.0.20:8081`입니다. MySQL 호스트 공개 주소는 계속 `127.0.0.1:3306`이며, 컨테이너 안의 앱 수신 주소 `0.0.0.0:8080`과 DB 연결 `mysql:3306`도 같습니다. `APP_BIND_IP`·`APP_PORT`는 기본 `compose.yaml`에는 영향을 주지 않습니다.
+
+상태·로그·종료에도 같은 파일을 지정합니다. 셸에서만 지정한 값을 유지하려면 다음 `up` 명령에도 같은 변수를 전달합니다.
+
+```bash
+docker compose -f compose-dev.yml ps
+docker compose -f compose-dev.yml logs -f backend
+docker compose -f compose-dev.yml stop
+```
+
+기본 구성으로 돌아가려면 `docker compose -f compose-dev.yml stop backend` 후 `docker compose up -d --wait`를 실행합니다.
 
 ## 단일 JAR로 직접 실행
 
@@ -82,7 +113,7 @@ Vite가 출력한 로컬 URL에 접속합니다. 직접 실행하는 앱은 `.en
 | `DB_PASSWORD` | `dashboard-local` (로컬 시연용) | `.env`의 값, MySQL 초기 계정과 공유 |
 | `MYSQL_ROOT_PASSWORD` | `.env`에서 설정하는 MySQL 초기 root 암호 | 백엔드에는 전달하지 않음 |
 | `SERVER_PORT` | `8080` | `8080` |
-| `SERVER_ADDRESS` | `127.0.0.1` | `0.0.0.0` (호스트 공개는 `127.0.0.1`) |
+| `SERVER_ADDRESS` | `127.0.0.1` | `0.0.0.0` (기본 구성의 호스트 공개는 `127.0.0.1`) |
 
 ## 화면과 집계 기준
 
@@ -189,7 +220,7 @@ java -jar build/libs/ai-security-dashboard.jar
 python3 scripts/smoke_api.py --base-url http://127.0.0.1:8081 --report /tmp/dashboard-api-smoke.json
 ```
 
-스크립트는 12개 동시 중복 등록, 재전송 충돌, 사용자·이력 상세, 페이지 순서, 검색, 항목·서비스·정책 필터 집계, 서울 일별 구간, 종료 시각 제외, 빈 일별 버킷, 잘못된 입력과 응답 오류 형식을 검증합니다. 실제 수행한 환경과 결과는 [validation/README.md](validation/README.md)에 기록합니다. 전체 앱 Compose 추가 작업의 설정·빌드 검증 범위와 컨테이너 실행 제약은 [validation/compose-backend.md](validation/compose-backend.md)에 별도로 기록합니다.
+스크립트는 12개 동시 중복 등록, 재전송 충돌, 사용자·이력 상세, 페이지 순서, 검색, 항목·서비스·정책 필터 집계, 서울 일별 구간, 종료 시각 제외, 빈 일별 버킷, 잘못된 입력과 응답 오류 형식을 검증합니다. 실제 수행한 환경과 결과는 [validation/README.md](validation/README.md)에 기록합니다. 전체 앱 Compose 추가 작업의 설정·빌드 검증 범위와 컨테이너 실행 제약은 [validation/compose-backend.md](validation/compose-backend.md), 개발용 Compose 설정 검증은 [validation/compose-dev.md](validation/compose-dev.md)에 별도로 기록합니다.
 
 JAR의 프런트엔드 포함 여부, 직접 URL 진입과 없는 리소스의 404 응답도 별도로 확인할 수 있습니다.
 
