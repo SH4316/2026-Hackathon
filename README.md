@@ -44,6 +44,10 @@ docker compose ps
 
 기본 실행은 CPU를 사용하며 `DECIDER_THREADS`의 기본값은 `4`입니다. 처음에는 이미지 빌드와 약 2.7GB 모델 다운로드가 필요합니다. 이후에는 `decider-data`의 모델 캐시를 재사용합니다. 사용하는 파일은 공식 [Mapika/decider-4b-GGUF](https://huggingface.co/Mapika/decider-4b-GGUF)의 `decider-4b-v3-Q4_K_M.gguf`이며 revision과 파일 해시는 [model_files.py](./server/decider/model_files.py)에 고정합니다.
 
+Decider 이미지 빌드는 BuildKit의 pip 캐시 마운트로 다운로드 파일과 빌드한 wheel을 재사용합니다. Torch 설치, [네이티브 의존성](./server/decider/requirements-native.txt)의 llama.cpp 컴파일, 일반 의존성 설치를 별도 레이어로 나눠 일반 의존성이나 서버 코드만 바뀌면 컴파일 레이어를 재사용합니다. CPU·CUDA, 아키텍처, Python·배포판별로 캐시를 구분하며 캐시 파일은 최종 이미지에 포함하지 않습니다. 첫 빌드와 캐시가 삭제된 빌드에서는 컴파일이 필요합니다. 캐시는 같은 BuildKit 빌더에 보관되고 `decider-data` 모델 볼륨과는 별개입니다.
+
+컴파일 옵션·베이스 이미지·툴체인·Python ABI를 바꾸면 [Dockerfile](./server/decider/Dockerfile)의 `DECIDER_WHEEL_CACHE_VERSION` 기본값을 올리거나 `docker compose build --build-arg DECIDER_WHEEL_CACHE_VERSION=2 decider`처럼 새 값을 지정합니다. pip의 wheel 캐시는 같은 패키지 버전의 컴파일 옵션 차이를 구분하지 않습니다. Docker 레이어가 재실행돼도 캐시 마운트는 남을 수 있으므로, 네이티브 wheel을 다시 컴파일할 때는 `--no-cache`만 쓰지 말고 캐시 버전도 바꿉니다.
+
 NVIDIA GPU를 쓰려면 GPU·호환 드라이버와 Docker용 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)을 준비하고 다음 명령을 사용합니다. GPU 구성의 `gpus: all`은 [Compose 2.30.0 이상](https://docs.docker.com/reference/compose-file/services/#gpus)이 필요합니다.
 
 ```bash

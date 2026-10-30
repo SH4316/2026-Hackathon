@@ -1,5 +1,9 @@
 # syntax=docker/dockerfile:1
 
+# Bump when changing CMake flags or the base/toolchain/Python ABI: pip's wheel
+# cache does not distinguish those build settings for the same package version.
+ARG DECIDER_WHEEL_CACHE_VERSION=1
+
 FROM python:3.12-slim-bookworm AS downloader
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
@@ -9,28 +13,44 @@ USER decider
 CMD ["python", "download.py"]
 
 FROM python:3.12-slim-bookworm AS cpu-build
-ENV PIP_NO_CACHE_DIR=1 CMAKE_BUILD_PARALLEL_LEVEL=2 \
+ARG TARGETARCH
+ARG TARGETVARIANT
+ARG DECIDER_WHEEL_CACHE_VERSION
+ENV CMAKE_BUILD_PARALLEL_LEVEL=2 \
     CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS -DGGML_CUDA=OFF -DLLAMA_CURL=OFF"
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential cmake pkg-config libopenblas-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN python -m venv /opt/venv
+RUN --mount=type=cache,id=decider-cpu-${TARGETARCH}${TARGETVARIANT}-py312-bookworm-v${DECIDER_WHEEL_CACHE_VERSION},target=/root/.cache/pip,sharing=locked \
+    /opt/venv/bin/pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+COPY requirements-native.txt /tmp/requirements-native.txt
+RUN --mount=type=cache,id=decider-cpu-${TARGETARCH}${TARGETVARIANT}-py312-bookworm-v${DECIDER_WHEEL_CACHE_VERSION},target=/root/.cache/pip,sharing=locked \
+    /opt/venv/bin/pip install --no-binary llama-cpp-python -r /tmp/requirements-native.txt
 COPY requirements.txt /tmp/requirements.txt
-RUN /opt/venv/bin/pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu \
-    && /opt/venv/bin/pip install --no-binary llama-cpp-python -r /tmp/requirements.txt \
+RUN --mount=type=cache,id=decider-cpu-${TARGETARCH}${TARGETVARIANT}-py312-bookworm-v${DECIDER_WHEEL_CACHE_VERSION},target=/root/.cache/pip,sharing=locked \
+    /opt/venv/bin/pip install --no-binary llama-cpp-python -r /tmp/requirements.txt \
     # The supported GGUF path needs none of the package's flash-linear-attention training dependency.
     && /opt/venv/bin/pip install --no-deps decider-ai==1.10.0 \
     && /opt/venv/bin/python -c "from decider.infer import Decider; from llama_cpp import llama_cpp"
 
 FROM nvidia/cuda:12.8.1-devel-ubuntu24.04@sha256:520292dbb4f755fd360766059e62956e9379485d9e073bbd2f6e3c20c270ed66 AS cuda-build
-ENV DEBIAN_FRONTEND=noninteractive PIP_NO_CACHE_DIR=1 CMAKE_BUILD_PARALLEL_LEVEL=2 \
+ARG TARGETARCH
+ARG TARGETVARIANT
+ARG DECIDER_WHEEL_CACHE_VERSION
+ENV DEBIAN_FRONTEND=noninteractive CMAKE_BUILD_PARALLEL_LEVEL=2 \
     CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS -DGGML_CUDA=ON -DLLAMA_CURL=OFF"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-venv python3-dev build-essential cmake pkg-config libopenblas-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv /opt/venv
+RUN --mount=type=cache,id=decider-cuda1281-${TARGETARCH}${TARGETVARIANT}-py312-ubuntu2404-v${DECIDER_WHEEL_CACHE_VERSION},target=/root/.cache/pip,sharing=locked \
+    /opt/venv/bin/pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+COPY requirements-native.txt /tmp/requirements-native.txt
+RUN --mount=type=cache,id=decider-cuda1281-${TARGETARCH}${TARGETVARIANT}-py312-ubuntu2404-v${DECIDER_WHEEL_CACHE_VERSION},target=/root/.cache/pip,sharing=locked \
+    /opt/venv/bin/pip install --no-binary llama-cpp-python -r /tmp/requirements-native.txt
 COPY requirements.txt /tmp/requirements.txt
-RUN /opt/venv/bin/pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu \
-    && /opt/venv/bin/pip install --no-binary llama-cpp-python -r /tmp/requirements.txt \
+RUN --mount=type=cache,id=decider-cuda1281-${TARGETARCH}${TARGETVARIANT}-py312-ubuntu2404-v${DECIDER_WHEEL_CACHE_VERSION},target=/root/.cache/pip,sharing=locked \
+    /opt/venv/bin/pip install --no-binary llama-cpp-python -r /tmp/requirements.txt \
     && /opt/venv/bin/pip install --no-deps decider-ai==1.10.0 \
     # Importing the CUDA library needs the host driver, which is absent during image builds.
     # GGML_NATIVE=OFF uses the pinned llama.cpp CUDA architecture list without a build-time GPU.

@@ -1,0 +1,3 @@
+# Installed before general dependencies so their updates keep the native layer cached.
+numpy==2.4.1
+llama-cpp-python==0.3.35

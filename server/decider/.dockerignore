@@ -1,6 +1,7 @@
 *
 !Dockerfile
 !requirements.txt
+!requirements-native.txt
 !model_files.py
 !download.py
 !serve.py

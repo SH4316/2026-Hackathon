@@ -50,9 +50,11 @@ python3 -m venv /tmp/safeprompt-decider-tests-venv
 
 런타임 검사는 유한한 0~1 Noul 확률만 워밍업 성공으로 인정하고, SDK의 `Context:\n` 접두어를 포함한 상태 입력이 32,768 토큰을 넘으면 잘라서 추론하지 않고 거절하는지 확인합니다. 본문·질문 수 제한, 입력을 포함하지 않는 오류 응답, 오프라인 캐시·해시 검사·원자적 다운로드 교체도 포함합니다.
 
+wheel 빌드 캐시 변경 후에도 런타임 22개 검사와 Compose 구성 검사가 통과했습니다. Dockerfile 파싱·전체 `RUN`의 셸 구문·`COPY` 입력의 `.dockerignore` 허용 여부와, 분리한 requirements를 확장했을 때 기존 직접 의존성 7개의 고정 버전이 유지되는지 확인했습니다. 별도 임시 pip 캐시에서 작은 `wheel==0.45.1` 패키지를 `--no-binary wheel`로 두 번 빌드해 두 번째 실행은 저장된 wheel을 재사용하는 것도 확인했습니다. 이는 pip 캐시 동작 검사이며 실제 llama.cpp 컴파일이나 BuildKit 캐시 적중 검사는 아닙니다. Docker Engine이 없어 실제 CPU/CUDA 이미지 빌드·캐시 적중·소요 시간은 검증하지 않았습니다.
+
 ## 고정 소스와 실행 한계
 
 - 공식 모델: [Mapika/decider-4b-GGUF](https://huggingface.co/Mapika/decider-4b-GGUF), revision `d3a78581751d518bbfa9e871a6d84059554d53c5`, `decider-4b-v3-Q4_K_M.gguf`(2,708,804,000 bytes). 토크나이저·설정 파일을 포함한 크기·SHA-256은 [model_files.py](../server/decider/model_files.py)에 고정합니다.
-- 공식 SDK: [Mapika/decider](https://github.com/Mapika/decider)의 `decider-ai==1.10.0`. `llama-cpp-python==0.3.35`, CPU `torch==2.10.0`, `transformers==5.0.0`을 사용합니다. CPU/GPU 빌드 정의는 [Dockerfile](../server/decider/Dockerfile), 나머지 직접 의존성은 [requirements.txt](../server/decider/requirements.txt)에 있습니다. CUDA 빌드·런타임은 NVIDIA CUDA `12.8.1`의 Ubuntu 24.04 이미지를 사용합니다.
+- 공식 SDK: [Mapika/decider](https://github.com/Mapika/decider)의 `decider-ai==1.10.0`. `llama-cpp-python==0.3.35`, CPU `torch==2.10.0`, `transformers==5.0.0`을 사용합니다. CPU/GPU 빌드 정의는 [Dockerfile](../server/decider/Dockerfile), llama.cpp와 NumPy는 [requirements-native.txt](../server/decider/requirements-native.txt), 나머지 직접 의존성은 [requirements.txt](../server/decider/requirements.txt)에 있습니다. CUDA 빌드·런타임은 NVIDIA CUDA `12.8.1`의 Ubuntu 24.04 이미지를 사용합니다.
 - 이미지 빌드, Docker 컨테이너 기동·볼륨 수명 주기, 실제 GGUF 다운로드·로드·추론, CPU 성능·메모리 사용량, NVIDIA GPU 동작은 이 환경에서 검증하지 않았습니다. Dockerfile의 CPU 빌드에는 SDK와 컴파일된 llama.cpp 모듈 import 검사를, CUDA 빌드에는 SDK import와 `llama-cpp-python` 패키지 메타데이터 검사를 정의합니다. 실제 CUDA 드라이버·추론 경로는 컨테이너 시작 시 SDK 워밍업으로 확인하도록 구성했으며, 이 빌드·실행 검사는 여기서 수행하지 않았습니다.
 - 대시보드·서버·실제 모델을 연결한 종단 간 검사는 미실행입니다. 확장 필터 기본 버전의 실제 DB 게시·활성화, 개발용 Jev API 키·사람 이름 분류의 정확도, 사람 등록·등록 코드 연결과 운영 장비의 시간 제한·메모리 적합성은 실행 환경에서 확인해야 합니다.
