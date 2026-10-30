@@ -19,7 +19,7 @@
       </svg>
     </div>
     <h1 class="sp-wordmark">Safe<span>Prompt</span></h1>
-    <span class="sp-version-badge">v1.2</span>
+    <span class="sp-version-badge">v0.3.0</span>
   </header>
 
   <!-- Server Status Card -->
@@ -34,6 +34,23 @@
     <p id="detail" class="sp-detail"></p>
   </div>
 
+
+  <section class="sp-card inspection-controls" aria-label="검사 방식">
+    <label class="sp-toggle-row">
+      <span class="sp-label">서버 검사</span>
+      <span class="sp-switch"><input id="serverEnabled" type="checkbox" role="switch"><span class="sp-switch-track"></span></span>
+    </label>
+    <div class="sp-divider"></div>
+    <label class="sp-toggle-row">
+      <span class="sp-label">기기 내 AI 검사</span>
+      <span class="sp-switch"><input id="localAiEnabled" type="checkbox" role="switch" aria-describedby="aiHelp"><span class="sp-switch-track"></span></span>
+    </label>
+    <p id="aiHelp" class="sp-help">처음 켤 때 모델 약 266 MB를 다운로드합니다. 이후에는 인터넷 없이 사용할 수 있습니다.</p>
+    <p id="aiStatus" class="sp-help" role="status" aria-live="polite">상태 확인 중…</p>
+    <progress id="aiProgress" aria-label="AI 모델 다운로드" hidden></progress>
+    <button id="aiRetry" type="button" hidden>모델 준비 다시 시도</button>
+    <p id="inspectionMode" class="sp-help"></p>
+  </section>
 
   <!-- Toggle Card -->
   <div class="sp-card">
@@ -70,6 +87,6 @@
     </svg>
     설정 열기
   </button>
-  <script src="src/popup.js"></script>
+  <script type="module" src="src/popup.js"></script>
 </body>
 </html>

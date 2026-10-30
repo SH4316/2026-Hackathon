@@ -58,6 +58,19 @@ PG.PROVIDER_LABELS = {
 };
 
 PG.NOTICE_LABELS = {
+  server_unavailable_local_check: "서버에 연결되지 않아 기기 내 AI와 기본 규칙으로 검사했습니다. 서버의 사용자 규칙은 적용되지 않습니다.",
+  local_ai_pii_without_location: "기기 내 AI가 개인정보 가능성을 감지했습니다. 위치를 찾는 모델이 아니므로 해당 내용은 직접 확인·수정해 주세요.",
+  local_ai_not_ready: "AI 모델을 준비하고 있습니다. 팝업에서 진행 상태를 확인하세요.",
+  local_ai_timeout: "기기 내 AI 검사 시간이 초과되었습니다. 내용을 줄이거나 모델을 다시 준비해 주세요.",
+  local_ai_failed: "기기 내 AI 검사를 완료하지 못했습니다. 다시 검사해 주세요.",
+  local_ai_load_failed: "AI 모델을 불러오지 못했습니다. 팝업에서 모델 준비를 다시 시도해 주세요.",
+  local_ai_superseded: "새 검사 요청이 있어 이전 검사를 취소했습니다.",
+  local_ai_input_too_long: "AI가 처리할 수 있는 입력 길이를 초과했습니다. 내용을 나누어 검사해 주세요.",
+  local_ai_busy: "AI 검사 요청이 많습니다. 잠시 후 다시 시도하세요.",
+  local_ai_integrity: "다운로드한 모델을 확인하지 못했습니다. 모델 준비를 다시 시도하세요.",
+  local_ai_output: "AI 결과를 확인하지 못했습니다. 다시 검사하세요.",
+  local_ai_encoding: "AI 입력을 변환하지 못했습니다. 다시 검사하세요.",
+  local_ai_download: "모델 다운로드에 실패했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
   destination_unknown: "전송 대상 AI를 알 수 없어 강화 기준을 적용했습니다.",
   destination_channel_unknown: "접근 경로를 알 수 없어 강화 기준을 적용했습니다.",
   destination_channel_unverified: "조직 계약이 확인되지 않은 경로라 강화 기준을 적용했습니다.",
@@ -67,6 +80,11 @@ PG.NOTICE_LABELS = {
 };
 
 PG.ERROR_LABELS = {
+  ...PG.NOTICE_LABELS,
+  no_inspector: "검사 방식이 모두 꺼져 있습니다. 서버 검사 또는 기기 내 AI 검사를 켜 주세요.",
+  settings_changed: "검사 설정이 바뀌었습니다. 새 설정으로 다시 검사해 주세요.",
+  inspection_failed: "검사를 완료하지 못했습니다. 설정을 확인하고 다시 검사해 주세요.",
+  invalid_inspection: "검사 응답 형식이 올바르지 않습니다. 서버 상태를 확인해 주세요.",
   network: "검사 서버에 연결할 수 없습니다.",
   timeout: "검사 서버 응답 시간이 초과되었습니다.",
   http_401: "검사 서버 인증에 실패했습니다. 확장프로그램 설정의 API 키를 확인하세요.",

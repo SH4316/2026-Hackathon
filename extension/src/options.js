@@ -1,3 +1,5 @@
+import { initAIControls } from "./ai-controls.js";
+void initAIControls();
 const $ = (id) => document.getElementById(id);
 const msg = $("msg");
 
@@ -21,7 +23,7 @@ async function ensurePermission(url) {
 $("form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const serverUrl = $("serverUrl").value.trim().replace(/\/+$/, "");
-  if (!(await ensurePermission(serverUrl))) {
+  if ($("serverEnabled").checked && !(await ensurePermission(serverUrl))) {
     msg.textContent = "서버 접근 권한이 없어 저장하지 않았습니다.";
     return;
   }

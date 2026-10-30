@@ -8,6 +8,7 @@ import os from "node:os";
 import { makeDocx, makeHwpx, makeOdt, makePptx, makeXlsx } from "./zip.mjs";
 
 const EXT = path.resolve(import.meta.dirname, "..");
+const VERSION = JSON.parse(fs.readFileSync(path.join(EXT, "manifest.json"), "utf8")).version;
 const OUT = path.resolve(import.meta.dirname, "shots");
 fs.mkdirSync(OUT, { recursive: true });
 const PAGE = process.env.PG_E2E_PAGE || "http://localhost:5500/index.html";
@@ -457,7 +458,7 @@ await popup.goto(`chrome-extension://${extId}/popup.html`);
 await popup.waitForTimeout(800);
 await popup.screenshot({ path: `${OUT}/6-popup.png` });
 check("popup shows server down", (await popup.locator("#status").textContent()).includes("연결 안 됨"));
-check("popup shows the extension version", (await popup.locator("#ver").textContent()).includes("0.3.0"));
+check("popup shows the extension version", (await popup.locator("#ver").textContent()).includes(VERSION));
 } catch (e) {
   results.push("ERROR " + e.message.split("\n")[0]);
   await page.screenshot({ path: `${OUT}/error.png` });
