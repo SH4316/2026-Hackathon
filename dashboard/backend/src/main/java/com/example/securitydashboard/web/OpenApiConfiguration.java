@@ -1,4 +1,4 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.web;
 
 import io.swagger.v3.oas.models.*;
 import io.swagger.v3.oas.models.examples.Example;
@@ -22,14 +22,17 @@ class OpenApiConfiguration {
                 .version("2.0")
                 .description(
                     "사용자가 정의한 버전별 태그 트리, 프롬프트 범위 탐지, 불변 검색 스냅샷 API. 인증 없는 로컬 개발 대시보드입니다. 요청 본문 최대"
-                        + " 1MiB, 프롬프트 최대 200000 Unicode code point. 시각은 UTC 마이크로초로 저장합니다. ID는"
-                        + " [A-Za-z0-9_-]{1,80} 형식이며 버전/저장 검색 ID는 서버가 생성합니다. 최초 데이터베이스는 비어 있습니다."))
+                        + " 1MiB(POST /api/v1/detector-events는 16MiB), 프롬프트 최대 200000 Unicode code"
+                        + " point. 시각은 UTC 마이크로초로 저장합니다. 대시보드 ID는 [A-Za-z0-9_-]{1,80} 형식이며 detector"
+                        + " request_id는 임의의 유니코드 1~128자입니다. 버전/저장 검색 ID는 서버가 생성합니다. 최초 데이터베이스는 비어"
+                        + " 있습니다."))
         .servers(List.of(new Server().url("/")));
   }
 
   @Bean
   OpenApiCustomizer examples() {
     return api -> {
+      detectorSchemas(api);
       var errorSchema =
           new ObjectSchema()
               .addProperty("code", new StringSchema().example("INVALID_INPUT"))
@@ -261,6 +264,25 @@ class OpenApiConfiguration {
                               "order",
                               0)))));
     };
+  }
+
+  private static void detectorSchemas(OpenAPI api) {
+    var schemas = api.getComponents().getSchemas();
+    // JsonNode preserves integer precision at runtime but is not the wire type of input_version.
+    schemas
+        .get("InspectResponse")
+        .addProperty(
+            "input_version",
+            new ComposedSchema()
+                .addOneOfItem(new Schema<>().types(Set.of("integer")))
+                .addOneOfItem(new StringSchema()));
+    // OpenAPI 3.1 uses a type union for nullability. Required/optional presence stays unchanged.
+    schemas.get("Destination").addProperty("basis", nullableString());
+    schemas.get("Finding").addProperty("replacement", nullableString());
+  }
+
+  private static Schema<?> nullableString() {
+    return new Schema<>().types(new LinkedHashSet<>(List.of("string", "null")));
   }
 
   private static void parameter(

@@ -1,13 +1,14 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.event;
 
+import com.example.securitydashboard.api.ApiModels;
+import com.example.securitydashboard.common.ApiException;
+import com.example.securitydashboard.common.InputValidation;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
-record CanonicalEvent(
+public record CanonicalEvent(
     String sourceId,
     String eventId,
     String personId,
@@ -18,30 +19,37 @@ record CanonicalEvent(
     String model,
     String policyStateId,
     List<Span> detections) {
-  record Span(int start, int end, String text, List<String> tagIds) {}
+  public record Span(int start, int end, String text, List<String> tagIds) {}
 
-  static CanonicalEvent from(ApiModels.CreateEvent request, Clock clock) {
+  public static CanonicalEvent from(ApiModels.CreateEvent request, Clock clock) {
+    return from(request, clock, false);
+  }
+
+  // InspectResponse permits empty text when there are no findings. Legacy /events does not.
+  public static CanonicalEvent from(
+      ApiModels.CreateEvent request, Clock clock, boolean allowEmptyText) {
     String prompt = request.prompt();
-    if (prompt.isBlank()) throw ApiException.invalid("prompt", "프롬프트를 입력해 주세요.");
+    if (!allowEmptyText && prompt.isBlank()) throw ApiException.invalid("prompt", "프롬프트를 입력해 주세요.");
     int length = prompt.codePointCount(0, prompt.length());
     if (length > 200000) throw ApiException.invalid("prompt", "프롬프트는 유니코드 문자 200000자 이하여야 합니다.");
-    if (hasUnpairedSurrogate(prompt))
+    if (InputValidation.hasUnpairedSurrogate(prompt))
       throw ApiException.invalid("prompt", "올바른 유니코드 문자열을 입력해 주세요.");
     Instant time = null;
     if (request.occurredAt() != null) {
-      time = parseInstant(request.occurredAt(), "occurredAt");
+      time = InputValidation.parseInstant(request.occurredAt(), "occurredAt");
       if (time.isAfter(clock.instant().plus(5, ChronoUnit.MINUTES)))
         throw ApiException.invalid("occurredAt", "현재 시각보다 5분 이상 미래인 이벤트는 등록할 수 없습니다.");
-      validateTime(time, "occurredAt");
+      InputValidation.validateTime(time, "occurredAt");
       time = time.truncatedTo(ChronoUnit.MICROS);
     }
     String model = request.model() == null ? null : request.model().strip();
     if (model != null && model.isEmpty()) model = null;
     if (model != null
-        && (model.codePointCount(0, model.length()) > 120 || hasUnpairedSurrogate(model)))
+        && (model.codePointCount(0, model.length()) > 120
+            || InputValidation.hasUnpairedSurrogate(model)))
       throw ApiException.invalid("model", "모델명은 120자 이하여야 합니다.");
     if (request.policyStateId() != null)
-      EventFilter.validateId(request.policyStateId(), "policyStateId");
+      InputValidation.validateId(request.policyStateId(), "policyStateId");
     var merged =
         new TreeMap<Range, TreeSet<String>>(
             Comparator.comparingInt(Range::start).thenComparingInt(Range::end));
@@ -59,7 +67,7 @@ record CanonicalEvent(
       texts.put(range, actual);
       var tags = merged.computeIfAbsent(range, key -> new TreeSet<>());
       for (String tag : detection.tagIds()) {
-        EventFilter.validateId(tag, "tagIds");
+        InputValidation.validateId(tag, "tagIds");
         tags.add(tag);
       }
     }
@@ -80,44 +88,15 @@ record CanonicalEvent(
         request.versionId(),
         prompt,
         time,
-        request.service() == null ? "unspecified" : normalizeService(request.service()),
+        request.service() == null
+            ? "unspecified"
+            : InputValidation.normalizeService(request.service()),
         model,
         request.policyStateId(),
         spans);
   }
 
   private record Range(int start, int end) {}
-
-  static boolean hasUnpairedSurrogate(String value) {
-    for (int i = 0; i < value.length(); i++) {
-      char c = value.charAt(i);
-      if (Character.isHighSurrogate(c)) {
-        if (i + 1 >= value.length() || !Character.isLowSurrogate(value.charAt(++i))) return true;
-      } else if (Character.isLowSurrogate(c)) return true;
-    }
-    return false;
-  }
-
-  static String normalizeService(String value) {
-    String service = value.strip().toLowerCase(Locale.ROOT);
-    if (!service.matches("[a-z0-9_-]{1,64}"))
-      throw ApiException.invalid("service", "서비스는 영문 소문자, 숫자, 하이픈, 밑줄로 1~64자여야 합니다.");
-    return service;
-  }
-
-  static Instant parseInstant(String value, String field) {
-    try {
-      return OffsetDateTime.parse(value).toInstant();
-    } catch (DateTimeParseException | ArithmeticException exception) {
-      throw ApiException.invalid(field, "시간대가 포함된 ISO 8601 시각을 입력해 주세요.");
-    }
-  }
-
-  static void validateTime(Instant time, String field) {
-    if (time.isBefore(Instant.parse("1000-01-01T00:00:00Z"))
-        || !time.isBefore(Instant.parse("+10000-01-01T00:00:00Z")))
-      throw ApiException.invalid(field, "1000년부터 9999년 사이의 시각을 입력해 주세요.");
-  }
 
   boolean matches(ApiModels.Event event) {
     List<Span> spans =

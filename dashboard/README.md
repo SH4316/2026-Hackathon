@@ -6,6 +6,21 @@
 
 `backend/`는 API·SQL 집계·마이그레이션·SPA 제공, `frontend/`는 같은 출처의 `/api/v1` 호출, `dev/sql/`은 개발용 SQL 콜백을 담당합니다. API의 전체 입출력 계약은 [CONTRACT.md](CONTRACT.md)에 있습니다.
 
+백엔드 코드는 `com.example.securitydashboard` 아래 기능·역할별 패키지로 나눕니다. 루트의 `DashboardApplication`은 실행과 컴포넌트 검색을 담당하고, 각 HTTP 컨트롤러는 해당 기능의 서비스에 요청을 전달합니다.
+
+| 패키지 | 책임 |
+| --- | --- |
+| `api` | 기존 대시보드 API의 입출력 DTO |
+| `configuration` | 태그·정책 초안, 게시·활성화와 버전 조회 |
+| `event` | 사람 등록, 프롬프트·탐지 저장, 재전송 및 트랜잭션 |
+| `detector` | 탐지기 계약 검증·구간 변환·이미지 디코딩, 원본 메타데이터 수집·조회 |
+| `query` | 검색 조건·페이지 해석, SQL 조회·집계와 스냅샷 멤버십 수집 |
+| `savedsearch` | 검색 조건과 결과 멤버십을 고정하는 저장 검색 |
+| `common` | 공통 입력 검증·안전한 오류와 JDBC 행 처리 |
+| `web` | 본문 제한·오류 응답, JSON·OpenAPI 설정, 상태 확인과 SPA 경로 |
+
+탐지기 수집은 `DetectorEventNormalizer`가 검증·변환한 결과를 `DetectorEventService`가 `EventWriter`에 전달하는 흐름입니다. 원문 이벤트와 원본 결과·첨부는 같은 트랜잭션으로 저장합니다. 저장 검색은 `DashboardQueries`에 전체 일치 이벤트의 멤버십 수집을 요청하므로 검색 서비스가 조회 SQL 조각을 직접 조립하지 않습니다.
+
 ## 일반 실행: 빈 DB
 
 이 문서의 명령은 `dashboard/`에서 실행합니다.
@@ -50,7 +65,7 @@ docker compose -f compose-dev.yml up --build --force-recreate -d --wait backend
 docker compose -f compose-dev.yml logs --tail=100 backend
 ```
 
-로그에서 `Successfully validated 2 migrations`와 V2 적용 또는 현재 스키마 버전 `2`를 확인합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
+로그에서 `Successfully validated 3 migrations`와 V2·V3 적용 또는 현재 스키마 버전 `3`을 확인합니다. V3는 탐지 결과 메타데이터·파일 이름·이미지 원본 바이트를 보관하는 테이블을 추가하고 기존 데이터를 보존합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
 
 SQL은 게시 버전 `demo-v1`, `demo-v2`, 14개 원본 분류와 개인정보 하위 태그, 사용자 정의 정책 3종, 이름에 `데모`가 붙은 가상 사람 6명, 서울 기준 최근 완료된 30일의 이벤트를 만듭니다. V2는 같은 태그 ID를 기술정보·업무정보 묶음으로 재구성합니다. 각 분류의 하위 예시와 판단 지침을 포함하며 초안으로 복제한 뒤 모두 편집할 수 있습니다. 프롬프트는 합성 자료로 표시되고 이름·전화번호·이메일도 가상 값입니다. 시간대·날짜별 이벤트 수, 서비스, 정책, 감지 0건, 여러 태그를 가진 동일 구간과 같은 텍스트의 서로 다른 구간을 포함합니다.
 
@@ -131,10 +146,58 @@ java -jar build/libs/ai-security-dashboard.jar
 | `/classifier-config` | 예시·지침을 포함한 활성 설정, 없으면 `404 NO_ACTIVE_VERSION` |
 | `/people`·`/{id}` | 사람 등록과 필터별 통계 |
 | `/events`·`/{id}` | 이벤트 등록·페이지·원문 상세 |
+| `/detector-events`·`/{id}`·`/{id}/images/{imageId}` | 탐지기 결과 수집·원본 결과 상세·이미지 바이트 다운로드 |
 | `/metrics` | 요약·시계열·트리·미매핑·정책·서비스 집계 |
 | `/saved-searches`·`/{id}`·`/{id}/events`·`/{id}/metrics` | 고정 검색 생성·조회·삭제 |
 
-필터는 `from`, `to`, `versionId`, `service`, `personId`, `tagId`, `policyStateId`, `hasDetections`, `q`, `interval`, `unmapped`입니다. `tagId`와 `unmapped=true`는 함께 사용할 수 없습니다. 페이지는 0부터, 기본 크기 20·최대 100입니다. 이벤트의 `prompt`는 최대 200,000 코드 포인트, HTTP 본문은 1MiB, 감지는 최대 1,000개입니다. 오류는 한국어 `{code,message,fieldErrors?}`이며 원문 프롬프트와 스택을 포함하지 않습니다.
+필터는 `from`, `to`, `versionId`, `service`, `personId`, `tagId`, `policyStateId`, `hasDetections`, `q`, `interval`, `unmapped`입니다. `tagId`와 `unmapped=true`는 함께 사용할 수 없습니다. 페이지는 0부터, 기본 크기 20·최대 100입니다. 원문은 최대 200,000 코드 포인트입니다. 기존 `/events` 등록의 감지는 최대 1,000개이며 탐지기 수집에는 별도 감지 개수 제한이 없습니다. HTTP 본문 제한은 탐지기 수집 POST만 16MiB이고 기존 API는 1MiB입니다. 오류는 한국어 `{code,message,fieldErrors?}`이며 원문 프롬프트와 스택을 포함하지 않습니다.
+
+## 탐지기 HTTP 수집
+
+`POST /api/v1/detector-events`는 탐지기가 호출할 수집 엔드포인트입니다. `result`에는 기존 `InspectResponse` JSON을 그대로 넣고, `text`에 검사한 원문을 전달합니다. 기준은 `origin/main` 커밋 `e2021df`의 [탐지 룰 형식](https://github.com/SH4316/2026-Hackathon/blob/e2021dfc6f733a9b8b141c93557b5c8ddf02d60f/docs/rule-formats.md)과 [`server/app/schemas.py`](https://github.com/SH4316/2026-Hackathon/blob/e2021dfc6f733a9b8b141c93557b5c8ddf02d60f/server/app/schemas.py)입니다. 이 작업은 탐지기·확장프로그램의 호출 코드를 변경하지 않습니다.
+
+필수 봉투 필드는 `source_id`, `person_id`, `version_id`, `text`, `result`입니다. 사람은 먼저 등록하고, `version_id`는 대시보드의 현재 활성 게시 버전을 사용합니다. 탐지기의 `policy_version`·`detector_versions.ruleset`과 대시보드 설정 버전은 별개입니다. 수집은 초기 태그·정책·사용자·버전을 자동 생성하지 않습니다.
+
+`finding.type`과 같은 ID의 태그가 활성 버전에 있으면 연결합니다. 다른 ID를 쓰려면 `tag_map: {"email":"my_email_tag"}`처럼 지정합니다. 연결할 태그가 없는 탐지도 구간과 메타데이터를 보존하고 미매핑으로 집계합니다. 명시한 매핑 대상이 활성 버전에 없으면 `422`입니다. `policy_state_id`도 명시한 경우에만 정책 목록과 연결하며, `decision`으로 사용자 정책 상태를 추론하지 않습니다.
+
+다음은 빈 DB에서 실행하는 합성 예제입니다. `curl`과 `jq`가 필요하며, 사람 등록은 처음 한 번만 실행합니다. 기존 사람과 활성 버전이 있다면 해당 ID로 예제의 `person_id`·`version_id`를 바꿔 수집 단계부터 실행할 수 있습니다.
+
+```bash
+api=http://127.0.0.1:8080/api/v1
+curl --fail-with-body -sS "$api/people" \
+  -H 'Content-Type: application/json' \
+  --data '{"id":"detector-demo-user","name":"탐지기 합성 데모 사용자"}'
+
+draft=$(curl --fail-with-body -sS "$api/config-versions" \
+  -H 'Content-Type: application/json' --data '{"name":"탐지기 연결 예제"}')
+version_id=$(jq -r '.id' <<<"$draft")
+updated=$(curl --fail-with-body -sS -X PUT "$api/config-versions/$version_id" \
+  -H 'Content-Type: application/json' \
+  --data '{"revision":0,"name":"탐지기 연결 예제","tags":[{"id":"email","name":"이메일","description":"합성 예제 이메일","examples":["hong@example.com"],"guidance":"이메일 구간","color":"#2563EB","parentId":null,"order":0}],"policyStates":[{"id":"blocked","name":"차단 판정","description":"검사 서버의 차단 판정을 수집한 예제","color":"#DC2626","order":0}]}')
+jq '{revision}' <<<"$updated" > /tmp/dashboard-detector-publish.json
+curl --fail-with-body -sS -X POST "$api/config-versions/$version_id/publish" \
+  -H 'Content-Type: application/json' --data-binary @/tmp/dashboard-detector-publish.json
+curl --fail-with-body -sS -X POST "$api/config-versions/$version_id/activate"
+
+jq --arg version "$version_id" '.version_id = $version' \
+  examples/detector-event.json > /tmp/dashboard-detector-event.json
+curl --fail-with-body -sS -D /tmp/dashboard-detector-headers.txt \
+  "$api/detector-events" -H 'Content-Type: application/json' \
+  --data-binary @/tmp/dashboard-detector-event.json > /tmp/dashboard-detector-response.json
+jq . /tmp/dashboard-detector-response.json
+
+detector_id=$(jq -r '.id' /tmp/dashboard-detector-response.json)
+curl --fail-with-body -sS "$api/detector-events/$detector_id" | jq .
+image_path=$(jq -r '.images[0].download_path' /tmp/dashboard-detector-response.json)
+curl --fail-with-body -sS "http://127.0.0.1:8080$image_path" \
+  --output /tmp/dashboard-detector-image.png
+```
+
+[`examples/detector-event.json`](examples/detector-event.json)은 이모지가 있는 프롬프트, 합성 이메일, 한글 파일 이름, 68바이트 PNG를 포함합니다. `files`는 파일 이름만 저장하고 `images`는 이름·미디어 유형과 Base64를 디코딩한 원본 바이트를 저장합니다. 이미지 다운로드는 `application/octet-stream` 첨부로 제공하며 바이트를 변환하지 않습니다. `media_type`은 `image/png`처럼 `image/*` MIME 형식이고, `data_base64`는 데이터 URI 접두어·공백 없이 패딩을 포함한 표준 Base64입니다. 이름은 공백만으로 구성할 수 없는 1~255 코드 포인트이며 슬래시·역슬래시·제어 문자와 `.`·`..` 이름을 허용하지 않습니다. 일반 파일 최대 100개, 이미지 최대 20개·개별 5MiB·합계 10MiB입니다.
+
+새 결과는 `201`, 같은 결과 재전송은 `200`, 같은 식별자에 다른 내용은 `409`입니다. `event_id`는 `source_id`·`result.request_id`·타입을 포함한 `result.input_version`으로 결정되므로 숫자 `3`과 문자열 `"3"`은 서로 다른 검사입니다. 같은 요청의 재전송은 활성 버전이 바뀌어도 기존 결과를 반환합니다. POST 응답은 상세 GET과 같은 봉투이며 숫자 `id`로 조회하고 `event` 안에 기존 대시보드 이벤트가 포함됩니다. 원문·결과 JSON·첨부는 함께 저장되고 결과의 신뢰도·위험도·조치·정책 버전을 유지합니다. `service`를 생략하면 `destination.provider`를 사용하고 목적지 LLM 모델명은 추론하지 않습니다.
+
+이 기록은 **검사 판정**입니다. 확장프로그램이나 외부 AI에서 실제 전송·차단이 일어났는지 나타내지 않습니다. 전체 필드와 검증 규칙은 [수집 계약](CONTRACT.md#detector-http-ingestion)을 참고하세요.
 
 ## 검증 재실행
 
@@ -160,10 +223,11 @@ TEST_DB_URL='jdbc:mysql://127.0.0.1:3306/sending_test?connectionTimeZone=UTC&for
   TEST_DB_USERNAME=sending_test TEST_DB_PASSWORD=sending-test-local ./gradlew test
 ```
 
-`TEST_MIGRATION_DB_URL`은 비워도 되며, 지정하면 해당 폐기 가능한 `_test` DB를 초기화해 V1→V2 초기화와 이후 보존을 검증합니다. HTTP 검증도 별도 테스트 DB를 연결한 JAR를 포트 `8083` 등으로 실행한 뒤 진행합니다. 다음 스크립트는 게시 버전·사람·이벤트를 생성하고 스냅샷의 불변성, 버전 재해석, 동시 재전송, 이모지 구간, 오류 응답을 확인합니다.
+`TEST_MIGRATION_DB_URL`은 비워도 되며, 지정하면 해당 폐기 가능한 `_test` DB를 초기화해 V1→V2의 일회성 초기화, V2→V3의 기존 데이터 보존과 새 일반 DB의 빈 상태를 검증합니다. HTTP 검증도 별도 테스트 DB를 연결한 JAR를 포트 `8083` 등으로 실행한 뒤 진행합니다. 다음 스크립트는 게시 버전·사람·이벤트를 생성하고 스냅샷의 불변성, 버전 재해석, 동시 재전송, 이모지 구간, 오류 응답을 확인합니다. `smoke_detector_api.py`는 합성 사람·설정·이벤트를 생성하고 새 설정을 게시·활성화하므로 시연 DB와 분리한 테스트 서버에서 실행합니다.
 
 ```bash
 python3 scripts/smoke_api.py --base-url http://127.0.0.1:8083 --report /tmp/api-smoke.json
+python3 scripts/smoke_detector_api.py --base-url http://127.0.0.1:8083 --report /tmp/detector-smoke.json
 python3 scripts/smoke_package.py --base-url http://127.0.0.1:8083 \
   --jar backend/build/libs/ai-security-dashboard.jar --report /tmp/package-smoke.json
 ```

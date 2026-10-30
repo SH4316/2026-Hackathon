@@ -7,12 +7,12 @@ import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
 public class DashboardApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(DashboardApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(DashboardApplication.class, args);
+  }
 
-    @Bean
-    Clock applicationClock() {
-        return Clock.systemUTC();
-    }
+  @Bean
+  Clock applicationClock() {
+    return Clock.systemUTC();
+  }
 }

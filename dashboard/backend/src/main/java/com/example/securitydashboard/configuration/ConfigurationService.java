@@ -1,5 +1,9 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.configuration;
 
+import com.example.securitydashboard.api.ApiModels;
+import com.example.securitydashboard.common.ApiException;
+import com.example.securitydashboard.common.InputValidation;
+import com.example.securitydashboard.common.JdbcRows;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.ResultSet;
@@ -14,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-class ConfigurationService {
+public class ConfigurationService {
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final Clock clock;
@@ -32,8 +36,8 @@ class ConfigurationService {
         this::summary);
   }
 
-  ApiModels.ConfigVersion get(String id) {
-    EventFilter.validateId(id, "versionId");
+  public ApiModels.ConfigVersion get(String id) {
+    InputValidation.validateId(id, "versionId");
     var rows =
         jdbc.query(
             "SELECT v.*, (a.version_id=v.id) AS is_active FROM config_versions v LEFT JOIN"
@@ -60,7 +64,7 @@ class ConfigurationService {
         "SELECT version_id FROM active_config WHERE singleton_id=1", String.class);
   }
 
-  String lockActiveId() {
+  public String lockActiveId() {
     return jdbc.queryForObject(
         "SELECT version_id FROM active_config WHERE singleton_id=1 FOR UPDATE", String.class);
   }
@@ -73,7 +77,7 @@ class ConfigurationService {
     return get(id);
   }
 
-  ApiModels.ConfigVersion view(String requested) {
+  public ApiModels.ConfigVersion view(String requested) {
     String id = requested == null ? activeId() : requested;
     if (id == null) return null;
     var version = get(id);
@@ -85,7 +89,7 @@ class ConfigurationService {
 
   @Transactional
   ApiModels.ConfigVersion create(ApiModels.CreateVersion input) {
-    String name = name(input.name(), "name");
+    String name = InputValidation.name(input.name(), "name");
     var base = input.baseVersionId() == null ? null : get(input.baseVersionId());
     String id = "v_" + UUID.randomUUID().toString().replace("-", "");
     jdbc.update(
@@ -100,7 +104,7 @@ class ConfigurationService {
   @Transactional
   ApiModels.ConfigVersion update(String id, ApiModels.UpdateVersion input) {
     lockDraft(id, input.revision());
-    String name = name(input.name(), "name");
+    String name = InputValidation.name(input.name(), "name");
     List<ApiModels.Tag> tags = normalizeTags(input.tags());
     List<ApiModels.PolicyDefinition> policies = normalizePolicies(input.policyStates());
     jdbc.update("DELETE FROM config_tag_closure WHERE version_id=?", id);
@@ -141,7 +145,7 @@ class ConfigurationService {
   }
 
   private void lockDraft(String id, Long revision) {
-    EventFilter.validateId(id, "versionId");
+    InputValidation.validateId(id, "versionId");
     var values =
         jdbc.queryForList("SELECT status,revision FROM config_versions WHERE id=? FOR UPDATE", id);
     if (values.isEmpty())
@@ -155,7 +159,7 @@ class ConfigurationService {
           HttpStatus.CONFLICT, "REVISION_CONFLICT", "다른 변경이 저장되었습니다. 최신 버전을 불러와 주세요.");
   }
 
-  List<ApiModels.Tag> tags(String id) {
+  public List<ApiModels.Tag> tags(String id) {
     return jdbc.query(
         "SELECT * FROM config_version_tags WHERE version_id=? ORDER BY sort_order,id",
         (rs, n) ->
@@ -253,21 +257,21 @@ class ConfigurationService {
     Map<String, ApiModels.Tag> values = new LinkedHashMap<>();
     for (var t : input) {
       if (t == null) throw ApiException.invalid("tags", "비어 있는 태그는 저장할 수 없습니다.");
-      EventFilter.validateId(t.id(), "tags.id");
-      if (t.parentId() != null) EventFilter.validateId(t.parentId(), "tags.parentId");
+      InputValidation.validateId(t.id(), "tags.id");
+      if (t.parentId() != null) InputValidation.validateId(t.parentId(), "tags.parentId");
       List<String> examples = t.examples() == null ? List.of() : t.examples();
       if (examples.size() > 20) throw ApiException.invalid("examples", "예시는 최대 20개입니다.");
       for (String example : examples) {
         if (example == null) throw ApiException.invalid("examples", "예시는 문자열이어야 합니다.");
-        text(example, 1000, "examples");
+        InputValidation.text(example, 1000, "examples");
       }
       var tag =
           new ApiModels.Tag(
               t.id(),
-              name(t.name(), "tags.name"),
-              text(t.description(), 4000, "description"),
+              InputValidation.name(t.name(), "tags.name"),
+              InputValidation.text(t.description(), 4000, "description"),
               List.copyOf(examples),
-              text(t.guidance(), 4000, "guidance"),
+              InputValidation.text(t.guidance(), 4000, "guidance"),
               color(t.color()),
               t.parentId(),
               t.order() == null ? 0 : t.order());
@@ -297,29 +301,17 @@ class ConfigurationService {
     List<ApiModels.PolicyDefinition> result = new ArrayList<>();
     for (var p : input) {
       if (p == null) throw ApiException.invalid("policyStates", "비어 있는 정책은 저장할 수 없습니다.");
-      EventFilter.validateId(p.id(), "policyStates.id");
+      InputValidation.validateId(p.id(), "policyStates.id");
       if (!ids.add(p.id())) throw ApiException.invalid("policyStates.id", "정책 ID는 중복될 수 없습니다.");
       result.add(
           new ApiModels.PolicyDefinition(
               p.id(),
-              name(p.name(), "policyStates.name"),
-              text(p.description(), 4000, "description"),
+              InputValidation.name(p.name(), "policyStates.name"),
+              InputValidation.text(p.description(), 4000, "description"),
               color(p.color()),
               p.order() == null ? 0 : p.order()));
     }
     return List.copyOf(result);
-  }
-
-  static String name(String value, String field) {
-    if (value == null || value.isBlank()) throw ApiException.invalid(field, "이름은 1~80자여야 합니다.");
-    return text(value.strip(), 80, field);
-  }
-
-  static String text(String value, int max, String field) {
-    if (value == null) return "";
-    if (value.codePointCount(0, value.length()) > max || CanonicalEvent.hasUnpairedSurrogate(value))
-      throw ApiException.invalid(field, "문자열의 길이와 형식을 확인해 주세요.");
-    return value;
   }
 
   static String color(String color) {
@@ -336,7 +328,7 @@ class ConfigurationService {
         rs.getString("status"),
         rs.getBoolean("is_active"),
         rs.getLong("revision"),
-        DashboardQueries.instant(rs, "created_at"),
-        DashboardQueries.instant(rs, "published_at"));
+        JdbcRows.instant(rs, "created_at"),
+        JdbcRows.instant(rs, "published_at"));
   }
 }

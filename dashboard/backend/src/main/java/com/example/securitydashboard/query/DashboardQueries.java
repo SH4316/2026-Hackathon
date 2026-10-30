@@ -1,5 +1,10 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.query;
 
+import com.example.securitydashboard.api.ApiModels;
+import com.example.securitydashboard.common.ApiException;
+import com.example.securitydashboard.common.InputValidation;
+import com.example.securitydashboard.common.JdbcRows;
+import com.example.securitydashboard.configuration.ConfigurationService;
 import java.sql.*;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
@@ -7,11 +12,12 @@ import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.*;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
-class DashboardQueries {
+public class DashboardQueries {
   private final NamedParameterJdbcTemplate jdbc;
   private final ConfigurationService configs;
 
@@ -20,11 +26,12 @@ class DashboardQueries {
     this.configs = configs;
   }
 
-  ApiModels.Page<ApiModels.Event> events(EventFilter filter, PageRequest page) {
+  public ApiModels.Page<ApiModels.Event> events(EventFilter filter, PageRequest page) {
     return events(filter, page, null);
   }
 
-  ApiModels.Page<ApiModels.Event> events(EventFilter filter, PageRequest page, String snapshotId) {
+  public ApiModels.Page<ApiModels.Event> events(
+      EventFilter filter, PageRequest page, String snapshotId) {
     Query q = query(filter, snapshotId);
     long total = count(q.cte() + " SELECT COUNT(*) FROM matched_events", q.parameters());
     q.parameters().addValue("limit", page.size()).addValue("offset", page.offset());
@@ -38,7 +45,7 @@ class DashboardQueries {
     return ApiModels.Page.of(withDetections(rows), page.page(), page.size(), total);
   }
 
-  ApiModels.Event event(long id) {
+  public ApiModels.Event event(long id) {
     var rows =
         jdbc.query(
             eventSelect("security_events") + " WHERE e.id=:id", Map.of("id", id), this::eventRow);
@@ -47,7 +54,7 @@ class DashboardQueries {
     return withDetections(rows).getFirst();
   }
 
-  ApiModels.Event byExternalId(String source, String event) {
+  public ApiModels.Event byExternalId(String source, String event) {
     var rows =
         jdbc.query(
             eventSelect("security_events") + " WHERE e.source_id=:source AND e.event_id=:event",
@@ -63,13 +70,13 @@ class DashboardQueries {
         + " cp.version_id=e.version_id AND cp.id=e.policy_state_id ";
   }
 
-  ApiModels.Page<ApiModels.Person> people(
+  public ApiModels.Page<ApiModels.Person> people(
       EventFilter filter, PageRequest page, String personQuery) {
     Query q = query(filter, null);
     String where = "1=1";
     if (filter.personId() != null) where += " AND p.id=:personId";
     if (personQuery != null) {
-      ConfigurationService.text(personQuery, 80, "personQuery");
+      InputValidation.text(personQuery, 80, "personQuery");
       where +=
           " AND (CONVERT(p.id USING utf8mb4) COLLATE utf8mb4_bin LIKE :personQuery ESCAPE '!' OR"
               + " p.name LIKE :personQuery ESCAPE '!')";
@@ -97,7 +104,7 @@ class DashboardQueries {
     return ApiModels.Page.of(rows, page.page(), page.size(), total);
   }
 
-  ApiModels.Person person(String id, EventFilter filter) {
+  public ApiModels.Person person(String id, EventFilter filter) {
     Query q = query(filter, null);
     q.parameters().addValue("requestedId", id);
     var rows =
@@ -115,11 +122,11 @@ class DashboardQueries {
     return rows.getFirst();
   }
 
-  ApiModels.Metrics metrics(EventFilter filter) {
+  public ApiModels.Metrics metrics(EventFilter filter) {
     return metrics(filter, null);
   }
 
-  ApiModels.Metrics metrics(EventFilter filter, String snapshotId) {
+  public ApiModels.Metrics metrics(EventFilter filter, String snapshotId) {
     Query q = query(filter, snapshotId);
     var summary =
         jdbc.queryForObject(
@@ -276,6 +283,17 @@ class DashboardQueries {
                 rs.getString("bucket"), rs.getLong("event_count"), rs.getLong("finding_count")));
   }
 
+  /** Materialize all matching events within the saved-search caller's transaction. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void captureSnapshotMembers(String savedSearchId, EventFilter filter) {
+    var query = query(filter, null);
+    jdbc.update(
+        "INSERT INTO saved_search_events(saved_search_id,event_id) SELECT :snapshotId,e.id FROM"
+            + " security_events e WHERE "
+            + query.where(),
+        query.parameters().addValue("snapshotId", savedSearchId));
+  }
+
   Query query(EventFilter filter, String snapshotId) {
     var version = configs.view(filter.versionId());
     var p =
@@ -348,8 +366,8 @@ class DashboardQueries {
         rs.getString("person_id"),
         rs.getString("person_name"),
         rs.getString("prompt"),
-        instant(rs, "occurred_at"),
-        instant(rs, "received_at"),
+        JdbcRows.instant(rs, "occurred_at"),
+        JdbcRows.instant(rs, "received_at"),
         rs.getString("service"),
         rs.getString("model"),
         rs.getString("policy_state_id"),
@@ -424,12 +442,7 @@ class DashboardQueries {
         rs.getString("name"),
         rs.getLong("event_count"),
         rs.getLong("finding_count"),
-        instant(rs, "last_event_at"));
-  }
-
-  static Instant instant(ResultSet rs, String column) throws SQLException {
-    Timestamp t = rs.getTimestamp(column, Calendar.getInstance(TimeZone.getTimeZone("UTC")));
-    return t == null ? null : t.toInstant();
+        JdbcRows.instant(rs, "last_event_at"));
   }
 
   static Timestamp timestampBoundary(Instant instant) {

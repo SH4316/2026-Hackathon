@@ -1,11 +1,14 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.query;
 
+import com.example.securitydashboard.api.ApiModels;
+import com.example.securitydashboard.common.ApiException;
+import com.example.securitydashboard.common.InputValidation;
 import java.time.*;
 import java.util.*;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-record EventFilter(
+public record EventFilter(
     Instant from,
     Instant to,
     String versionId,
@@ -32,7 +35,8 @@ record EventFilter(
           "interval",
           "unmapped");
 
-  static EventFilter parse(MultiValueMap<String, String> query, Clock clock, Set<String> extra) {
+  public static EventFilter parse(
+      MultiValueMap<String, String> query, Clock clock, Set<String> extra) {
     query.forEach(
         (name, values) -> {
           if (!COMMON.contains(name) && !extra.contains(name))
@@ -44,16 +48,16 @@ record EventFilter(
     Instant from =
         fromText == null
             ? today.minusDays(6).atStartOfDay(SEOUL).toInstant()
-            : CanonicalEvent.parseInstant(fromText, "from");
+            : InputValidation.parseInstant(fromText, "from");
     Instant to =
         toText == null
             ? today.plusDays(1).atStartOfDay(SEOUL).toInstant()
-            : CanonicalEvent.parseInstant(toText, "to");
+            : InputValidation.parseInstant(toText, "to");
     if (!from.isBefore(to)) throw ApiException.invalid("to", "종료 시각은 시작 시각보다 뒤여야 합니다.");
     if (Duration.between(from, to).compareTo(Duration.ofDays(366)) > 0)
       throw ApiException.invalid("to", "검색 기간은 최대 366일입니다.");
-    CanonicalEvent.validateTime(from, "from");
-    CanonicalEvent.validateTime(to, "to");
+    InputValidation.validateTime(from, "from");
+    InputValidation.validateTime(to, "to");
     String interval = value(query, "interval");
     if (interval == null) interval = "day";
     if (!Set.of("day", "hour").contains(interval))
@@ -72,13 +76,13 @@ record EventFilter(
       throw ApiException.invalid("unmapped", "태그와 미분류 조건을 동시에 사용할 수 없습니다.");
     String q = query.getFirst("q");
     if (q != null && q.isEmpty()) q = null;
-    if (q != null) ConfigurationService.text(q, 4000, "q");
+    if (q != null) InputValidation.text(q, 4000, "q");
     String service = value(query, "service");
     return new EventFilter(
         from,
         to,
         version,
-        service == null ? null : CanonicalEvent.normalizeService(service),
+        service == null ? null : InputValidation.normalizeService(service),
         person,
         tag,
         policy,
@@ -88,7 +92,7 @@ record EventFilter(
         unmapped != null);
   }
 
-  static EventFilter parse(ApiModels.Filters input, Clock clock) {
+  public static EventFilter parse(ApiModels.Filters input, Clock clock) {
     var query = new LinkedMultiValueMap<String, String>();
     if (input != null) {
       add(query, "from", input.from());
@@ -106,7 +110,7 @@ record EventFilter(
     return parse(query, clock, Set.of());
   }
 
-  EventFilter withVersion(String id) {
+  public EventFilter withVersion(String id) {
     return new EventFilter(
         from,
         to,
@@ -121,7 +125,7 @@ record EventFilter(
         unmapped);
   }
 
-  ApiModels.Filters snapshot() {
+  public ApiModels.Filters snapshot() {
     return new ApiModels.Filters(
         from.toString(),
         to.toString(),
@@ -140,19 +144,14 @@ record EventFilter(
     if (value != null) query.add(name, value);
   }
 
-  static String value(MultiValueMap<String, String> query, String name) {
+  public static String value(MultiValueMap<String, String> query, String name) {
     String value = query.getFirst(name);
     return value == null || value.isBlank() ? null : value.strip();
   }
 
-  static void validateId(String id, String field) {
-    if (id == null || !id.matches(ApiModels.ID_PATTERN))
-      throw ApiException.invalid(field, "ID는 영문, 숫자, 하이픈, 밑줄로 1~80자여야 합니다.");
-  }
-
   private static String id(MultiValueMap<String, String> query, String name) {
     String id = value(query, name);
-    if (id != null) validateId(id, name);
+    if (id != null) InputValidation.validateId(id, name);
     return id;
   }
 

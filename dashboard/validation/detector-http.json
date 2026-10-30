@@ -1,0 +1,48 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T18:13:56.145958+00:00",
+  "baseUrl": "http://127.0.0.1:8084",
+  "personId": "detector-smoke-2c4dca25ca2f",
+  "versionId": "v_28bd8ebe538c46d9aadaaa5d1a568fe1",
+  "previousActiveVersionId": "v_63c8d01dc6da409eb3efeef18f301e2d",
+  "eventIds": [
+    3,
+    4
+  ],
+  "externalEventIds": [
+    "d_0f7d89ddee1355b8b01416fbf7527807d1d53694ff57dab874e4734afce7ebc7",
+    "d_71437f8ed8c3462218fac48cee0122eebb79983dee8c1f8ca53f3e8ce1585b6e"
+  ],
+  "statuses": {
+    "created": 201,
+    "replay": 200,
+    "changed": 409,
+    "detail": 200,
+    "image": 200
+  },
+  "exactInspectResponsePreserved": true,
+  "integerPrecisionPreserved": true,
+  "typedInputVersionsHaveDistinctIdentity": true,
+  "filesPreserved": true,
+  "images": [
+    {
+      "id": 3,
+      "sizeBytes": 68,
+      "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+    }
+  ],
+  "metrics": {
+    "eventCount": 2,
+    "findingCount": 2,
+    "personCount": 1,
+    "detectedEventCount": 2
+  },
+  "openApi": {
+    "pathsPresent": true,
+    "resultIsInspectResponse": true,
+    "inputVersionTypes": [
+      "integer",
+      "string"
+    ]
+  }
+}

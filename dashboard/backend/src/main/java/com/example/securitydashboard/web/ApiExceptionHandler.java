@@ -1,5 +1,6 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.web;
 
+import com.example.securitydashboard.common.ApiException;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.ConstraintViolationException;
 import java.util.LinkedHashMap;

@@ -1,4 +1,4 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.api;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;

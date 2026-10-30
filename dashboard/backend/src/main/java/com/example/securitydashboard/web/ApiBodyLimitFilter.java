@@ -1,4 +1,4 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
@@ -23,6 +23,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 class ApiBodyLimitFilter extends OncePerRequestFilter {
   static final int MAX_BYTES = 1024 * 1024;
+  static final int DETECTOR_MAX_BYTES = 16 * 1024 * 1024;
   private final ObjectMapper mapper;
 
   ApiBodyLimitFilter(ObjectMapper mapper) {
@@ -38,26 +39,34 @@ class ApiBodyLimitFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
-    if (request.getContentLengthLong() > MAX_BYTES) {
-      reject(response);
+    int maximum =
+        request.getMethod().equals("POST")
+                && request
+                    .getRequestURI()
+                    .equals(request.getContextPath() + "/api/v1/detector-events")
+            ? DETECTOR_MAX_BYTES
+            : MAX_BYTES;
+    if (request.getContentLengthLong() > maximum) {
+      reject(response, maximum);
       return;
     }
     // Limit reads as well as Content-Length so chunked requests cannot bypass the cap.
-    byte[] body = request.getInputStream().readNBytes(MAX_BYTES + 1);
-    if (body.length > MAX_BYTES) {
-      reject(response);
+    byte[] body = request.getInputStream().readNBytes(maximum + 1);
+    if (body.length > maximum) {
+      reject(response, maximum);
       return;
     }
     chain.doFilter(new BufferedRequest(request, body), response);
   }
 
-  private void reject(HttpServletResponse response) throws IOException {
+  private void reject(HttpServletResponse response, int maximum) throws IOException {
     response.setStatus(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
     response.setContentType("application/json");
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     mapper.writeValue(
         response.getOutputStream(),
-        new ApiExceptionHandler.ErrorBody("PAYLOAD_TOO_LARGE", "요청 본문은 1MiB 이하여야 합니다.", Map.of()));
+        new ApiExceptionHandler.ErrorBody(
+            "PAYLOAD_TOO_LARGE", "요청 본문은 " + maximum / 1024 / 1024 + "MiB 이하여야 합니다.", Map.of()));
   }
 
   private static final class BufferedRequest extends HttpServletRequestWrapper {

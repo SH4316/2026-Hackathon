@@ -513,7 +513,7 @@ class MySqlApiIntegrationTest {
     person("p", "담당");
     create(event("large", v, "p", "😀".repeat(200000), List.of(), null));
     byte[] oversized =
-        ("{\"name\":\"" + "x".repeat(ApiBodyLimitFilter.MAX_BYTES) + "\"}")
+        ("{\"name\":\"" + "x".repeat(1024 * 1024) + "\"}")
             .getBytes(java.nio.charset.StandardCharsets.UTF_8);
     mvc.perform(post("/api/v1/people").contentType(MediaType.APPLICATION_JSON).content(oversized))
         .andExpect(status().isPayloadTooLarge());

@@ -1,9 +1,16 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.event;
 
+import com.example.securitydashboard.api.ApiModels;
+import com.example.securitydashboard.common.ApiException;
+import com.example.securitydashboard.common.InputValidation;
+import com.example.securitydashboard.common.JdbcRows;
+import com.example.securitydashboard.configuration.ConfigurationService;
+import com.example.securitydashboard.query.DashboardQueries;
 import java.sql.*;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.function.Consumer;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,7 +20,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
-class EventWriter {
+public class EventWriter {
   private final JdbcTemplate jdbc;
   private final DashboardQueries queries;
   private final ConfigurationService configs;
@@ -34,7 +41,7 @@ class EventWriter {
   }
 
   ApiModels.Person createPerson(ApiModels.CreatePerson request) {
-    String name = ConfigurationService.name(request.name(), "name");
+    String name = InputValidation.name(request.name(), "name");
     try {
       transaction.executeWithoutResult(
           status -> jdbc.update("INSERT INTO people(id,name) VALUES(?,?)", request.id(), name));
@@ -44,10 +51,15 @@ class EventWriter {
     return new ApiModels.Person(request.id(), name, 0, 0, null);
   }
 
-  IngestResult ingest(ApiModels.CreateEvent request) {
-    CanonicalEvent input = CanonicalEvent.from(request, clock);
+  public IngestResult ingest(ApiModels.CreateEvent request) {
+    return ingest(CanonicalEvent.from(request, clock), result -> {});
+  }
+
+  // Additional detector metadata and image writes participate in this same event transaction.
+  // The callback also checks metadata on both fast and concurrent replay paths.
+  public IngestResult ingest(CanonicalEvent input, Consumer<IngestResult> accompanyingWrite) {
     var existing = queries.byExternalId(input.sourceId(), input.eventId());
-    if (existing != null) return replay(input, existing);
+    if (existing != null) return accompany(replay(input, existing), accompanyingWrite);
     try {
       return Objects.requireNonNull(
           transaction.execute(
@@ -56,7 +68,8 @@ class EventWriter {
                 // The singleton lock serializes activation and ingestion; read replay again after
                 // waiting.
                 var concurrent = queries.byExternalId(input.sourceId(), input.eventId());
-                if (concurrent != null) return replay(input, concurrent);
+                if (concurrent != null)
+                  return accompany(replay(input, concurrent), accompanyingWrite);
                 if (!input.versionId().equals(active))
                   throw new ApiException(
                       HttpStatus.CONFLICT,
@@ -118,13 +131,18 @@ class EventWriter {
                     "INSERT INTO detection_tags(detection_id,version_id,tag_id) VALUES ",
                     3,
                     detectionTags);
-                return new IngestResult(queries.event(id), true);
+                return accompany(new IngestResult(queries.event(id), true), accompanyingWrite);
               }));
     } catch (DataIntegrityViolationException exception) {
       var concurrent = queries.byExternalId(input.sourceId(), input.eventId());
-      if (concurrent != null) return replay(input, concurrent);
+      if (concurrent != null) return accompany(replay(input, concurrent), accompanyingWrite);
       throw exception;
     }
+  }
+
+  private IngestResult accompany(IngestResult result, Consumer<IngestResult> write) {
+    write.accept(result);
+    return result;
   }
 
   private long insert(String sql, Object... values) {
@@ -146,5 +164,5 @@ class EventWriter {
     return new IngestResult(event, false);
   }
 
-  record IngestResult(ApiModels.Event event, boolean created) {}
+  public record IngestResult(ApiModels.Event event, boolean created) {}
 }

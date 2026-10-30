@@ -1,7 +1,8 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.query;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.example.securitydashboard.common.ApiException;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;

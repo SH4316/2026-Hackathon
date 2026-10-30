@@ -1,5 +1,13 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.savedsearch;
 
+import com.example.securitydashboard.api.ApiModels;
+import com.example.securitydashboard.common.ApiException;
+import com.example.securitydashboard.common.InputValidation;
+import com.example.securitydashboard.common.JdbcRows;
+import com.example.securitydashboard.configuration.ConfigurationService;
+import com.example.securitydashboard.query.DashboardQueries;
+import com.example.securitydashboard.query.EventFilter;
+import com.example.securitydashboard.query.PageRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.*;
 import java.time.Clock;
@@ -33,17 +41,15 @@ class SavedSearchService {
 
   @Transactional
   ApiModels.SavedSearch create(ApiModels.CreateSavedSearch input) {
-    String name = ConfigurationService.name(input.name(), "name");
+    String name = InputValidation.name(input.name(), "name");
     EventFilter filter = EventFilter.parse(input.filters(), clock);
     var version = configs.view(filter.versionId());
     if (version == null)
       throw new ApiException(HttpStatus.CONFLICT, "NO_ACTIVE_VERSION", "저장하려면 게시한 조회 버전이 필요합니다.");
     filter = filter.withVersion(version.id());
-    var query = queries.query(filter, null);
     String id = "s_" + UUID.randomUUID().toString().replace("-", "");
     var params =
-        query
-            .parameters()
+        new MapSqlParameterSource()
             .addValue("id", id)
             .addValue("name", name)
             .addValue("versionId", version.id())
@@ -54,12 +60,7 @@ class SavedSearchService {
             + " saved_searches(id,name,version_id,created_at,filters,event_count,finding_count)"
             + " VALUES(:id,:name,:versionId,:createdAt,:filters,0,0)",
         params);
-    // INSERT...SELECT materializes the complete matching set within this transaction, never a page.
-    jdbc.update(
-        "INSERT INTO saved_search_events(saved_search_id,event_id) SELECT :id,e.id FROM"
-            + " security_events e WHERE "
-            + query.where(),
-        params);
+    queries.captureSnapshotMembers(id, filter);
     var summary = queries.metrics(filter, id).summary();
     params
         .addValue("eventCount", summary.eventCount())
@@ -76,7 +77,7 @@ class SavedSearchService {
   }
 
   ApiModels.SavedSearch get(String id) {
-    EventFilter.validateId(id, "id");
+    InputValidation.validateId(id, "id");
     var rows = jdbc.query("SELECT * FROM saved_searches WHERE id=:id", Map.of("id", id), this::row);
     if (rows.isEmpty())
       throw new ApiException(HttpStatus.NOT_FOUND, "SAVED_SEARCH_NOT_FOUND", "저장한 검색을 찾을 수 없습니다.");
@@ -105,7 +106,7 @@ class SavedSearchService {
           rs.getString("id"),
           rs.getString("name"),
           rs.getString("version_id"),
-          DashboardQueries.instant(rs, "created_at"),
+          JdbcRows.instant(rs, "created_at"),
           json.readValue(rs.getString("filters"), ApiModels.Filters.class),
           rs.getLong("event_count"),
           rs.getLong("finding_count"));

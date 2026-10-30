@@ -1,4 +1,4 @@
-package com.example.securitydashboard;
+package com.example.securitydashboard.web;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.StreamReadConstraints;
@@ -27,9 +27,9 @@ class JsonConfiguration {
                       .setStreamReadConstraints(
                           StreamReadConstraints.builder()
                               .maxNestingDepth(16)
-                              .maxStringLength(400000)
+                              .maxStringLength(7 * 1024 * 1024)
                               .maxNameLength(128)
-                              .maxNumberLength(20)
+                              .maxNumberLength(10000)
                               .build());
                   mapper
                       .coercionConfigFor(LogicalType.Textual)
