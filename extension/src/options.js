@@ -2,11 +2,12 @@ const $ = (id) => document.getElementById(id);
 const msg = $("msg");
 
 chrome.storage.local
-  .get({ serverUrl: "http://127.0.0.1:8000", apiKey: "", enabled: true, testMode: false })
+  .get({ serverUrl: "http://127.0.0.1:8000", apiKey: "", enabled: true, testMode: false, blockUnscannableFiles: false })
   .then((s) => {
     $("serverUrl").value = s.serverUrl;
     $("apiKey").value = s.apiKey;
     $("enabled").checked = s.enabled;
+    $("blockUnscannableFiles").checked = s.blockUnscannableFiles;
     $("testMode").checked = s.testMode;
   });
 
@@ -26,6 +27,7 @@ $("form").addEventListener("submit", async (e) => {
   }
   await chrome.storage.local.set({
     serverUrl, apiKey: $("apiKey").value.trim(), enabled: $("enabled").checked, testMode: $("testMode").checked,
+    blockUnscannableFiles: $("blockUnscannableFiles").checked,
   });
   msg.textContent = "저장했습니다.";
 });

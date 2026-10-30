@@ -17,6 +17,28 @@ PG.SITES = [
   { hosts: ["www.meta.ai"], provider: "meta" },
 ];
 
+// 사이트별 AI 답변 영역 선택자(토큰 복원용). 사이트 개편 시 여기만 고친다.
+// 테스트 페이지(localhost)는 [data-pg-assistant] 를 쓴다.
+PG.RESPONSE_SELECTORS = {
+  openai: ['[data-message-author-role="assistant"]'],
+  anthropic: ["[data-is-streaming]", '[class*="font-claude"]'],
+  google: ["message-content", ".model-response-text"],
+  microsoft: ['[data-content="ai-message"]'],
+  deepseek: [".ds-markdown"],
+  perplexity: ['[class*="prose"]'],
+  xai: ['[class*="message-bubble"]'],
+  mistral: ['[data-message-author-role="assistant"]'],
+  moonshot: [".markdown", '[class*="segment-assistant"]'],
+  alibaba: ['[class*="assistant"]'],
+  meta: ['[data-testid*="assistant"]'],
+};
+
+PG.responseSelectors = () => {
+  if (PG.isTestHost()) return ["[data-pg-assistant]"];
+  const d = PG.resolveDestination();
+  return (d && PG.RESPONSE_SELECTORS[d.provider]) || [];
+};
+
 PG.isTestHost = () => ["localhost", "127.0.0.1"].includes(location.hostname);
 
 PG.resolveDestination = () => {

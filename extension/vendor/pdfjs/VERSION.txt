@@ -1,0 +1,2 @@
+pdfjs-dist 5.4.624 (Apache-2.0)
+PDF 텍스트 추출용. 업그레이드: npm i pdfjs-dist 후 build/pdf.min.mjs, build/pdf.worker.min.mjs, LICENSE 를 이 폴더로 복사한다.

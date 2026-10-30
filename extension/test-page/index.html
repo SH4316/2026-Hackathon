@@ -78,8 +78,41 @@
   </section>
 
   <section>
+    <h2>입력창 D · 붙여넣기를 직접 처리하는 편집기 (Gemini·Quill 방식)</h2>
+    <p class="muted">붙여넣기를 가로채 내용을 직접 넣고 input 이벤트를 내지 않습니다. 붙여넣은 뒤 다른 입력이 없어도 신호등이 갱신되어야 합니다.</p>
+    <div class="composer">
+      <div id="cq" class="ce" contenteditable="true" data-placeholder="여기에 붙여넣어 보세요"></div>
+      <button type="button" aria-label="Send message C" data-target="cq">보내기</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>입력창 E · 숨은 편집 영역을 거치는 편집기 (실제 Gemini·Quill 방식)</h2>
+    <p class="muted">붙여넣기를 가로채 화면 밖의 .ql-clipboard 에 잠깐 넣었다가 본 입력창으로 옮기고 비웁니다. 이 숨은 영역을 입력창으로 잘못 잡으면 신호등이 사라집니다.</p>
+    <div class="composer">
+      <div id="qe" class="ce" contenteditable="true" data-placeholder="여기에 붙여넣어 보세요"></div>
+      <button type="button" aria-label="Send message E" data-target="qe">보내기</button>
+    </div>
+    <div class="ql-clipboard" id="qclip" contenteditable="true" tabindex="-1" style="position:absolute;left:-100000px;top:50%;height:1px;overflow-y:hidden"></div>
+  </section>
+
+  <section>
+    <h2>파일 첨부</h2>
+    <label>
+      <input id="file" type="file" multiple>
+      <span class="muted">텍스트·PDF는 내용을 검사해 민감한 위치를 알려 주고, 읽을 수 없는 파일(이미지·음성)은 진행할지 묻습니다. 첨부한 파일 이름은 아래 로그에 남습니다.</span>
+    </label>
+  </section>
+
+  <section>
     <h2>전송된 메시지</h2>
     <ol id="log"></ol>
+  </section>
+
+  <section>
+    <h2>AI 답변(시뮬레이션)</h2>
+    <p class="muted">받은 문장의 토큰을 그대로 되풀이하며 한 글자씩 보여 줍니다. 정제해서 보냈다면 토큰이 원래 값으로 복원되어 보여야 합니다.</p>
+    <div id="replies" style="display:grid;gap:8px"></div>
   </section>
 </main>
 <script>
@@ -95,15 +128,39 @@
   const ta = document.getElementById("ta");
   const ce = document.getElementById("ce");
   const pm = document.getElementById("pm");
+  const qe = document.getElementById("qe");
+  const qclip = document.getElementById("qclip");
+
+  // 입력창 E: Quill 의 붙여넣기 흐름 — 숨은 .ql-clipboard 로 포커스를 옮겨 붙여넣고, 잠시 뒤 본 입력창으로 옮긴 다음 비운다.
+  qe.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    qclip.focus();
+    document.execCommand("insertText", false, text);
+    setTimeout(() => {
+      const moved = qclip.textContent;
+      qclip.textContent = "";
+      qe.append(document.createTextNode(moved));
+      qe.focus();
+    }, 15);
+  });
+  const cq = document.getElementById("cq");
   const log = document.getElementById("log");
   let last = ta;
-  [ta, ce, pm].forEach((el) => el.addEventListener("focus", () => { last = el; }));
+  [ta, ce, pm, cq, qe].forEach((el) => el.addEventListener("focus", () => { last = el; }));
 
   // 입력창 C: DOM 변경을 관찰해 30ms 뒤 내부 상태(pmState)를 갱신한다(프레임워크 상태 동기화 지연 흉내).
   let pmState = "";
   new MutationObserver(() => {
     setTimeout(() => { pmState = pm.innerText.trim(); }, 30);
   }).observe(pm, { childList: true, characterData: true, subtree: true });
+
+  // 입력창 D: 붙여넣기를 직접 처리한다(preventDefault 후 DOM 에 삽입, input 이벤트 없음).
+  cq.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    setTimeout(() => { cq.append(document.createTextNode(text)); }, 20);
+  });
 
   document.getElementById("dest").addEventListener("change", (e) => {
     document.documentElement.dataset.pgTestDestination = e.target.value;
@@ -128,17 +185,37 @@
   }
 
   function send(el) {
-    const text = el === ta ? ta.value : el === pm ? pmState : ce.innerText.trim();
+    const text = el === ta ? ta.value : el === pm ? pmState : el.innerText.trim();
     if (!text.trim()) return;
     const li = document.createElement("li");
     li.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
     log.append(li);
     if (el === ta) ta.value = ""; else el.textContent = "";
+    reply(text);
   }
+
+  // 모델 흉내: 받은 토큰을 그대로 되풀이한다. 토큰이 없으면 받은 문장을 요약하는 척한다.
+  function reply(text) {
+    const toks = [...new Set(text.match(/\[[A-Z][A-Z0-9_]*_\d+\]/g) || [])];
+    const out = "요청을 확인했습니다. " +
+      (toks.length ? "말씀하신 " + toks.join(", ") + " 항목을 기준으로 분석했습니다." : "내용을 분석했습니다.");
+    const d = document.createElement("div");
+    d.setAttribute("data-pg-assistant", "");
+    d.style.cssText = "white-space:pre-wrap;word-break:break-word;border:1px solid var(--line);border-radius:10px;padding:8px 12px";
+    document.getElementById("replies").append(d);
+    let i = 0;
+    const t = setInterval(() => { d.textContent = out.slice(0, ++i); if (i >= out.length) clearInterval(t); }, 12);
+  }
+
+  document.getElementById("file").addEventListener("change", (e) => {
+    const li = document.createElement("li");
+    li.textContent = `[첨부] ${[...e.target.files].map((f) => f.name).join(", ")}`;
+    log.append(li);
+  });
 
   document.querySelectorAll("[data-target]").forEach((btn) =>
     btn.addEventListener("click", () => send(document.getElementById(btn.dataset.target))));
-  [ta, ce, pm].forEach((el) => el.addEventListener("keydown", (e) => {
+  [ta, ce, pm, cq, qe].forEach((el) => el.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(el); }
   }));
 </script>
