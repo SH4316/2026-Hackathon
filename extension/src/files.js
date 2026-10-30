@@ -1,8 +1,8 @@
 // 파일 첨부 검사. 입력창 텍스트와 달리 첨부는 사이트가 곧바로 업로드하므로,
 // 이벤트를 먼저 멈추고 검사한 뒤 사용자가 허락한 경우에만 같은 이벤트를 다시 보낸다.
-//  - 텍스트·코드 파일과 PDF(pdf.js 로 글자를 뽑음): 내용을 서버에서 검사한다.
-//    민감정보가 있으면 어디에 있는지(PDF 는 쪽, 텍스트는 줄) 보여 주고 "그래도 진행할지" 묻는다.
-//  - 읽을 수 없는 파일(음성·영상·이미지·스캔본 PDF 등): "읽을 수 없는 파일이라 안전한지 알 수 없다, 그래도 진행할지" 묻는다.
+//  - 텍스트·코드 파일, PDF(pdf.js), 글자로 된 문서(Word·Excel·PowerPoint·한글 hwpx·OpenDocument·RTF): 내용을 서버에서 검사한다.
+//    민감정보가 있으면 어디에 있는지(PDF 는 쪽, 문서는 문단·시트와 셀·슬라이드, 텍스트는 줄) 보여 주고 "그래도 진행할지" 묻는다.
+//  - 읽을 수 없는 파일(음성·영상·이미지·스캔본 PDF·구형 doc/xls/ppt/hwp·암호 문서 등): "읽을 수 없는 파일이라 안전한지 알 수 없다, 그래도 진행할지" 묻는다.
 //    (설정에서 '묻지 않고 막기'로 바꿀 수 있다)
 //  - 서버 글자 수 제한(50,000자)을 넘는 내용은 나눠서 모두 검사한다.
 //  - 검사 서버가 응답하지 못하면 묻지 않고 막는다(자동 폴백 없음).
@@ -107,7 +107,7 @@ PG.files = (() => {
     for (const f of files) {
       let text = null;
       let label = "";
-      let starts = null; // PDF 일 때만
+      let whereFn = null; // 글자 위치 → "2쪽" · "문단 3" · "Sheet1!B2" · "슬라이드 4" · "12줄"
 
       if (PG.pdf.isPdf(f)) {
         let r;
@@ -128,10 +128,34 @@ PG.files = (() => {
           continue;
         }
         text = r.text;
-        starts = r.starts;
+        whereFn = (pos) => `${pageOf(r.starts, pos)}쪽`;
         label = `PDF ${r.pages}쪽${r.truncated ? " 중 앞부분" : ""}`;
+      } else if (PG.office.isDocument(f)) {
+        let r;
+        try {
+          r = await PG.office.extractText(f);
+        } catch (e) {
+          const why = {
+            ole: "암호가 걸렸거나 구형 형식의 문서입니다.",
+            encrypted: "암호가 걸린 문서입니다.",
+            too_large: "문서가 너무 커서 읽지 못했습니다.",
+          }[e?.message] || "손상되었거나 읽을 수 없는 문서입니다.";
+          if (!unreadable(f, why)) return false;
+          continue;
+        }
+        if (!r.text.trim()) {
+          if (!unreadable(f, "읽을 수 있는 글자가 없는 문서입니다(그림으로만 이뤄졌을 수 있습니다).")) return false;
+          continue;
+        }
+        text = r.text;
+        whereFn = r.where;
+        label = `${r.label}${r.truncated ? " 중 앞부분" : ""}`;
+      } else if (PG.office.legacyName(f)) {
+        if (!unreadable(f, `${PG.office.legacyName(f)} 형식은 읽을 수 없습니다(.docx·.xlsx·.pptx·.hwpx 로 저장하면 검사할 수 있습니다).`)) return false;
+        continue;
       } else if (isText(f)) {
         text = await f.text();
+        whereFn = (pos) => `${lineOf(text, pos)}줄`;
         label = "텍스트";
       } else if (isMedia(f)) {
         if (!unreadable(f, "음성·영상 파일은 내용을 분석할 수 없습니다(음성 인식 서버가 필요합니다).")) return false;
@@ -152,7 +176,7 @@ PG.files = (() => {
       if (r.truncated) partial = true;
       if (r.hits.length) {
         const items = r.hits.slice(0, MAX_SHOWN).map((h) => ({
-          where: starts ? `${pageOf(starts, h.start)}쪽` : `${lineOf(text, h.start)}줄`,
+          where: whereFn(h.start),
           label: PG.TYPE_LABELS[h.type] || h.type,
           action: h.action,
           ...excerpt(text, h.start, h.end),

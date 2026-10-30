@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T15:09:11.411513+00:00",
+  "database": "MySQL Community Server8.4.7",
+  "restart": "clean mysqladmin shutdown and restart of same datadir",
+  "summaryBefore": {
+    "eventCount": 48,
+    "findingCount": 213,
+    "personCount": 4,
+    "unknownPolicyCount": 12
+  },
+  "summaryAfter": {
+    "eventCount": 48,
+    "findingCount": 213,
+    "personCount": 4,
+    "unknownPolicyCount": 12
+  },
+  "peoplePageIdentical": true,
+  "eventsPageIdentical": true,
+  "metricsIdentical": true,
+  "existingApiConnectionPoolRecovered": true,
+  "limitation": "Docker daemon unavailable; persistent Compose volume lifecycle not executed"
+}

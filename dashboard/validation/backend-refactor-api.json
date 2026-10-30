@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T18:40:12.986666+00:00",
+  "baseUrl": "http://127.0.0.1:8084",
+  "personId": "v2-smoke-897eb0d6b4ba",
+  "versions": [
+    "v_c7a54ef4b48343728ac94dd77cc54bb4",
+    "v_ac0d6f2a3609491fa916bbef15999775"
+  ],
+  "concurrentStatuses": {
+    "200": 11,
+    "201": 1
+  },
+  "errorCodes": [
+    "INVALID_INPUT",
+    "TAG_NOT_IN_VERSION",
+    "PERSON_NOT_REGISTERED"
+  ],
+  "checks": [
+    "custom tag tree/policy catalog, revision conflicts, publish immutability and singleton activation",
+    "12 concurrent idempotent requests, code-point emoji spans, duplicate-range union, canonical replay, microseconds and omitted defaults",
+    "distinct span/tree counts, literal prompt search vs personQuery, registered zero-event people retained, zero detections, exclusive end, hour buckets and whole-result snapshot",
+    "published version projects all historical events, moved IDs/unmapped tags and policies, captured labels, stale rejection and immutable snapshot after ingestion/activation",
+    "Korean safe errors for invalid Unicode ranges/tags/person, code-point/body/detection limits, conflicting filters, hourly range limit, cyclic tree and non-destructive saved-search deletion"
+  ]
+}

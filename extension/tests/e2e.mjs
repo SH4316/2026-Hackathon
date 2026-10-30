@@ -5,11 +5,12 @@ import { chromium } from "playwright";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { makeDocx, makeHwpx, makeOdt, makePptx, makeXlsx } from "./zip.mjs";
 
 const EXT = path.resolve(import.meta.dirname, "..");
 const OUT = path.resolve(import.meta.dirname, "shots");
 fs.mkdirSync(OUT, { recursive: true });
-const PAGE = "http://localhost:5500/index.html";
+const PAGE = process.env.PG_E2E_PAGE || "http://localhost:5500/index.html";
 
 const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), "pg-e2e-")), {
   channel: "chromium",
@@ -34,9 +35,10 @@ async function fill(sample, target = "#ta") {
 // 경고 창에서 '안전 다듬기'를 누르면 경고 창이 닫히고 위젯이 정제 미리보기를 보여 준다(정제 경로는 위젯 하나).
 async function sanitizeViaWidget() {
   await modal.getByRole("button", { name: "안전 다듬기" }).click();
-  await page.locator(".badge").getByRole("button", { name: "입력창에 넣기" }).waitFor({ timeout: 8000 });
+  await page.locator(".ov-frame").waitFor({ timeout: 8000 }); // 입력창 오버레이가 뜨면 반영 완료
 }
-const widgetApply = () => page.locator(".badge").getByRole("button", { name: "입력창에 넣기" }).click();
+const widgetApply = async () => {}; // 안전 다듬기가 바로 입력창에 반영하므로 별도 단계 없음
+const highlightCount = () => page.evaluate(() => (globalThis.CSS?.highlights?.get("pg-token")?.size) || 0);
 
 try {
 await page.goto(PAGE);
@@ -81,6 +83,7 @@ await page.screenshot({ path: `${OUT}/3-warning-pii.png` });
 await sanitizeViaWidget();
 await widgetApply();
 await page.waitForTimeout(300);
+check("contenteditable: tokens highlighted inside the input", (await highlightCount()) === 3, String(await highlightCount()));
 const ceText = await page.locator("#ce").innerText();
 check("sanitized applied to contenteditable", ceText.includes("[PHONE_1]") && !ceText.includes("010-"), ceText);
 await page.click('[aria-label="Send message"]');
@@ -192,17 +195,20 @@ const chip = await badge.locator(".chip-w").textContent();
 check("widget shows Tier 1 with finding summary", chip.includes("Tier 1") && chip.includes("전화번호"), chip);
 await page.screenshot({ path: `${OUT}/7-widget-red.png` });
 
-// 9. 위젯에서 바로 정제 → 미리보기(토큰 칩) → 입력창은 아직 원문
+// 9. 위젯 안전 다듬기 → 입력창에 바로 반영, 바뀐 토큰은 입력창 오버레이로 강조, 원문으로 되돌리기 버튼 표시
+const n10 = await logCount();
 await badge.getByRole("button", { name: "안전 다듬기" }).click();
-await page.waitForFunction(() => /정제 완료/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .chip-w")?.textContent || ""), null, { timeout: 8000 });
-const tokens = await badge.locator(".pbody .tk").allTextContents();
-check("preview lists replaced tokens", ["[PHONE_1]", "[EMAIL_1]", "[RRN_1]"].every((t) => tokens.includes(t)), tokens.join(","));
-check("input untouched until applied", (await page.inputValue("#ta")).includes("010-1234-5678"));
+await page.locator(".ov-frame").waitFor({ timeout: 8000 });
+const taVal = await page.inputValue("#ta");
+check("sanitize applies to the input right away", ["[PHONE_1]", "[EMAIL_1]", "[RRN_1]"].every((t) => taVal.includes(t)) && !taVal.includes("010-1234"), taVal);
+check("overlay label shows replaced count", (await page.locator(".ov-label").textContent()).includes("3건 치환됨"));
+check("overlay marks each token in the textarea", (await page.locator(".ov-mirror mark").count()) === 3);
+check("revert button shown right after sanitizing",
+  await page.locator(".ov-revert").isVisible() && await badge.getByRole("button", { name: "원문으로 되돌리기" }).isVisible());
+check("no separate preview panel", !(await badge.locator(".pbox").isVisible()));
 await page.screenshot({ path: `${OUT}/8-widget-sanitized.png` });
 
-// 10. 입력창에 넣기(자동 전송 없음) → 사용자가 직접 전송 → 사이트에는 토큰만, 답변의 토큰은 원래 값으로 복원
-const n10 = await logCount();
-await badge.getByRole("button", { name: "입력창에 넣기" }).click();
+// 10. 자동 전송 없음 → 사용자가 직접 전송 → 사이트에는 토큰만, 답변의 토큰은 원래 값으로 복원
 await page.waitForTimeout(1200); // 사이트 내부 상태 갱신 + 재검사
 check("nothing sent automatically", (await logCount()) === n10);
 check("sanitized text is in the input", (await page.inputValue("#ta")).includes("[PHONE_1]"));
@@ -210,6 +216,7 @@ await page.press("#ta", "Enter"); // 사용자가 확인 후 직접 전송
 await page.waitForTimeout(800);
 const sent10 = await lastLog();
 check("only tokens reach the AI", (await logCount()) === n10 + 1 && sent10.includes("[PHONE_1]") && !sent10.includes("010-1234"), sent10.slice(0, 80));
+check("overlay removed after sending", (await page.locator(".ov-frame").count()) === 0);
 await page.waitForTimeout(4500);
 const reply = await page.locator("[data-pg-assistant]").last().innerText();
 check("reply tokens restored to original values", reply.includes("010-1234-5678") && reply.includes("hong@example.com") && !reply.includes("[PHONE_1]"), reply.replace(/\n/g, " ").slice(0, 90));
@@ -222,12 +229,12 @@ await page.getByRole("button", { name: "AWS 키", exact: true }).click();
 await page.waitForFunction(() => document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge[data-state='red']"), null, { timeout: 5000 });
 await page.waitForTimeout(800);
 await badge.getByRole("button", { name: "안전 다듬기" }).click();
-await badge.getByRole("button", { name: "입력창에 넣기" }).waitFor({ timeout: 8000 });
-await badge.getByRole("button", { name: "입력창에 넣기" }).click();
+await page.locator(".ov-frame").waitFor({ timeout: 8000 });
 check("applied sanitized text to input", (await page.inputValue("#ta")).includes("[AWS_KEY_1]"));
-await badge.getByRole("button", { name: "원문으로 되돌리기" }).click();
+await page.locator(".ov-revert").click();
 await page.waitForTimeout(300);
 check("revert restores original text", (await page.inputValue("#ta")).includes("AKIAIOSFODNN7EXAMPLE"));
+check("overlay removed after revert", (await page.locator(".ov-frame").count()) === 0);
 
 // 12. 그래도 전송: 확인 체크 없이는 보낼 수 없다
 await page.waitForTimeout(800);
@@ -385,12 +392,57 @@ check("Korean PDF: finds the resident number with its page", korModal.includes("
 await page.getByRole("button", { name: "첨부 취소" }).click();
 await page.waitForTimeout(500);
 
+// 16. 글자로 된 문서(Word·Excel·PowerPoint·한글 hwpx·OpenDocument): PDF 처럼 민감한 위치를 알려 주고 묻는다
+const KEY = "aws_access_key_id = AKIAIOSFODNN7EXAMPLE";
+const docs = {
+  "memo.docx": [makeDocx(["Weekly memo", `Deploy ${KEY}`]), "문단 2", "AWS Access Key"],
+  "list.xlsx": [makeXlsx([["name", "note"], ["Kim", KEY]], "Sheet1"), "Sheet1!B2", "AWS Access Key"],
+  "deck.pptx": [makePptx([["Title"], [`Appendix ${KEY}`]]), "슬라이드 2", "AWS Access Key"],
+  "hangul.hwpx": [makeHwpx(["인사 기록", "고객 홍길동 주민등록번호 900101-1234567"]), "문단 2", "주민등록번호"],
+  "notes.odt": [makeOdt(["intro", `Deploy ${KEY}`]), "문단 2", "AWS Access Key"],
+};
+for (const [name, [buf, where, kind]] of Object.entries(docs)) {
+  const fp = path.join(tmp, name);
+  fs.writeFileSync(fp, buf);
+  const base = await logCount();
+  await page.setInputFiles("#file", fp);
+  await modal.waitFor({ timeout: 20000 });
+  const t = await modal.innerText();
+  check(`${name}: shows where the sensitive value is (${where})`, t.includes(name) && t.includes(where) && t.includes(kind), t.replace(/\s+/g, " ").slice(0, 90));
+  check(`${name}: not attached while asking`, (await logCount()) === base);
+  if (name === "memo.docx") await page.screenshot({ path: `${OUT}/13-docx-review.png` });
+  await page.getByRole("button", { name: "첨부 취소" }).click();
+  await page.waitForTimeout(500);
+}
+// 깨끗한 문서는 묻지 않고 "검사 완료"
+const cleanDocx = path.join(tmp, "clean.docx"); fs.writeFileSync(cleanDocx, makeDocx(["Weekly minutes", "Goal: finish documentation"]));
+const baseDoc = await logCount();
+await page.setInputFiles("#file", cleanDocx);
+await page.waitForFunction(() => /검사 완료/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 20000 }).catch(() => {});
+const docNote = await badge.locator(".wnotice").textContent().catch(() => "");
+check("clean docx: analyzed, attached without asking", docNote.includes("Word") && !(await modal.isVisible()) && (await logCount()) === baseDoc + 1, docNote.slice(0, 70));
+// 읽을 수 없는 문서: 구형 .doc · 암호가 걸린(OLE) 문서 · 깨진 파일
+const legacy = path.join(tmp, "old.doc"); fs.writeFileSync(legacy, Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]));
+await page.setInputFiles("#file", legacy);
+await modal.waitFor({ timeout: 10000 });
+const legacyText = await modal.innerText();
+check("legacy .doc: unreadable question names the format", legacyText.includes("Word(.doc)") && legacyText.includes("안전한지 알 수 없습니다") && legacyText.includes("그래도 진행"), legacyText.replace(/\s+/g, " ").slice(0, 100));
+await page.getByRole("button", { name: "첨부 취소" }).click();
+await page.waitForTimeout(400);
+const lockedDocx = path.join(tmp, "locked.docx"); fs.writeFileSync(lockedDocx, Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]));
+await page.setInputFiles("#file", lockedDocx);
+await modal.waitFor({ timeout: 10000 });
+check("password-protected docx: unreadable question", (await modal.innerText()).includes("암호"), "");
+await page.getByRole("button", { name: "첨부 취소" }).click();
+await page.waitForTimeout(400);
+
 // 옵션을 켜면 읽을 수 없는 파일은 묻지 않고 바로 막는다
+const baseOpt = await logCount();
 await sw0.evaluate(() => chrome.storage.local.set({ blockUnscannableFiles: true }));
 await page.waitForTimeout(400);
 await page.setInputFiles("#file", mp3);
 await page.waitForFunction(() => /막았습니다/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 8000 }).catch(() => {});
-check("block-unreadable option: blocked without asking", !(await modal.isVisible()) && (await logCount()) === base15 + 2);
+check("block-unreadable option: blocked without asking", !(await modal.isVisible()) && (await logCount()) === baseOpt);
 await sw0.evaluate(() => chrome.storage.local.set({ blockUnscannableFiles: false }));
 
 // 팝업 확인은 서버가 꺼진 상태를 기준으로 하므로 다시 닫힌 포트로 돌려 둔다
@@ -405,7 +457,7 @@ await popup.goto(`chrome-extension://${extId}/popup.html`);
 await popup.waitForTimeout(800);
 await popup.screenshot({ path: `${OUT}/6-popup.png` });
 check("popup shows server down", (await popup.locator("#status").textContent()).includes("연결 안 됨"));
-check("popup shows the extension version", (await popup.locator("#ver").textContent()).includes("0.2.0"));
+check("popup shows the extension version", (await popup.locator("#ver").textContent()).includes("0.3.0"));
 } catch (e) {
   results.push("ERROR " + e.message.split("\n")[0]);
   await page.screenshot({ path: `${OUT}/error.png` });

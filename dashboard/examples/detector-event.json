@@ -1,0 +1,59 @@
+{
+  "source_id": "prompt-guard",
+  "person_id": "detector-demo-user",
+  "version_id": "REPLACE_WITH_ACTIVE_VERSION_ID",
+  "text": "A😀 hong@example.com",
+  "result": {
+    "request_id": "detector-demo-001",
+    "input_version": 3,
+    "status": "complete",
+    "decision": "block",
+    "signal": "red",
+    "findings": [
+      {
+        "finding_id": "f1",
+        "type": "email",
+        "category": "personal",
+        "rule_id": "email",
+        "detector": "rule",
+        "confidence": "high",
+        "severity": "medium",
+        "action": "mask",
+        "span": {
+          "start": 3,
+          "end": 19,
+          "start_utf16": 4,
+          "end_utf16": 20
+        },
+        "reason": "이메일 주소 형식",
+        "replacement": "[EMAIL_n]"
+      }
+    ],
+    "policy_version": "2026-10-31.draft4",
+    "destination": {
+      "provider": "openai",
+      "channel": "consumer",
+      "tier": "elevated",
+      "verified": false,
+      "basis": null
+    },
+    "detector_versions": {
+      "rules": "rules-0.2.0",
+      "ruleset": "rs-1"
+    },
+    "notices": []
+  },
+  "policy_state_id": "blocked",
+  "files": [
+    {
+      "name": "합성-테스트.txt"
+    }
+  ],
+  "images": [
+    {
+      "name": "합성-이미지.png",
+      "media_type": "image/png",
+      "data_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    }
+  ]
+}

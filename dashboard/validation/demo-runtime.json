@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T17:34:54.298199+00:00",
+  "url": "http://127.0.0.1:8080",
+  "database": "sending_demo_v2",
+  "databaseEngine": "MySQL Community Server8.4.7",
+  "jarSha256": "5cd84561e22d9664340273de6ff4dbc1f55459ef7bb208a4747c8d75f4498004",
+  "activeVersion": "demo-v1",
+  "publishedVersions": 2,
+  "people": 6,
+  "summary": {
+    "eventCount": 209,
+    "findingCount": 246,
+    "personCount": 6,
+    "detectedEventCount": 172
+  },
+  "countsEqualToOriginalSeed": true,
+  "viewV2ProjectsAllEvents": true,
+  "zeroAndMultiTagDetectionsVerified": true,
+  "unicodeSpansOnFirst100EventsValid": true,
+  "ordinaryStartupDidNotMigrateOrReset": true,
+  "filesystemDevCallbackExecuted": true,
+  "duplicateOrMissingTemporaryTableWarnings": 0,
+  "port8080WasAvailableNoOldProcessStopped": true,
+  "port8082PreservedForVite": true,
+  "processId": 27387,
+  "isolatedHttpTestService8083Stopped": true
+}

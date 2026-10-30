@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T18:57:47.179968+00:00",
+  "baseUrl": "http://127.0.0.1:8084",
+  "spaRoutes": [
+    "/",
+    "/events",
+    "/events/1",
+    "/people",
+    "/people/demo-person",
+    "/settings/metrics",
+    "/settings/monitoring",
+    "/saved-searches",
+    "/saved-searches/demo-snapshot"
+  ],
+  "assets": [
+    "/assets/index-DTWXvpRW.js",
+    "/assets/index-BGwJnI08.css"
+  ],
+  "missingResourcesReturn404": true,
+  "apiReturnsJson": true,
+  "swaggerUiServed": true,
+  "openApiRelativeServer": true,
+  "devSqlExcludedFromJar": true,
+  "jarSha256": "332a29f57b4d7353fdc910d1dd4b0562e946d4a0047ecb5c55d17a0fde8c9e4a"
+}
