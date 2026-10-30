@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import json
 import re
+from datetime import date
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -16,7 +17,7 @@ from app.detection.base import Candidate
 from app.detection.validators import luhn_ok, parse_ip, parse_network, rrn_date_ok
 from app.schemas import Confidence
 
-RULESET_VERSION = "rules-0.1.0"
+RULESET_VERSION = "rules-0.2.0"
 
 # 검증 함수: 매치 값 → (타입 재지정 또는 None, 신뢰도) 또는 None(버림)
 Validator = Callable[[str], "tuple[str | None, Confidence] | None"]
@@ -53,6 +54,30 @@ def _jwt(value: str):
     return (None, Confidence.HIGH) if isinstance(decoded, dict) and "alg" in decoded else None
 
 
+def _intl_phone(value: str):
+    # E.164 는 국가번호 포함 8~15자리
+    n = sum(ch.isdigit() for ch in value)
+    return (None, Confidence.MEDIUM) if 8 <= n <= 15 else None
+
+
+def _has_digits(value: str):
+    # 키워드 뒤 식별번호는 숫자가 4개 이상이어야 한다(단어 오탐 방지)
+    return (None, Confidence.MEDIUM) if sum(ch.isdigit() for ch in value) >= 4 else None
+
+
+def _not_date8(value: str):
+    # 8자리는 YYYYMMDD 날짜와 겹치므로 유효한 날짜(1900~2099)면 제외
+    if len(value) == 8:
+        try:
+            y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
+            if 1900 <= y <= 2099:
+                date(y, m, d)
+                return None
+        except ValueError:
+            pass
+    return (None, Confidence.LOW)
+
+
 def _ip(value: str):
     if "/" in value:
         net = parse_network(value)
@@ -83,6 +108,14 @@ RULES: list[Rule] = [
          Confidence.HIGH, reason="휴대전화번호 형식"),
     Rule("kr_landline", "phone", _r(r"(?<!\d)0(?:2|[3-6][1-5])-\d{3,4}-\d{4}(?!\d)"),
          Confidence.HIGH, reason="유선전화번호 형식"),
+    # 북미(NANP) 번호: 지역·국번 첫 자리 2~9, 내선(x123, ext.123) 포함. 한국 번호(0으로 시작)와 겹치지 않는다.
+    Rule("nanp_phone", "phone",
+         _r(r"(?<![\w+])(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?[2-9]\d{2}[-.\s]\d{4}"
+            r"(?:\s?(?:x|ext\.?)\s?\d{1,6})?(?!\d)", re.IGNORECASE),
+         Confidence.HIGH, reason="북미 전화번호 형식"),
+    # 국제 형식(+국가번호): 숫자 8~15자리
+    Rule("intl_phone", "phone", _r(r"(?<![\w+])\+[1-9]\d{0,2}(?:[-.\s]?\(?\d{1,4}\)?){2,5}(?!\d)"),
+         Confidence.MEDIUM, validate=_intl_phone, reason="국제 전화번호 형식(+국가번호)"),
     Rule("email", "email", _r(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"),
          Confidence.HIGH, reason="이메일 주소 형식"),
     Rule("kr_passport", "passport", _r(_NB + r"[MSRODG](?:\d{8}|\d{3}[A-Z]\d{4})" + _NA),
@@ -90,6 +123,47 @@ RULES: list[Rule] = [
     Rule("kr_driver_license", "driver_license",
          _r(r"(?<!\d)(?:1[1-9]|2[0-8])-\d{2}-\d{6}-\d{2}(?!\d)"), Confidence.MEDIUM,
          reason="운전면허번호 형식"),
+    # 식별번호: 키워드(학번·사번·ID·No. 등) 뒤 값, 또는 구분자 없는 8~16자리 숫자(학생·회원·주문번호 등).
+    # 카드·주민번호·전화번호와 겹치면 병합 시 그쪽(더 강한 조치)이 대표가 된다.
+    Rule("id_number_ctx", "id_number",
+         _r(r"(?:학번|사번|군번|회원\s?번호|고객\s?번호|수험\s?번호|학생\s?번호|"
+            r"\b(?:student|employee|member|customer|roll|pin|account|user)?\s{0,3}(?:id|no\.?|number|#))"
+            r"\s{0,10}[:：#]\s{0,10}([A-Z0-9][A-Z0-9-]{4,19})(?![A-Za-z0-9])", re.IGNORECASE),
+         Confidence.MEDIUM, group=1, validate=_has_digits, reason="식별번호 키워드 뒤 값"),
+    # 앞뒤가 영숫자·밑줄이거나 소수점·URL 파라미터(=, &, ?) 위치면 제외(타임스탬프·URL 속 숫자 오탐 방지)
+    Rule("long_digit_id", "id_number", _r(r"(?<![\w.,/=&?#-])\d{8,16}(?![\w.,/-])"),
+         Confidence.LOW, validate=_not_date8, reason="구분자 없는 8~16자리 숫자(식별번호 후보, 날짜 제외)"),
+    # 주소: 미국식(번지 + 거리명 + USPS 접미사 [+ 호수] [+ 도시, 주 우편번호]),
+    #       한국 도로명(시·군·구 + 도로명 + 건물번호)
+    Rule("us_street_address", "street_address",
+         _r(r"(?<![\w-])\d{1,6}\s+(?:[A-Z][a-z]+\s+){1,3}"
+            r"(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Place|Pl|Way|"
+            r"Terrace|Parkway|Pkwy|Highway|Hwy|Circle|Cir|Square|Trail|Bypass|Center|Centers|"
+            r"Crossing|Plaza|Ridge|Heights|Loop|Pike|Point|Station|Valley|Walk|Alley|Expressway|"
+            r"Freeway|Junction|Landing|Manor|Meadows?|Park|Ports?|Shores?|Springs?|Summit|Turnpike|"
+            r"Villages?|Vista|Wells?|Estates?|Gardens?|Groves?|Harbors?|Hills?|Islands?|Lakes?|"
+            r"Mills?|Mountains?|Oaks|Orchard|Pines|Prairie|Ramp|Ranch|Rapids?|Rest|Roads|Routes?|"
+            r"Row|Run|Spur|Streets|Stravenue|Throughway|Trace|Track|Tunnel|Unions?|Viaducts?|Views?)"
+            r"\.?(?:,?\s+(?:Apt|Apartment|Suite|Ste|Unit)\.?\s*\d+[A-Z]?)?"
+            r"(?:,?\s+[A-Z][a-z]+(?:\s[A-Z][a-z]+)?,\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)?(?![\w])"),
+         Confidence.MEDIUM, reason="미국식 거리 주소 형식"),
+    Rule("kr_road_address", "street_address",
+         _r(r"(?:[가-힣]{1,10}(?:특별시|광역시|특별자치시|특별자치도|도|시)\s)?"
+            r"[가-힣]{1,10}(?:시|군|구)\s[가-힣0-9]{1,15}(?:대로|로|길)\s?\d{1,4}(?:-\d{1,4})?"
+            r"(?:번길\s?\d{1,4}(?:-\d{1,4})?)?"),
+         Confidence.MEDIUM, reason="도로명 주소 형식(시·군·구 + 도로명 + 건물번호)"),
+    # 개인 계정: 소셜·프로필 URL(영상 시청 링크는 제외), 아이디 키워드 뒤 값
+    # (@핸들은 기관·서비스 언급과 구별되지 않아 규칙에서 뺐다 — 평가에서 개인 아이디 0건, 기관명 오탐만 발생)
+    Rule("profile_url", "url_personal",
+         _r(r"(?<![\w.-])(?:(?:https?:)?//|(?:ht)?tps?://)?(?:www\.|m\.)?"
+            r"(?:(?:facebook|instagram|twitter|x|tiktok|github|threads)\.com/@?|linkedin\.com/in/|"
+            r"youtube\.com/(?:channel/|c/|user/|@)|medium\.com/@|behance\.net/|dribbble\.com/)"
+            r"[A-Za-z0-9_.-]{2,}", re.IGNORECASE),
+         Confidence.MEDIUM, reason="개인 소셜·프로필 URL"),
+    Rule("username_ctx", "username",
+         _r(r"\b(?:user\s?name|user\s?id|login\s?id|handle|아이디|계정명)\s?[:：]\s?@?([A-Za-z][A-Za-z0-9_.]{2,29})"
+            r"(?![\w@])", re.IGNORECASE),
+         Confidence.MEDIUM, group=1, reason="아이디 키워드 뒤 값"),
     # ── 금융정보 ──
     Rule("credit_card", "credit_card", _r(r"(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)"), Confidence.HIGH,
          validate=_card, reason="카드번호 형식 및 Luhn 체크섬 일치"),

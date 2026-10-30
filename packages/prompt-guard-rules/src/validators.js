@@ -18,7 +18,7 @@ export function luhnOk(digits) {
 const RRN_SEP = new RegExp(`[-${S_CLASS}]`, "gu");
 const CENTURY = { 1: 1900, 2: 1900, 5: 1900, 6: 1900, 3: 2000, 4: 2000, 7: 2000, 8: 2000 };
 
-function validDate(y, m, d) {
+export function validDate(y, m, d) {
   if (!(m >= 1 && m <= 12) || d < 1) return false;
   const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
   const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];

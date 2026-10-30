@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafePrompt Brand Kit & Design System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Pretendard & JetBrains Mono Fonts -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0B0F19;
+      color: #F1F5F9;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      transition: background-color 0.25s ease, color 0.25s ease;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Grid Background Pattern */
+    .cyber-grid {
+      background-size: 32px 32px;
+      background-image:
+        linear-gradient(to right, rgba(59, 130, 246, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(59, 130, 246, 0.05) 1px, transparent 1px);
+    }
+    /* Light Mode Theme Overrides */
+    body.light-mode {
+      background-color: #F8FAFC;
+      color: #0F172A;
+      background-image:
+        linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+    }
+    body.light-mode .theme-card {
+      background-color: #FFFFFF !important;
+      border-color: #E2E8F0 !important;
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06) !important;
+    }
+    body.light-mode .theme-subcard {
+      background-color: #F1F5F9 !important;
+      border-color: #CBD5E1 !important;
+    }
+    body.light-mode .theme-text-main {
+      color: #0F172A !important;
+    }
+    body.light-mode .theme-text-sub {
+      color: #475569 !important;
+    }
+    body.light-mode .theme-border {
+      border-color: #E2E8F0 !important;
+    }
+
+    .logo-card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .dark .logo-card,
+    body:not(.light-mode) .logo-card {
+      background: #0F172A !important;
+      border-color: #334155 !important;
+    }
+    .dark .logo-card .logo-title,
+    body:not(.light-mode) .logo-card .logo-title {
+      color: #F8FAFC !important;
+    }
+    .dark .logo-card .logo-sub,
+    body:not(.light-mode) .logo-card .logo-sub {
+      color: #94A3B8 !important;
+    }
+
+    .dark .theme-icon-box,
+    body:not(.light-mode) .theme-icon-box {
+      background-color: #F8FAFC !important;
+      border-color: #E2E8F0 !important;
+      box-shadow: 0 4px 16px rgba(255, 255, 255, 0.07);
+    }
+    .dark .theme-icon-box svg path,
+    body:not(.light-mode) .theme-icon-box svg path {
+      fill: #0F172A !important;
+      stroke: #2563EB !important;
+    }
+
+    body.light-mode .theme-icon-box {
+      background-color: #0F172A !important;
+      border-color: #334155 !important;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+    }
+    body.light-mode .theme-icon-box svg path {
+      fill: #1E293B !important;
+      stroke: #3B82F6 !important;
+    }
+
+    .traffic-pill-widget {
+      transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .dark .traffic-pill-widget,
+    body:not(.light-mode) .traffic-pill-widget {
+      background-color: #FFFFFF !important;
+      border-color: #E2E8F0 !important;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35), 0 0 1px rgba(255, 255, 255, 0.2);
+    }
+    .dark .traffic-pill-widget .pill-title,
+    body:not(.light-mode) .traffic-pill-widget .pill-title {
+      color: #0F172A !important;
+    }
+    .dark .traffic-pill-widget .pill-divider,
+    body:not(.light-mode) .traffic-pill-widget .pill-divider {
+      border-color: #CBD5E1 !important;
+    }
+    .dark .traffic-pill-widget .light-off,
+    body:not(.light-mode) .traffic-pill-widget .light-off {
+      background-color: #E2E8F0 !important;
+      opacity: 0.85;
+    }
+
+    body.light-mode .traffic-pill-widget {
+      background-color: #0F172A !important;
+      border-color: #334155 !important;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.22);
+    }
+    body.light-mode .traffic-pill-widget .pill-title {
+      color: #FFFFFF !important;
+    }
+    body.light-mode .traffic-pill-widget .pill-divider {
+      border-color: #334155 !important;
+    }
+    body.light-mode .traffic-pill-widget .light-off {
+      background-color: #1E293B !important;
+      opacity: 0.65;
+    }
+
+    /* Signal Glow Effects */
+    .glow-red { box-shadow: 0 0 16px rgba(239, 68, 68, 0.55); }
+    .glow-yellow { box-shadow: 0 0 16px rgba(245, 158, 11, 0.55); }
+    .glow-green { box-shadow: 0 0 16px rgba(16, 185, 129, 0.55); }
+    .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); }
+  </style>
+</head>
+<body class="dark cyber-grid min-h-screen p-4 sm:p-6 lg:p-10 selection:bg-blue-500 selection:text-white">
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none bg-slate-900/95 border border-blue-500/50 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+    <span id="toast-msg" class="text-xs sm:text-sm font-semibold">복사되었습니다.</span>
+  </div>
+
+  <!-- Fallback Modal -->
+  <div id="copy-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl text-left">
+      <div class="flex items-center justify-between">
+        <h3 id="modal-title" class="font-bold text-white text-base">클립보드 수동 복사</h3>
+        <button onclick="closeCopyModal()" class="text-slate-400 hover:text-white text-sm font-mono-code px-2 py-1 rounded-md bg-slate-800">닫기 ✕</button>
+      </div>
+      <p class="text-xs text-slate-300">현재 브라우저 보안 정책상 자동 복사가 차단되었습니다. 아래 텍스트를 선택 후 <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-300 font-mono-code text-[11px]">Ctrl+C</kbd>를 눌러 복사하세요.</p>
+      <textarea id="modal-textarea" readonly class="w-full h-36 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono-code text-cyan-200 focus:outline-none focus:border-cyan-500 select-all"></textarea>
+      <div class="flex justify-end">
+        <button onclick="selectModalContent()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition">전체 선택</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="max-w-7xl mx-auto space-y-8">
+
+    <!-- HEADER BANNER -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800 theme-border">
+      <div class="flex items-center gap-4">
+        <div class="theme-icon-box p-2.5 rounded-2xl border transition-all duration-300 shrink-0">
+          <svg width="44" height="44" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z" fill="#0F172A" stroke="#3B82F6" stroke-width="3.2" stroke-linejoin="round"/>
+            <circle cx="24" cy="15" r="3.5" fill="#EF4444"/>
+            <circle cx="24" cy="24" r="3.5" fill="#F59E0B"/>
+            <circle cx="24" cy="33" r="3.5" fill="#10B981"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white theme-text-main">
+              Safe<span class="text-blue-500">Prompt</span>
+            </h1>
+            <span class="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+              BRAND SYSTEM v1.2
+            </span>
+            <span class="text-[11px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-0.5 rounded-full">
+              NOTION & CANVASES READY
+            </span>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-400 theme-text-sub mt-1">
+            온프레미스 기반 형태 보존형(Type-Safe) 프롬프트 신호등 & 보안 거버넌스 디자인 시스템
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2.5">
+        <button onclick="toggleThemeMode()" id="theme-toggle-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-semibold text-xs sm:text-sm transition flex items-center gap-2 cursor-pointer shadow-sm">
+          <span id="theme-icon">🌞</span>
+          <span id="theme-label">라이트 모드로 미리보기</span>
+        </button>
+        <button onclick="copyCSSVariables()" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-blue-600/20 cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+          전체 CSS 변수 복사
+        </button>
+      </div>
+    </header>
+
+    <!-- SECTION 1 & 2 GRID: COLOR PALETTE & LOGO SYSTEM -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+
+      <!-- SECTION 1: COLOR PALETTE (7 Cols) -->
+      <section class="lg:col-span-7 bg-slate-900/80 border border-slate-800 theme-card rounded-2xl p-5 sm:p-6 shadow-xl space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-blue-500 uppercase tracking-wider">01. Color Palette</span>
+            <h2 class="text-lg sm:text-xl font-bold text-white theme-text-main mt-0.5">브랜드 & 신호등 컬러 팔레트</h2>
+          </div>
+          <span class="text-xs text-slate-400 theme-text-sub theme-subcard bg-slate-800 px-2.5 py-1 rounded-lg">💡 클릭 시 복사</span>
+        </div>
+
+        <!-- A. Base & Brand Colors -->
+        <div>
+          <h3 class="text-xs font-semibold text-slate-400 theme-text-sub uppercase tracking-wider mb-3">A. 다크/라이트 배경 & 브랜드 포인트 컬러</h3>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div onclick="copyText('#0F172A', 'Deep Cyber Navy (#0F172A)')" class="group cursor-pointer rounded-xl overflow-hidden border border-slate-700/80 hover:border-blue-400 transition bg-slate-950">
+              <div class="h-16 sm:h-20 w-full bg-[#0F172A] flex items-end p-2.5 border-b border-slate-800">
+                <span class="text-[10px] font-mono-code text-slate-400 group-hover:text-white transition">Dark Mode Bg</span>
+              </div>
+              <div class="p-2.5 sm:p-3 bg-slate-900">
+                <p class="font-bold text-xs sm:text-sm text-white">Deep Navy</p>
+                <p class="font-mono-code text-[11px] sm:text-xs text-blue-400 mt-0.5">#0F172A</p>
+                <p class="text-[10px] text-slate-400 mt-1">다크 배경 / 표지</p>
+              </div>
+            </div>
+            <div onclick="copyText('#F8FAFC', 'Light Alabaster (#F8FAFC)')" class="group cursor-pointer rounded-xl overflow-hidden border border-slate-700/80 hover:border-blue-400 transition bg-slate-950">
+              <div class="h-16 sm:h-20 w-full bg-[#F8FAFC] flex items-end p-2.5 border-b border-slate-300">
+                <span class="text-[10px] font-mono-code text-slate-700 font-bold">Light Mode Bg</span>
+              </div>
+              <div class="p-2.5 sm:p-3 bg-slate-900">
+                <p class="font-bold text-xs sm:text-sm text-white">Alabaster</p>
+                <p class="font-mono-code text-[11px] sm:text-xs text-blue-400 mt-0.5">#F8FAFC</p>
+                <p class="text-[10px] text-slate-400 mt-1">라이트 배경 / 리포트</p>
+              </div>
+            </div>
+            <div onclick="copyText('#3B82F6', 'Trust Indigo (#3B82F6)')" class="group cursor-pointer rounded-xl overflow-hidden border border-slate-700/80 hover:border-blue-400 transition bg-slate-950">
+              <div class="h-16 sm:h-20 w-full bg-[#3B82F6] flex items-end p-2.5">
+                <span class="text-[10px] font-mono-code text-white/90 font-semibold">Brand Accent</span>
+              </div>
+              <div class="p-2.5 sm:p-3 bg-slate-900">
+                <p class="font-bold text-xs sm:text-sm text-white">Trust Blue</p>
+                <p class="font-mono-code text-[11px] sm:text-xs text-blue-400 mt-0.5">#3B82F6</p>
+                <p class="text-[10px] text-slate-400 mt-1">핵심 강조 / CTA</p>
+              </div>
+            </div>
+            <div onclick="copyText('#06B6D4', 'Tech Mint (#06B6D4)')" class="group cursor-pointer rounded-xl overflow-hidden border border-slate-700/80 hover:border-cyan-400 transition bg-slate-950">
+              <div class="h-16 sm:h-20 w-full bg-[#06B6D4] flex items-end p-2.5">
+                <span class="text-[10px] font-mono-code text-slate-950 font-bold">Type-Safe</span>
+              </div>
+              <div class="p-2.5 sm:p-3 bg-slate-900">
+                <p class="font-bold text-xs sm:text-sm text-white">Tech Cyan</p>
+                <p class="font-mono-code text-[11px] sm:text-xs text-cyan-400 mt-0.5">#06B6D4</p>
+                <p class="text-[10px] text-slate-400 mt-1">형태보존 치환 강조</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- B. Semantic Traffic Lights -->
+        <div>
+          <h3 class="text-xs font-semibold text-slate-400 theme-text-sub uppercase tracking-wider mb-3">B. 시맨틱 신호등 3색 (다크/라이트 모드 공통 적용)</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div onclick="copyText('#EF4444', 'Signal Red (#EF4444)')" class="group cursor-pointer rounded-xl overflow-hidden border border-red-500/40 hover:border-red-400 transition bg-slate-950">
+              <div class="h-20 w-full bg-[#EF4444] p-2.5 flex flex-col justify-between">
+                <span class="inline-block w-fit text-[9px] font-extrabold uppercase tracking-wider bg-black/35 text-white px-2 py-0.5 rounded">Tier 1 · BLOCK</span>
+                <span class="font-mono-code text-xs font-bold text-white">#EF4444</span>
+              </div>
+              <div class="p-3 bg-slate-900 space-y-1">
+                <div class="flex items-center justify-between">
+                  <p class="font-bold text-xs sm:text-sm text-red-400">Signal Red (차단)</p>
+                  <span class="text-[10px] font-mono-code text-slate-400">RGB(239,68,68)</span>
+                </div>
+                <p class="text-[11px] text-slate-300">API Key, 기밀 데이터</p>
+                <p class="text-[10px] text-slate-400">배지: <span class="font-mono-code text-red-300">#FEF2F2</span></p>
+              </div>
+            </div>
+            <div onclick="copyText('#F59E0B', 'Signal Yellow (#F59E0B)')" class="group cursor-pointer rounded-xl overflow-hidden border border-amber-500/40 hover:border-amber-400 transition bg-slate-950">
+              <div class="h-20 w-full bg-[#F59E0B] p-2.5 flex flex-col justify-between">
+                <span class="inline-block w-fit text-[9px] font-extrabold uppercase tracking-wider bg-black/35 text-white px-2 py-0.5 rounded">Tier 2 · WARN</span>
+                <span class="font-mono-code text-xs font-bold text-white">#F59E0B</span>
+              </div>
+              <div class="p-3 bg-slate-900 space-y-1">
+                <div class="flex items-center justify-between">
+                  <p class="font-bold text-xs sm:text-sm text-amber-400">Signal Amber (주의)</p>
+                  <span class="text-[10px] font-mono-code text-slate-400">RGB(245,158,11)</span>
+                </div>
+                <p class="text-[11px] text-slate-300">미발표 실험 수치, 내부 IP</p>
+                <p class="text-[10px] text-slate-400">배지: <span class="font-mono-code text-amber-300">#FFFBEB</span></p>
+              </div>
+            </div>
+            <div onclick="copyText('#10B981', 'Signal Green (#10B981)')" class="group cursor-pointer rounded-xl overflow-hidden border border-emerald-500/40 hover:border-emerald-400 transition bg-slate-950">
+              <div class="h-20 w-full bg-[#10B981] p-2.5 flex flex-col justify-between">
+                <span class="inline-block w-fit text-[9px] font-extrabold uppercase tracking-wider bg-black/35 text-white px-2 py-0.5 rounded">Tier 3 · SAFE</span>
+                <span class="font-mono-code text-xs font-bold text-white">#10B981</span>
+              </div>
+              <div class="p-3 bg-slate-900 space-y-1">
+                <div class="flex items-center justify-between">
+                  <p class="font-bold text-xs sm:text-sm text-emerald-400">Signal Green (안전)</p>
+                  <span class="text-[10px] font-mono-code text-slate-400">RGB(16,185,129)</span>
+                </div>
+                <p class="text-[11px] text-slate-300">프롬프트 깎기 완료</p>
+                <p class="text-[10px] text-slate-400">배지: <span class="font-mono-code text-emerald-300">#ECFDF5</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: LOGO SYSTEM & ASSETS (5 Cols) -->
+      <section class="lg:col-span-5 bg-slate-900/80 border border-slate-800 theme-card rounded-2xl p-5 sm:p-6 shadow-xl flex flex-col justify-between space-y-5">
+        <div>
+          <span class="text-xs font-bold text-blue-500 uppercase tracking-wider">02. Logo & Symbol Assets</span>
+          <h2 class="text-lg sm:text-xl font-bold text-white theme-text-main mt-0.5">확장프로그램 & 대시보드 로고</h2>
+          <p class="text-xs text-slate-400 theme-text-sub mt-1">다크/라이트 환경 모두에서 최적의 대비와 시인성을 보장합니다.</p>
+        </div>
+
+        <div class="logo-card shadow-sm w-full">
+          <div class="flex items-center justify-between w-full gap-3">
+            <div class="flex items-center gap-3.5">
+              <div class="theme-icon-box w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border flex items-center justify-center transition-all duration-300 shrink-0">
+                <svg width="38" height="38" viewBox="0 0 48 48" fill="none">
+                  <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z" fill="#0F172A" stroke="#2563EB" stroke-width="3.2" stroke-linejoin="round"/>
+                  <circle cx="24" cy="15" r="3.5" fill="#EF4444"/>
+                  <circle cx="24" cy="24" r="3.5" fill="#F59E0B"/>
+                  <circle cx="24" cy="33" r="3.5" fill="#10B981"/>
+                </svg>
+              </div>
+              <div class="text-left">
+                <span class="text-[10px] font-bold text-blue-500 uppercase tracking-wide">App Icon (.logo-card)</span>
+                <h3 class="text-sm sm:text-base font-bold logo-title">SafePrompt 앱 심볼</h3>
+                <p class="text-[11px] sm:text-xs logo-sub mt-0.5">다크모드: 흰색 박스 / 라이트모드: 어두운 박스</p>
+              </div>
+            </div>
+            <button onclick="copyExtensionSVG()" class="shrink-0 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition cursor-pointer">
+              SVG 복사
+            </button>
+          </div>
+        </div>
+
+        <div class="p-3.5 sm:p-4 rounded-xl bg-[#0F172A] border border-slate-800 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Dashboard Header (Dark)</span>
+            <button onclick="copyHeaderLogoHTML()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition cursor-pointer">
+              HTML 복사
+            </button>
+          </div>
+          <div class="py-2.5 px-3.5 rounded-lg bg-slate-900/90 border border-slate-800/80 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
+                <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z" fill="#1E293B" stroke="#3B82F6" stroke-width="3.5"/>
+                <circle cx="24" cy="15" r="3" fill="#EF4444"/>
+                <circle cx="24" cy="24" r="3" fill="#F59E0B"/>
+                <circle cx="24" cy="33" r="3" fill="#10B981"/>
+              </svg>
+              <span class="text-lg font-extrabold text-white tracking-tight">
+                Safe<span class="text-blue-500">Prompt</span>
+              </span>
+            </div>
+            <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/40 px-2 py-0.5 rounded">
+              ON-PREM
+            </span>
+          </div>
+        </div>
+
+        <div class="p-3.5 sm:p-4 rounded-xl bg-slate-100 border border-slate-300 space-y-2 text-slate-900">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-blue-700 uppercase tracking-wide">PI Audit Report (Light)</span>
+            <span class="text-[10px] text-slate-500">배경 #F8FAFC 권장</span>
+          </div>
+          <div class="py-2.5 px-3.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-2.5">
+              <svg width="26" height="26" viewBox="0 0 48 48" fill="none">
+                <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z" fill="#0F172A" stroke="#2563EB" stroke-width="3.5"/>
+                <circle cx="24" cy="15" r="3" fill="#EF4444"/>
+                <circle cx="24" cy="24" r="3" fill="#F59E0B"/>
+                <circle cx="24" cy="33" r="3" fill="#10B981"/>
+              </svg>
+              <span class="text-base font-extrabold text-slate-900 tracking-tight">
+                Safe<span class="text-blue-600">Prompt</span>
+              </span>
+            </div>
+            <span class="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-300 px-2 py-0.5 rounded">
+              AI Security Audit
+            </span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SECTION 3 & 4 GRID: INTERACTIVE SIMULATOR & PPT GUIDE -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+
+      <!-- SECTION 3: INTERACTIVE SANITIZATION SIMULATOR (7 Cols) -->
+      <section class="lg:col-span-7 bg-slate-900/80 border border-slate-800 theme-card rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span class="text-xs font-bold text-blue-500 uppercase tracking-wider">03. Type-Safe Sanitization Simulator</span>
+            <h2 class="text-lg sm:text-xl font-bold text-white theme-text-main mt-0.5">신호등 가드레일 & '형태 보존 치환'</h2>
+          </div>
+          <div class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 self-start sm:self-auto">
+            <button onclick="setSignalState('red')" id="btn-state-red" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/40 transition cursor-pointer">
+              🔴 Tier 1 차단
+            </button>
+            <button onclick="setSignalState('yellow')" id="btn-state-yellow" class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-amber-300 transition cursor-pointer">
+              🟡 Tier 2 주의
+            </button>
+            <button onclick="setSignalState('green')" id="btn-state-green" class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-emerald-300 transition cursor-pointer">
+              🟢 Tier 3 안전
+            </button>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="space-y-0.5">
+            <span class="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+              🔬 통계/코드 실행 보장 옵션 (FPE: Format-Preserving Sanitization)
+            </span>
+            <p class="text-[11px] text-slate-400">
+              숫자는 숫자(Float)로, 텍스트는 텍스트로 치환하여 코드 실행 에러를 방지합니다.
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0 bg-slate-900 p-1 rounded-lg border border-slate-700">
+            <button onclick="setMaskingMode('typesafe')" id="mode-typesafe" class="px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 transition cursor-pointer">
+              🔢 형태·자료형 보존
+            </button>
+            <button onclick="setMaskingMode('token')" id="mode-token" class="px-2.5 py-1.5 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition cursor-pointer">
+              🔤 단순 기호 ([TOKEN])
+            </button>
+          </div>
+        </div>
+
+        <div class="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4 theme-subcard">
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80 theme-border">
+            <div class="traffic-pill-widget flex items-center gap-3 px-3.5 py-1.5 rounded-full border">
+              <span class="pill-title text-xs font-extrabold flex items-center gap-1.5 transition-colors">
+                🛡️ SafePrompt
+              </span>
+              <div class="pill-divider flex items-center gap-2 pl-2 border-l transition-colors">
+                <span id="light-red" class="w-3.5 h-3.5 rounded-full bg-red-500 glow-red transition-all"></span>
+                <span id="light-yellow" class="w-3.5 h-3.5 rounded-full bg-amber-500/25 light-off transition-all"></span>
+                <span id="light-green" class="w-3.5 h-3.5 rounded-full bg-emerald-500/25 light-off transition-all"></span>
+              </div>
+            </div>
+            <div id="status-badge" class="px-3 py-1 rounded-lg bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-bold flex items-center gap-2">
+              <span>🚨 위험: 전송 차단됨 (Critical Block)</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>감지 영역 (연구 코드 / 통계 시나리오)</span>
+              <span id="detected-rule" class="font-mono-code text-red-400 font-semibold">탐지: RULE_API_KEY + RULE_LAB_NUMERIC</span>
+            </div>
+            <div id="prompt-box" class="p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-red-500/50 font-mono-code text-xs sm:text-sm text-slate-200 leading-relaxed">
+              신규 촉매 <span class="bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">KR-Bio-992</span>의 <span class="bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">수율 94.2%, 반응온도 185.5°C</span>로 회귀분석 차트 그리는 파이썬 코드 짜줘. API 키는 <span class="bg-red-500/25 text-red-300 px-1.5 py-0.5 rounded border border-red-500/40">sk-proj-98a7bc65d4e3f210</span> 이야.
+            </div>
+          </div>
+
+          <div id="mapping-table-box" class="hidden p-3.5 rounded-xl bg-slate-900/95 border border-cyan-500/40 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-1">
+              <span class="text-[11px] font-bold text-cyan-400 flex items-center gap-1.5">
+                🔄 온프레미스 로컬 매핑 테이블 (외부 유출 없음 · 자동 역치환 복원)
+              </span>
+              <span class="text-[10px] font-mono-code text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Python Float/String 100% 호환</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-mono-code">
+              <div class="p-2 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <span class="text-slate-400">문자열(str):</span>
+                <span><s class="text-amber-400">KR-Bio</s> ➔ <strong class="text-cyan-300">"Compound_A"</strong></span>
+              </div>
+              <div class="p-2 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <span class="text-slate-400">실수형(float):</span>
+                <span><s class="text-amber-400">94.2%</s> ➔ <strong class="text-cyan-300">71.4%</strong></span>
+              </div>
+              <div class="p-2 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <span class="text-slate-400">인증키(secret):</span>
+                <span><s class="text-red-400">sk-proj...</s> ➔ <strong class="text-emerald-400">"DUMMY_KEY"</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <p id="helper-text" class="text-xs text-red-400 font-medium">
+              ⚠️ 외부 전송 시 민감 키 유출 위험이 감지되어 전송이 잠겼습니다.
+            </p>
+            <div class="flex items-center gap-2 ml-auto">
+              <button onclick="setSignalState('green')" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-lg shadow-blue-600/25 cursor-pointer">
+                ✨ 온프레미스 형태보존 다듬기
+              </button>
+              <button id="send-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-500 text-xs font-bold cursor-not-allowed border border-slate-700">
+                전송 잠김 🔒
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 4: PPT SLIDE & TECHNICAL GUIDE (5 Cols) -->
+      <section class="lg:col-span-5 bg-slate-900/80 border border-slate-800 theme-card rounded-2xl p-5 sm:p-6 shadow-xl flex flex-col justify-between space-y-5">
+        <div>
+          <span class="text-xs font-bold text-blue-500 uppercase tracking-wider">04. PPT Slide & Differentiation</span>
+          <h2 class="text-lg sm:text-xl font-bold text-white theme-text-main mt-0.5">발표자료 배색 & 기술 차별화 포인트</h2>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 rounded-xl bg-[#0F172A] border border-slate-700 space-y-1.5">
+            <span class="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">다크 슬라이드</span>
+            <p class="text-xs font-extrabold text-white">배경: #0F172A</p>
+            <p class="text-[11px] text-slate-300 leading-snug">
+              실시간 관제 & 문제점<br>
+              포인트: <span class="text-red-400 font-bold">#EF4444</span>
+            </p>
+          </div>
+          <div class="p-3 rounded-xl bg-[#F8FAFC] border border-slate-300 space-y-1.5 text-slate-900">
+            <span class="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">라이트 슬라이드</span>
+            <p class="text-xs font-extrabold text-slate-900">배경: #F8FAFC</p>
+            <p class="text-[11px] text-slate-600 leading-snug">
+              아키텍처 & PI 리포트<br>
+              포인트: <span class="text-emerald-600 font-bold">#10B981</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-cyan-400">💡 핵심 기술 피칭 메시지</span>
+            <span class="text-[10px] font-mono-code text-slate-400">Slide #4 권장</span>
+          </div>
+          <p class="text-xs text-slate-200 font-semibold">
+            "단순 마스킹([MASK])은 통계·차트 코드를 망가뜨립니다."
+          </p>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            SafePrompt는 <strong class="text-white">자료형 보존 합성 치환(Type-Safe Synthetic Substitution)</strong>을 적용하여 숫자는 동형 스케일의 가짜 숫자로, 텍스트는 가짜 식별자로 변환해 <strong class="text-emerald-400">파이썬/R 통계 분석 코드가 오류 없이 100% 실행</strong>되도록 보장합니다.
+          </p>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-start gap-2.5">
+          <span class="text-base">🔒</span>
+          <p class="text-[11px] text-emerald-200/90 theme-text-sub leading-relaxed">
+            <strong class="text-emerald-400">양방향 자동 복원 (Bi-directional Restore):</strong><br>
+            AI가 생성한 가짜 데이터 결과는 브라우저 렌더링 직전 온프레미스 매핑 테이블을 거쳐 원본 실험 수치로 안전하게 자동 복원됩니다.
+          </p>
+        </div>
+      </section>
+
+    </div>
+
+  </div>
+
+  <script>
+    let currentSignalState = 'red';
+    let currentMaskingMode = 'typesafe';
+    let isLightMode = false;
+
+    function toggleThemeMode() {
+      isLightMode = !isLightMode;
+      const html = document.documentElement;
+      const body = document.body;
+      const icon = document.getElementById('theme-icon');
+      const label = document.getElementById('theme-label');
+
+      if (isLightMode) {
+        html.classList.remove('dark');
+        body.classList.remove('dark');
+        body.classList.add('light-mode');
+        icon.textContent = '🌙';
+        label.textContent = '다크 모드로 미리보기';
+        showToast('🌞 라이트 모드로 전환되었습니다');
+      } else {
+        html.classList.add('dark');
+        body.classList.add('dark');
+        body.classList.remove('light-mode');
+        icon.textContent = '🌞';
+        label.textContent = '라이트 모드로 미리보기';
+        showToast('🌙 다크 모드로 전환되었습니다');
+      }
+    }
+
+    function setMaskingMode(mode) {
+      currentMaskingMode = mode;
+      const btnTypesafe = document.getElementById('mode-typesafe');
+      const btnToken = document.getElementById('mode-token');
+
+      if (mode === 'typesafe') {
+        btnTypesafe.className = 'px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 transition cursor-pointer';
+        btnToken.className = 'px-2.5 py-1.5 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition cursor-pointer';
+      } else {
+        btnToken.className = 'px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 transition cursor-pointer';
+        btnTypesafe.className = 'px-2.5 py-1.5 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition cursor-pointer';
+      }
+      setSignalState('green');
+    }
+
+    async function copyText(text, label) {
+      let copied = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          copied = true;
+        }
+      } catch (err) { copied = false; }
+
+      if (!copied) {
+        try {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          Object.assign(textarea.style, { position:'fixed', top:'0', left:'0', width:'2em', height:'2em', padding:'0', border:'none', outline:'none', boxShadow:'none', background:'transparent', opacity:'0.01' });
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          copied = document.execCommand('copy');
+          document.body.removeChild(textarea);
+        } catch (e) { copied = false; }
+      }
+
+      if (copied) {
+        showToast(`복사 완료: ${label}`);
+      } else {
+        openCopyModal(label, text);
+      }
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const msg = document.getElementById('toast-msg');
+      msg.textContent = message;
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      setTimeout(() => { toast.classList.add('translate-y-24', 'opacity-0'); }, 2200);
+    }
+
+    function openCopyModal(title, content) {
+      const modal = document.getElementById('copy-modal');
+      document.getElementById('modal-title').textContent = `${title} 복사하기`;
+      document.getElementById('modal-textarea').value = content;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.getElementById('modal-textarea').select();
+    }
+
+    function closeCopyModal() {
+      const modal = document.getElementById('copy-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function selectModalContent() {
+      document.getElementById('modal-textarea').select();
+      showToast('텍스트가 전체 선택되었습니다. Ctrl+C를 누르세요.');
+    }
+
+    function copyCSSVariables() {
+      const cssVars = `:root {
+  /* Dark Mode Defaults */
+  --sp-bg-main: #0F172A;
+  --sp-bg-card: #1E293B;
+  --sp-text-primary: #F1F5F9;
+  --sp-text-secondary: #94A3B8;
+  /* Light Mode Overrides */
+  --sp-light-bg-main: #F8FAFC;
+  --sp-light-bg-card: #FFFFFF;
+  --sp-light-text-primary: #0F172A;
+  /* Brand & Semantic Traffic Lights */
+  --sp-brand-blue: #3B82F6;
+  --sp-tech-cyan: #06B6D4;
+  --sp-signal-red: #EF4444;
+  --sp-signal-yellow: #F59E0B;
+  --sp-signal-green: #10B981;
+}`;
+      copyText(cssVars, 'CSS 컬러 변수 (:root)');
+    }
+
+    function copyExtensionSVG() {
+      const svg = `<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z" fill="#0F172A" stroke="#3B82F6" stroke-width="3.2" stroke-linejoin="round"/>
+  <circle cx="24" cy="15" r="3.5" fill="#EF4444"/>
+  <circle cx="24" cy="24" r="3.5" fill="#F59E0B"/>
+  <circle cx="24" cy="33" r="3.5" fill="#10B981"/>
+</svg>`;
+      copyText(svg, '앱 심볼 SVG 코드');
+    }
+
+    function copyHeaderLogoHTML() {
+      const html = `<div style="display:inline-flex;align-items:center;gap:10px;">
+  <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+    <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z" fill="#1E293B" stroke="#3B82F6" stroke-width="3.5"/>
+    <circle cx="24" cy="15" r="3.5" fill="#EF4444"/>
+    <circle cx="24" cy="24" r="3.5" fill="#F59E0B"/>
+    <circle cx="24" cy="33" r="3.5" fill="#10B981"/>
+  </svg>
+  <span style="font-size:20px;font-weight:800;color:#FFFFFF;letter-spacing:-0.5px;">Safe<span style="color:#3B82F6;">Prompt</span></span>
+</div>`;
+      copyText(html, '헤더 로고 HTML 스니펫');
+    }
+
+    function setSignalState(state) {
+      currentSignalState = state;
+      const btnRed = document.getElementById('btn-state-red');
+      const btnYellow = document.getElementById('btn-state-yellow');
+      const btnGreen = document.getElementById('btn-state-green');
+      const lightRed = document.getElementById('light-red');
+      const lightYellow = document.getElementById('light-yellow');
+      const lightGreen = document.getElementById('light-green');
+      const badge = document.getElementById('status-badge');
+      const rule = document.getElementById('detected-rule');
+      const box = document.getElementById('prompt-box');
+      const mappingBox = document.getElementById('mapping-table-box');
+      const helper = document.getElementById('helper-text');
+      const sendBtn = document.getElementById('send-btn');
+
+      btnRed.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-red-400 transition cursor-pointer';
+      btnYellow.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-amber-300 transition cursor-pointer';
+      btnGreen.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-emerald-300 transition cursor-pointer';
+      lightRed.className = 'w-3.5 h-3.5 rounded-full bg-red-500/25 light-off transition-all';
+      lightYellow.className = 'w-3.5 h-3.5 rounded-full bg-amber-500/25 light-off transition-all';
+      lightGreen.className = 'w-3.5 h-3.5 rounded-full bg-emerald-500/25 light-off transition-all';
+
+      if (state === 'red') {
+        btnRed.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/40 transition cursor-pointer';
+        lightRed.className = 'w-3.5 h-3.5 rounded-full bg-red-500 glow-red transition-all';
+        badge.className = 'px-3 py-1 rounded-lg bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-bold flex items-center gap-2';
+        badge.innerHTML = '<span>🚨 위험: 전송 차단됨 (Critical Block)</span>';
+        rule.className = 'font-mono-code text-red-400 font-semibold';
+        rule.textContent = '탐지: RULE_API_KEY + RULE_LAB_NUMERIC';
+        box.className = 'p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-red-500/50 font-mono-code text-xs sm:text-sm text-slate-200 leading-relaxed';
+        box.innerHTML = `신규 촉매 <span class="bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">KR-Bio-992</span>의 <span class="bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">수율 94.2%, 반응온도 185.5°C</span>로 회귀분석 차트 그리는 파이썬 코드 짜줘. API 키는 <span class="bg-red-500/25 text-red-300 px-1.5 py-0.5 rounded border border-red-500/40">sk-proj-98a7bc65d4e3f210</span> 이야.`;
+        mappingBox.classList.add('hidden');
+        helper.className = 'text-xs text-red-400 font-medium';
+        helper.textContent = '⚠️ 외부 전송 시 민감 키 유출 위험이 감지되어 전송이 잠겼습니다.';
+        sendBtn.className = 'px-3.5 py-2 rounded-xl bg-slate-800 text-slate-500 text-xs font-bold cursor-not-allowed border border-slate-700';
+        sendBtn.textContent = '전송 잠김 🔒';
+      } else if (state === 'yellow') {
+        btnYellow.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 transition cursor-pointer';
+        lightYellow.className = 'w-3.5 h-3.5 rounded-full bg-amber-500 glow-yellow transition-all';
+        badge.className = 'px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-2';
+        badge.innerHTML = '<span>⚠️ 주의: 미발표 연구 수치 감지</span>';
+        rule.className = 'font-mono-code text-amber-400 font-semibold';
+        rule.textContent = '탐지: RULE_LAB_METRIC (Float/String)';
+        box.className = 'p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-amber-500/50 font-mono-code text-xs sm:text-sm text-slate-200 leading-relaxed';
+        box.innerHTML = `신규 촉매 <span class="bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">KR-Bio-992</span>의 <span class="bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">수율 94.2%, 반응온도 185.5°C</span> 데이터 분포 그래프를 그리는 파이썬 코드 짜줘.`;
+        mappingBox.classList.add('hidden');
+        helper.className = 'text-xs text-amber-300 font-medium';
+        helper.textContent = '💡 코드가 정상 실행되도록 숫자는 가짜 숫자로, 명칭은 가짜 문자로 안전 치환하세요.';
+        sendBtn.className = 'px-3.5 py-2 rounded-xl bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/40 cursor-pointer';
+        sendBtn.textContent = '주의하며 전송';
+      } else {
+        btnGreen.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 transition cursor-pointer';
+        lightGreen.className = 'w-3.5 h-3.5 rounded-full bg-emerald-500 glow-green transition-all';
+        badge.className = 'px-3 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-bold flex items-center gap-2';
+        box.className = 'p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-emerald-500/50 font-mono-code text-xs sm:text-sm text-slate-200 leading-relaxed';
+
+        if (currentMaskingMode === 'typesafe') {
+          badge.innerHTML = '<span>✅ 안전: 형태·자료형 보존 치환 (Type-Safe FPE)</span>';
+          rule.className = 'font-mono-code text-cyan-400 font-semibold';
+          rule.textContent = '치환 완료: str 1건, float 2건, secret 1건 동형 변환';
+          box.innerHTML = `신규 촉매 <span class="bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/40" title="원본: KR-Bio-992">Compound_A</span>의 <span class="bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/40" title="원본: 94.2%, 185.5°C">수율 71.4%, 반응온도 140.0°C</span>로 회귀분석 차트 그리는 파이썬 코드 짜줘. API 키는 <span class="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/40">"DUMMY_KEY_01"</span> 이야.`;
+          mappingBox.classList.remove('hidden');
+          helper.className = 'text-xs text-emerald-400 font-medium';
+          helper.textContent = '🛡️ 숫자(float)와 텍스트(str) 자료형이 그대로 유지되어 파이썬 통계 코드가 100% 정상 실행됩니다!';
+        } else {
+          badge.innerHTML = '<span>✅ 안전: 단순 기호 마스킹 (Token Mode)</span>';
+          rule.className = 'font-mono-code text-emerald-400 font-semibold';
+          rule.textContent = '토큰 치환 완료 (수치 연산 시 파이썬 TypeError 가능)';
+          box.innerHTML = `신규 촉매 <span class="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/40">[CATALYST_1]</span>의 <span class="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/40">수율 [VAL_1], 반응온도 [TEMP_1]</span>로 회귀분석 차트 그리는 파이썬 코드 짜줘. API 키는 <span class="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/40">[API_KEY_REDACTED]</span> 이야.`;
+          mappingBox.classList.add('hidden');
+          helper.className = 'text-xs text-amber-300 font-medium';
+          helper.textContent = 'ℹ️ 기호([VAL_1])로 변환되었습니다. 차트 및 수치 계산이 필요하면 [🔢 형태·자료형 보존]을 선택하세요.';
+        }
+
+        sendBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 cursor-pointer';
+        sendBtn.textContent = 'AI로 안전 전송 🚀';
+      }
+    }
+  </script>
+</body>
+</html>

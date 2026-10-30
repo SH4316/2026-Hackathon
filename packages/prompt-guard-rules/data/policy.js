@@ -1,7 +1,7 @@
 // 자동 생성 파일: server/scripts/export_rules_bundle.py 로 갱신한다. 직접 수정하지 않는다.
 export default {
   "_generated_from": "server/policies/default.yaml, destinations.yaml, detectors.yaml",
-  "version": "2026-10-31.draft3",
+  "version": "2026-10-31.draft4",
   "model_required": false,
   "default": {
     "category": "uncategorized",
@@ -38,6 +38,30 @@ export default {
       "severity": "medium",
       "action": "mask",
       "token": "EMAIL"
+    },
+    "id_number": {
+      "category": "personal_id",
+      "severity": "medium",
+      "action": "warn",
+      "token": "ID_NUM"
+    },
+    "street_address": {
+      "category": "personal",
+      "severity": "high",
+      "action": "mask",
+      "token": "ADDRESS"
+    },
+    "url_personal": {
+      "category": "personal",
+      "severity": "medium",
+      "action": "warn",
+      "token": "URL_PERSONAL"
+    },
+    "username": {
+      "category": "personal",
+      "severity": "medium",
+      "action": "warn",
+      "token": "USERNAME"
     },
     "credit_card": {
       "category": "financial",
@@ -371,7 +395,7 @@ export default {
   },
   "ruleset": {
     "ruleset_version": 1,
-    "policy_version": "2026-10-31.draft3",
+    "policy_version": "2026-10-31.draft4",
     "updated_at": "1970-01-01T00:00:00+00:00",
     "modules": {
       "custom_rules": true,
