@@ -82,6 +82,15 @@ body.options {
   padding: 28px 20px;
 }
 
+/* Options — 대시보드 연결 */
+.link { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--sp-border-faint); }
+.link h2 { font-size: 15px; font-weight: 700; margin: 0 0 8px; color: var(--sp-text-primary); }
+.link input[type="text"] {
+  display: block; width: 100%; margin-top: 4px; padding: 8px 10px; font: inherit;
+  border: 1px solid var(--sp-border); border-radius: 8px;
+  background: var(--sp-bg-card); color: var(--sp-text-primary);
+}
+
 /* ============================================================
    Popup — Header
    ============================================================ */

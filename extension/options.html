@@ -7,6 +7,22 @@
 </head>
 <body class="options">
   <h1>Prompt Guard 설정</h1>
+  <section class="link" aria-labelledby="link-title">
+    <h2 id="link-title">대시보드 연결</h2>
+    <p id="linkState" class="muted small">연결 안 됨</p>
+    <div id="linkForm">
+      <label>등록 코드
+        <input id="linkCode" type="text" autocomplete="off" spellcheck="false" maxlength="20" placeholder="ABCD-EFGH">
+      </label>
+      <p class="muted small">관리자가 대시보드에서 발급한 일회용 코드입니다. 연결하면 개인 토큰이 API 키 자리에 저장되고, 검사 기록이 대시보드에 내 이름으로 집계됩니다(원문은 저장되지 않음). 먼저 아래 검사 서버 주소를 저장하세요.</p>
+    </div>
+    <div class="actions">
+      <button id="linkBtn" type="button">연결</button>
+      <button id="unlinkBtn" type="button" hidden>연결 해제</button>
+      <span id="linkMsg" class="muted" role="status"></span>
+    </div>
+  </section>
+
   <form id="form">
     <label>검사 서버 주소
       <input id="serverUrl" type="url" required placeholder="http://127.0.0.1:8000">

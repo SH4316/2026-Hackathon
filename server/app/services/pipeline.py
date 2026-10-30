@@ -149,7 +149,7 @@ class Pipeline:
             ))
         return out
 
-    async def inspect(self, req: InspectRequest) -> InspectResponse:
+    async def inspect(self, req: InspectRequest, client_id: str | None = None) -> InspectResponse:
         t0 = time.perf_counter()
         dest, dest_notices = self.resolve_destination(req)
         a = await self.analyze(req.text, dest.tier)
@@ -160,10 +160,10 @@ class Pipeline:
             policy_version=self.policy.version, destination=_dest_out(dest),
             detector_versions=self.detector_versions, notices=dest_notices + a.notices,
         )
-        self._record("inspect", req, a, dest, masked=0, t0=t0)
+        self._record("inspect", req, a, dest, masked=0, t0=t0, client_id=client_id)
         return resp
 
-    async def sanitize(self, req: InspectRequest) -> SanitizeResponse:
+    async def sanitize(self, req: InspectRequest, client_id: str | None = None) -> SanitizeResponse:
         """클라이언트가 보낸 구간을 믿지 않고 서버가 직접 검사 → 치환 → 재검사한다."""
         t0 = time.perf_counter()
         dest, dest_notices = self.resolve_destination(req)
@@ -198,11 +198,11 @@ class Pipeline:
             notices=dest_notices + sorted(set(first.notices + second.notices)),
         )
         final = Analysis(status, decision, signal, second.merged, resp.notices, dest.tier)
-        self._record("sanitize", req, final, dest, masked=len(tokens), t0=t0)
+        self._record("sanitize", req, final, dest, masked=len(tokens), t0=t0, client_id=client_id)
         return resp
 
     def _record(self, endpoint: str, req: InspectRequest, a: Analysis, dest: Destination,
-                masked: int, t0: float) -> None:
+                masked: int, t0: float, client_id: str | None = None) -> None:
         self.audit.record(AuditEvent.new(
             endpoint=endpoint, client_type=req.context.client_type.value,
             destination_provider=dest.provider, destination_channel=dest.channel,
@@ -215,6 +215,7 @@ class Pipeline:
             masked_count=masked, policy_version=self.policy.version,
             detector_versions=self.detector_versions,
             duration_ms=int((time.perf_counter() - t0) * 1000),
+            client_id=client_id,
         ))
 
 

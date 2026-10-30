@@ -32,6 +32,41 @@ $("form").addEventListener("submit", async (e) => {
   msg.textContent = "저장했습니다.";
 });
 
+// ── 대시보드 연결 ──
+const LINK_ERRORS = {
+  http_400: "등록 코드가 올바르지 않거나 만료되었습니다.",
+  network: "검사 서버에 연결할 수 없습니다. 서버 주소를 저장했는지 확인하세요.",
+  timeout: "검사 서버 응답 시간이 초과되었습니다.",
+};
+
+function renderLink(linked) {
+  $("linkState").textContent = linked ? `연결됨 · ${linked.label}` : "연결 안 됨";
+  $("linkForm").hidden = !!linked;
+  $("linkBtn").hidden = !!linked;
+  $("unlinkBtn").hidden = !linked;
+}
+
+chrome.storage.local.get({ linkedClient: null }).then(({ linkedClient }) => renderLink(linkedClient));
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.linkedClient) renderLink(changes.linkedClient.newValue);
+  if (changes.apiKey) $("apiKey").value = changes.apiKey.newValue || "";
+});
+
+$("linkBtn").addEventListener("click", async () => {
+  const msgEl = $("linkMsg");
+  const code = $("linkCode").value.trim();
+  if (!code) { msgEl.textContent = "등록 코드를 입력하세요."; return; }
+  msgEl.textContent = "연결 중…";
+  const res = await chrome.runtime.sendMessage({ type: "enroll", code });
+  $("linkCode").value = "";
+  msgEl.textContent = res?.ok ? "연결했습니다." : (LINK_ERRORS[res?.error] || `실패: ${res?.error}`);
+});
+
+$("unlinkBtn").addEventListener("click", async () => {
+  const res = await chrome.runtime.sendMessage({ type: "unlink" });
+  $("linkMsg").textContent = res?.ok ? "연결을 해제했습니다." : `실패: ${res?.error}`;
+});
+
 $("test").addEventListener("click", async () => {
   msg.textContent = "확인 중…";
   const res = await chrome.runtime.sendMessage({ type: "health" });
