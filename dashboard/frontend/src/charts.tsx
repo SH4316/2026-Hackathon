@@ -58,13 +58,13 @@ export function Trend({
         >
           <CartesianGrid
             vertical={false}
-            stroke="#e9edf2"
+            stroke="#334155"
             strokeDasharray="3 4"
           />
           <XAxis
             dataKey="bucket"
             tickFormatter={label}
-            tick={{ fill: "#5e6c82", fontSize: 11 }}
+            tick={{ fill: "#94A3B8", fontSize: 11 }}
             tickLine={false}
             axisLine={false}
             minTickGap={45}
@@ -72,16 +72,18 @@ export function Trend({
           />
           <YAxis
             allowDecimals={false}
-            tick={{ fill: "#5e6c82", fontSize: 11 }}
+            tick={{ fill: "#94A3B8", fontSize: 11 }}
             tickLine={false}
             axisLine={false}
           />
           <Tooltip
             labelFormatter={(v) => label(String(v))}
             contentStyle={{
-              border: "1px solid #e4e9f0",
+              background: "#0F172A",
+              border: "1px solid #334155",
               borderRadius: 9,
               fontSize: 12,
+              color: "#F1F5F9",
             }}
           />
           <Legend
@@ -93,16 +95,16 @@ export function Trend({
             type="monotone"
             dataKey="findingCount"
             name="감지 영역 (개)"
-            stroke="#365fc5"
+            stroke="#3B82F6"
             strokeWidth={2.5}
-            dot={metrics.series.length < 10 ? { r: 3, fill: "#fff" } : false}
+            dot={metrics.series.length < 10 ? { r: 3, fill: "#0F172A" } : false}
             isAnimationActive={false}
           />
           <Line
             type="monotone"
             dataKey="eventCount"
             name="분석 Prompt (건)"
-            stroke="#8a9bbf"
+            stroke="#64748B"
             strokeWidth={1.7}
             strokeDasharray="4 4"
             dot={false}
