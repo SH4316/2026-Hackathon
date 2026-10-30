@@ -1,6 +1,8 @@
 // 서비스 워커: 검사 서버 호출을 전담한다.
 // content script 는 페이지 CORS 의 영향을 받으므로 서버 요청은 모두 여기서 보낸다.
 // 원문은 로그·저장소에 남기지 않는다.
+// 개인 정규식 규칙(설정 화면)은 서버가 모르므로 여기서 서버 판정에 더한다(강화만, src/personal.js).
+import { STORAGE_KEY as PERSONAL_KEY, mergeInspect, mergeSanitize } from "./personal.js";
 
 const DEFAULTS = {
   serverUrl: "http://127.0.0.1:8000",
@@ -60,12 +62,29 @@ async function bumpStat(name) {
   return { ok: true };
 }
 
+async function personalRules() {
+  const { [PERSONAL_KEY]: rules = [] } = await chrome.storage.local.get(PERSONAL_KEY);
+  return rules;
+}
+
+// 개인 규칙을 처리하다 실패해도 서버 판정은 그대로 돌려준다(개인 규칙은 판정을 강화만 하므로).
+async function withPersonal(res, merge) {
+  if (!res.ok) return res;
+  try {
+    return { ok: true, data: merge(res.data, await personalRules()) };
+  } catch {
+    return res;
+  }
+}
+
 async function handle(msg) {
   switch (msg?.type) {
     case "inspect":
-      return callServer("POST", "/v1/inspect", checkRequest(msg));
+      return withPersonal(await callServer("POST", "/v1/inspect", checkRequest(msg)),
+        (data, rules) => mergeInspect(data, msg.text, rules, msg.destination));
     case "sanitize":
-      return callServer("POST", "/v1/sanitize", checkRequest(msg));
+      return withPersonal(await callServer("POST", "/v1/sanitize", checkRequest(msg)),
+        (data, rules) => mergeSanitize(data, rules, msg.destination));
     case "health":
       return callServer("GET", "/readyz");
     case "settings":

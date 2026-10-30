@@ -15,7 +15,8 @@
     "https://*/*"
   ],
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -61,6 +62,7 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "src/personal.js",
         "vendor/prompt-guard-rules/src/*.js",
         "vendor/prompt-guard-rules/data/*.js",
         "vendor/pdfjs/*.mjs",
