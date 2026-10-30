@@ -1,0 +1,47 @@
+# Run the full stack with development-only Jev presets and separate data volumes.
+# docker compose -f compose-dev.yml up --build -d --wait
+name: safeprompt-dev
+
+services:
+  dashboard:
+    extends:
+      file: compose.yml
+      service: dashboard
+
+  dashboard-init:
+    extends:
+      file: compose.yml
+      service: dashboard-init
+    environment:
+      SEED_JEV_FILTERS: "true"
+
+  mysql:
+    extends:
+      file: compose.yml
+      service: mysql
+
+  server:
+    extends:
+      file: compose.yml
+      service: server
+
+  decider-pull:
+    extends:
+      file: compose.yml
+      service: decider-pull
+
+  decider:
+    extends:
+      file: compose.yml
+      service: decider
+
+networks:
+  default:
+  model-download:
+  decider-internal:
+    internal: true
+
+volumes:
+  mysql-data:
+  server-data:
+  decider-data:

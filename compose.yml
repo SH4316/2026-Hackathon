@@ -27,6 +27,24 @@ services:
       start_period: 40s
     restart: unless-stopped
 
+  # Register the extension's bundled filter types before the inspection server starts.
+  dashboard-init:
+    image: node:24-bookworm-slim
+    user: node
+    working_dir: /seed
+    command: ["node", "/seed/scripts/seed-dashboard.mjs"]
+    environment:
+      DASHBOARD_URL: http://dashboard:8080
+      SEED_JEV_FILTERS: "false"
+    volumes:
+      - ./scripts/seed-dashboard.mjs:/seed/scripts/seed-dashboard.mjs:ro
+      - ./extension/vendor/prompt-guard-rules/data/policy.js:/seed/extension/vendor/prompt-guard-rules/data/policy.js:ro
+      - ./extension/src/labels.js:/seed/extension/src/labels.js:ro
+    depends_on:
+      dashboard:
+        condition: service_healthy
+    restart: "no"
+
   mysql:
     image: mysql:8.4
     environment:
@@ -90,6 +108,8 @@ services:
     depends_on:
       dashboard:
         condition: service_healthy
+      dashboard-init:
+        condition: service_completed_successfully
       decider:
         condition: service_healthy
     healthcheck:

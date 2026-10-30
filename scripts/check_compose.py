@@ -23,10 +23,14 @@ def main():
     compose = shlex.split(args.compose_command)
     require(bool(compose), "Compose command must not be empty")
     # A service env_file/include could read real secrets independently of --env-file.
-    for file in ("compose.yml", "compose.gpu.yml"):
-        require(not re.search(r"^\s*(env_file|include|extends)\s*:",
+    for file in ("compose.yml", "compose-dev.yml", "compose.gpu.yml"):
+        blocked = "env_file|include" if file == "compose-dev.yml" else "env_file|include|extends"
+        require(not re.search(rf"^\s*({blocked})\s*:",
                               (root / file).read_text(), re.MULTILINE),
-                "Use explicit service environments; env_file/include/extends are outside this check")
+                "Use explicit service environments and only the checked development extends")
+    dev_source = (root / "compose-dev.yml").read_text()
+    require(re.findall(r"^\s*file:\s*(\S+)\s*$", dev_source, re.MULTILINE) == ["compose.yml"] * 6,
+            "Development services must extend only the checked root compose.yml")
     environment = {key: os.environ[key] for key in ("PATH", "HOME", "SYSTEMROOT", "TMPDIR")
                    if key in os.environ}
     environment.update({
@@ -39,6 +43,8 @@ def main():
         "UNRELATED_SECRET": "synthetic-must-not-leak",
         "GUARD_SERVER_URL": "http://host-must-not-leak:7777",
         "GUARD_ADMIN_KEY": "synthetic-wrong-admin-key",
+        "DASHBOARD_URL": "http://host-must-not-leak:9998",
+        "SEED_JEV_FILTERS": "host-must-not-leak",
     })
     credentials = {"MYSQL_ROOT_PASSWORD": "synthetic-root-password",
                    "DB_PASSWORD": "synthetic-db-password",
@@ -48,9 +54,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix="safeprompt-compose-") as temporary:
         env_file = Path(temporary) / "check.env"
 
-        def config(values, *, template="", gpu=False, valid=True):
+        def config(values, *, template="", gpu=False, dev=False, valid=True):
             env_file.write_text(template + "\n" + "\n".join(f"{k}={v}" for k, v in values.items()) + "\n")
-            files = ["-f", str(root / "compose.yml")]
+            files = ["-f", str(root / ("compose-dev.yml" if dev else "compose.yml"))]
             if gpu:
                 files += ["-f", str(root / "compose.gpu.yml")]
             result = subprocess.run(
@@ -69,14 +75,17 @@ def main():
         example = config(credentials, template=(root / ".env.example").read_text())
         gpu = config(credentials, gpu=True)
         gpu_custom = config({**credentials, "DECIDER_GPU_LAYERS": "8"}, gpu=True)
+        dev = config(credentials, dev=True)
+        dev_gpu = config(credentials, dev=True, gpu=True)
         multiple_admin = config({**credentials, "PG_ADMIN_KEYS": "synthetic-first,synthetic-second"})
         without_admin = config({k: v for k, v in credentials.items() if k != "PG_ADMIN_KEYS"})
         for key in ("MYSQL_ROOT_PASSWORD", "PG_API_KEYS"):
             config({k: v for k, v in credentials.items() if k != key}, valid=False)
+            config({k: v for k, v in credentials.items() if k != key}, dev=True, valid=False)
 
-    for cfg in (base, custom, example, gpu, gpu_custom):
+    for cfg in (base, custom, example, gpu, gpu_custom, dev, dev_gpu):
         services = cfg["services"]
-        require(set(services) == {"dashboard", "mysql", "server", "decider-pull", "decider"}, "Expected app, DB and Decider services")
+        require(set(services) == {"dashboard", "dashboard-init", "mysql", "server", "decider-pull", "decider"}, "Expected app, filter initializer, DB and Decider services")
         require(set(cfg["volumes"]) == {"mysql-data", "server-data", "decider-data"}, "Unexpected data volumes")
         dashboard, mysql, server = (services[name] for name in ("dashboard", "mysql", "server"))
         for name in ("dashboard", "server"):
@@ -86,7 +95,29 @@ def main():
             require(service.get("pull_policy") == "build", f"{name} must rebuild current source")
         require(dashboard["depends_on"]["mysql"]["condition"] == "service_healthy", "Dashboard must wait for MySQL")
         require(server["depends_on"]["dashboard"]["condition"] == "service_healthy", "Server must wait for dashboard")
+        require(server["depends_on"]["dashboard-init"]["condition"] == "service_completed_successfully", "Server must wait for filter registration")
         require(server["depends_on"]["decider"]["condition"] == "service_healthy", "Server must wait for model")
+        initializer = services["dashboard-init"]
+        require(initializer["image"] == "node:24-bookworm-slim"
+                and initializer["user"] == "node" and initializer["working_dir"] == "/seed"
+                and initializer["command"] == ["node", "/seed/scripts/seed-dashboard.mjs"]
+                and initializer["restart"] == "no", "Filter initializer must run once as the unprivileged Node user")
+        require(initializer["depends_on"]["dashboard"]["condition"] == "service_healthy"
+                and "server" not in initializer["depends_on"], "Filter registration must avoid a server dependency cycle")
+        require(initializer["environment"] == {"DASHBOARD_URL": "http://dashboard:8080",
+                                             "SEED_JEV_FILTERS": "true" if cfg in (dev, dev_gpu) else "false"},
+                "Filter initializer must receive only its internal URL and the correct Jev preset flag")
+        require(not initializer.get("ports") and not initializer.get("profiles")
+                and set(initializer["networks"]) == {"default"}, "Filter initializer must use only the dashboard network")
+        seed_mounts = {mount["target"]: mount for mount in initializer["volumes"]}
+        expected_seed_files = ("scripts/seed-dashboard.mjs",
+                               "extension/vendor/prompt-guard-rules/data/policy.js", "extension/src/labels.js")
+        require(set(seed_mounts) == {f"/seed/{file}" for file in expected_seed_files},
+                "Filter initializer must mount the extension bundle, labels, and initialization script")
+        for file in expected_seed_files:
+            mount = seed_mounts[f"/seed/{file}"]
+            require((root / file).is_file() and Path(mount["source"]) == root / file and mount["read_only"],
+                    "Filter initialization inputs must be read-only repository files")
         for name, endpoint in (("mysql", "mysqladmin ping"), ("dashboard", "/api/v1/health"),
                                ("server", "/healthz"), ("decider", "/health")):
             require(endpoint in " ".join(services[name]["healthcheck"]["test"]), f"Missing {name} health check")
@@ -148,20 +179,28 @@ def main():
             require(len(bindings) == 1 and bindings[0]["host_ip"] == host_ip
                     and bindings[0]["published"] == published and bindings[0]["target"] == target,
                     f"Wrong {name} published port")
-    for cfg in (base, example):
+    for cfg in (base, example, dev, dev_gpu):
         require(cfg["services"]["server"]["environment"]["PG_MODEL_MODE"] == "required"
                 and cfg["services"]["server"]["environment"]["PG_MODEL_TIMEOUT_S"] == "120", "Default model must be required with 120s timeout")
-    for cfg in (base, custom, example):
+    for cfg in (base, custom, example, dev):
         decider = cfg["services"]["decider"]
         require(decider["build"]["target"] == "cpu" and not decider.get("gpus")
                 and decider["environment"]["DECIDER_GPU_LAYERS"] == "0", "Base must use CPU regardless of GPU env")
-    for cfg, layers in ((gpu, "-1"), (gpu_custom, "8")):
+    for cfg, layers in ((gpu, "-1"), (gpu_custom, "8"), (dev_gpu, "-1")):
         decider = cfg["services"]["decider"]
         require(decider["build"]["target"] == "cuda"
                 and decider["environment"]["DECIDER_GPU_LAYERS"] == layers, "GPU override must select CUDA and requested layers")
         # Compose normalizes `gpus: all` to count=-1; gpu capability is implicit.
         require(len(decider["gpus"]) == 1 and decider["gpus"][0]["count"] == -1,
                 "GPU override must request host GPU access")
+    require(dev["name"] == dev_gpu["name"] == "safeprompt-dev" and base["name"] != dev["name"],
+            "Development must use a separate Compose project")
+    for name in ("mysql-data", "server-data", "decider-data"):
+        require(dev["volumes"][name]["name"] != base["volumes"][name]["name"],
+                "Development data and model volumes must be separate from the default project")
+    for name in set(base["services"]) - {"dashboard-init"}:
+        require(dev["services"][name] == base["services"][name],
+                f"Development {name} must inherit the root service unchanged")
     require(custom["services"]["server"]["environment"]["PG_MODEL_MODE"] == "optional"
             and custom["services"]["server"]["environment"]["PG_MODEL_TIMEOUT_S"] == "150"
             and custom["services"]["decider"]["environment"]["DECIDER_THREADS"] == "6"
@@ -172,7 +211,7 @@ def main():
     require(without_admin["services"]["server"]["environment"]["PG_ADMIN_KEYS"] == "", "Admin key must remain optional")
     require(subprocess.run(["git", "check-ignore", "--quiet", ".env"], cwd=root,
                            env=environment, check=False).returncode == 0, "Root .env must be gitignored")
-    print("PASS: root Compose defaults/example/overrides, CPU/CUDA overlay, isolated model download/inference, scoped environments, internal URLs, health dependencies, private MySQL, persistent volumes, required secrets, and ignored .env")
+    print("PASS: root/default and development Compose, extension filter initialization, development Jev preset, CPU/CUDA overlay, isolated model download/inference, scoped environments, internal URLs, health dependencies, private MySQL, separate persistent volumes, required secrets, and ignored .env")
     print("Scope: Compose config parsing only; no images built or containers executed. Real .env was not read.")
 
 

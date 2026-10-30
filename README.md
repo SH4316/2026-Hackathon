@@ -12,6 +12,7 @@
 | 서비스 | 역할 |
 | --- | --- |
 | `dashboard` | React 화면과 Spring API |
+| `dashboard-init` | 확장프로그램의 기본 필터 유형을 대시보드에 등록한 뒤 종료 |
 | `mysql` | 대시보드 DB |
 | `server` | Prompt Guard 검사 API와 대시보드 연동 |
 | `decider-pull` | 고정 버전의 공식 모델 파일 다운로드·무결성 검사 후 종료 |
@@ -66,11 +67,25 @@ GPU 구성은 CUDA 이미지와 전체 레이어 오프로딩(`DECIDER_GPU_LAYER
 
 > **경고:** 대시보드에는 인증이 없으며 `/api/v1/guard/**` 관리 프록시가 백엔드에 보관된 관리 키로 검사 서버 설정·규칙·사용자 연결을 변경할 수 있습니다. 루트 Compose 기본값 `0.0.0.0`에서는 접근 가능한 다른 호스트도 이 기능과 대시보드 원문·첨부 기록에 접근할 수 있습니다. 로컬 시연은 `APP_BIND_IP=127.0.0.1`, `PG_BIND_IP=127.0.0.1`로 제한하거나 별도 인증·접근 제어를 적용하세요. 관리 키를 브라우저에 숨기는 것만으로 대시보드 접근이 보호되지는 않습니다.
 
-MySQL의 상태 확인이 통과하면 대시보드가 시작합니다. 별도로 모델 다운로드가 완료되면 Decider가 모델을 로드하고 실제 워밍업 판단을 수행합니다. 대시보드와 Decider가 모두 healthy가 되면 검사 서버가 시작합니다. 컨테이너 간 DB 주소는 `mysql:3306`, `PG_DASHBOARD_URL`은 `http://dashboard:8080`, 모델 주소는 `http://decider:8000`으로 고정되어 있으며 호스트 공개 IP·포트를 바꿔도 유지됩니다. 모델 다운로드 서비스는 검사 서버와 네트워크를 공유하지 않으며, 추론 서비스는 내부 네트워크에서만 실행됩니다.
+MySQL의 상태 확인이 통과하면 대시보드가 시작하고, `dashboard-init`이 기본 필터를 등록합니다. 별도로 모델 다운로드가 완료되면 Decider가 모델을 로드하고 실제 워밍업 판단을 수행합니다. 필터 등록이 성공하고 대시보드와 Decider가 모두 healthy가 되면 검사 서버가 시작합니다. 컨테이너 간 DB 주소는 `mysql:3306`, `PG_DASHBOARD_URL`은 `http://dashboard:8080`, 모델 주소는 `http://decider:8000`으로 고정되어 있으며 호스트 공개 IP·포트를 바꿔도 유지됩니다. 모델 다운로드 서비스는 검사 서버와 네트워크를 공유하지 않으며, 추론 서비스는 내부 네트워크에서만 실행됩니다.
 
 ### 최초 조직 설정과 현재 연동 범위
 
-새 DB에는 데모 데이터를 자동으로 넣지 않습니다. 대시보드의 **메트릭 설정**(`/settings/metrics`)에서 초안을 만들고 태그·정책을 저장한 뒤 **게시·활성화**합니다. 검사 서버는 이 활성 설정을 읽습니다. 활성 버전이 없거나 대시보드에 연결할 수 없으면 조직 규칙 검사 결과가 미완료(회색, `org_config_unavailable`)가 될 수 있습니다. `/healthz`와 컨테이너의 healthy 상태는 프로세스 생존 확인이며, `/readyz`도 활성 조직 설정의 정상 적용을 보장하지는 않습니다.
+처음 실행하면 확장프로그램의 `extension/vendor/prompt-guard-rules/data/policy.js`와 화면 표시 이름을 읽어 **확장프로그램 기본 필터** 버전을 게시합니다. 기본 규칙 유형 26개, 사용자 규칙 1개, Jev 기준 유형 5개를 같은 ID의 태그 32개로 등록하고, 활성 버전이 없을 때만 활성화합니다. 기존 활성 버전과 이미 등록한 기본 버전의 편집 내용은 재실행해도 덮어쓰지 않습니다. 대시보드의 **메트릭 설정**(`/settings/metrics`)에서 태그를 확인하거나 새 초안으로 복제할 수 있습니다. 가상 사람·이벤트 등 데모 데이터는 생성하지 않습니다.
+
+이 태그들은 확장프로그램·검사 서버의 기존 탐지 결과를 같은 ID로 분류합니다. 내장 검증 로직·정규식을 대시보드 정규식으로 복제하지 않으며, 태그를 끄더라도 기존 내장 탐지를 끄지는 않습니다. 브라우저에만 저장된 개인 정규식과 기기 내 Qoamo AI는 이 초기화 대상에 포함되지 않습니다. 검사 서버는 활성 조직 설정을 읽으며, 이 설정을 읽지 못하면 검사 결과가 미완료(회색, `org_config_unavailable`)가 될 수 있습니다. `/healthz`와 컨테이너의 healthy 상태는 프로세스 생존 확인이며, `/readyz`도 활성 조직 설정의 정상 적용을 보장하지는 않습니다.
+
+### 개발용 Jev 기본 설정
+
+루트 `compose-dev.yml`은 위 서비스 구성을 그대로 사용하면서 **개발용 확장 필터 · Jev** 버전에 기본 필터 32개와 `api_key`(API 키)·`person_name`(사람 이름) 태그를 등록합니다. 두 태그에는 각각 활성 Jev 판단 프롬프트와 `0.5` 임계값을 설정합니다. API 키 탐지는 실제 인증 키·토큰 값을, 이름 탐지는 실제 사람을 지칭하는 이름을 대상으로 하며 메트릭 설정의 Jev 화면에서 기준·임계값을 조정할 수 있습니다.
+
+```bash
+docker compose -f compose-dev.yml up -d --build --wait
+# NVIDIA GPU 구성:
+docker compose -f compose-dev.yml -f compose.gpu.yml up -d --build --wait
+```
+
+개발 구성은 `safeprompt-dev` 프로젝트의 별도 DB·서버·모델 볼륨을 사용합니다. 기본 구성과 같은 포트를 쓰므로 함께 실행하려면 `.env`의 포트를 조정합니다. 상태·로그·정지에도 같은 `-f` 옵션을 지정합니다. 기존 `dashboard/compose-dev.yml`은 데모 대시보드만 실행하는 별도 구성입니다.
 
 Decider는 태그별 **입력 전체 분류**에 사용합니다. Jev 설정의 프롬프트와 출력 태그별 질문을 `/v1/systemone`에 보내 `true` 확률을 받고, 태그의 `jevThreshold` 이상이면 입력 전체를 해당 태그의 분류 범위로 표시합니다. 이는 모델이 근거 구간을 추출했다는 뜻이 아닙니다. 조직 기본 조치가 `mask`이므로 정제 시 입력 전체가 토큰으로 바뀔 수 있습니다. Python 정규식은 계속 실제 일치 구간을 사용합니다. Decider는 선택지 확률을 반환하므로 이 구성은 Ollama 채팅 API 대신 공식 SDK를 사용합니다([공식 모델 사용 방식](https://huggingface.co/Mapika/decider-4b-GGUF#this-is-not-a-chat-model)).
 
@@ -108,7 +123,7 @@ AI 도구의 base URL을 `http://127.0.0.1:8787/v1`로 지정하면 지원 API �
 폐쇄망에서는 이미지와 모델 캐시를 미리 반입하고 `.env`에 `DECIDER_OFFLINE=true`를 설정합니다. 다운로드 서비스는 `/models/d3a78581751d518bbfa9e871a6d84059554d53c5/` 아래의 고정 파일·해시를 확인하며, 파일이 없거나 일치하지 않으면 다운로드 없이 실패합니다. 온라인 환경에서는 `docker compose run --rm --build decider-pull`로 모델 캐시만 먼저 준비할 수 있습니다.
 
 ```bash
-docker compose logs --tail=100 dashboard server decider decider-pull
+docker compose logs --tail=100 dashboard dashboard-init server decider decider-pull
 docker compose stop                 # 컨테이너 정지
 docker compose up -d                # 재시작
 docker compose down                # 컨테이너 제거, 데이터 볼륨 보존
@@ -116,7 +131,7 @@ docker compose down                # 컨테이너 제거, 데이터 볼륨 보�
 
 `docker compose down -v`는 데이터와 모델 캐시 볼륨을 삭제합니다. 기존 `dashboard/`·`server/` 전용 Compose와 루트 구성은 별도 Compose 프로젝트이며 기존 데이터가 자동으로 이전되지 않습니다. 호스트 포트가 겹치는 구성은 함께 실행할 수 없습니다.
 
-컨테이너 실행 없이 기본값·CPU/GPU 구성 병합·포트 변경·서비스 환경변수 분리·내부 주소·모델 네트워크 격리·상태 확인 의존성·볼륨·필수 비밀값을 검증하려면 다음 명령을 실행합니다. Python 표준 라이브러리와 Compose 2.30.0 이상을 사용하며 실제 `.env` 대신 임시 합성 값을 읽습니다. 이미지 빌드·실제 모델 추론·GPU 동작은 검증하지 않습니다.
+컨테이너 실행 없이 기본·개발 구성과 필터 초기화 의존성·CPU/GPU 구성 병합·포트 변경·서비스 환경변수 분리·내부 주소·모델 네트워크 격리·볼륨·필수 비밀값을 검증하려면 다음 명령을 실행합니다. Python 표준 라이브러리와 Compose 2.30.0 이상을 사용하며 실제 `.env` 대신 임시 합성 값을 읽습니다. 이미지 빌드·실제 모델 추론·GPU 동작은 검증하지 않습니다.
 
 ```bash
 python3 scripts/check_compose.py
