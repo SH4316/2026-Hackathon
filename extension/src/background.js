@@ -31,7 +31,7 @@ async function callServer(method, path, body) {
       signal: ctrl.signal,
     });
     if (!res.ok) return { ok: false, error: `http_${res.status}` };
-    return { ok: true, data: await res.json() };
+    return { ok: true, data: res.status === 204 ? null : await res.json() };
   } catch (err) {
     return { ok: false, error: err.name === "AbortError" ? "timeout" : "network" };
   } finally {
@@ -48,6 +48,24 @@ function checkRequest(msg) {
     text: msg.text,
     context,
   };
+}
+
+// 대시보드 연결: 등록 코드 → 개인 토큰. 토큰은 apiKey 자리에 저장해 이후 모든 검사 요청에 쓴다.
+async function enroll(code) {
+  const res = await callServer("POST", "/v1/auth/enroll", {
+    code, client_type: "browser_extension", device_name: navigator.userAgentData?.platform || null,
+  });
+  if (!res.ok) return res;
+  const { client_id: clientId, label, token } = res.data;
+  await chrome.storage.local.set({ apiKey: token, linkedClient: { clientId, label } });
+  return { ok: true, data: { clientId, label } };
+}
+
+async function unlink() {
+  const res = await callServer("POST", "/v1/auth/logout");
+  // 서버에서 이미 해지됐어도(401) 이 브라우저의 연결 정보는 지운다.
+  if (res.ok || res.error === "http_401") await chrome.storage.local.set({ apiKey: "", linkedClient: null });
+  return res.error === "http_401" ? { ok: true } : res;
 }
 
 // 이 브라우저에만 쌓는 횟수 통계. 원문은 포함하지 않으며 어디로도 전송하지 않는다.
@@ -72,6 +90,12 @@ async function handle(msg) {
       return { ok: true, data: await getSettings() };
     case "stat":
       return bumpStat(msg.name);
+    case "enroll":
+      return enroll(String(msg.code || ""));
+    case "unlink":
+      return unlink();
+    case "me":
+      return callServer("GET", "/v1/auth/me");
     default:
       return { ok: false, error: "unknown_message" };
   }

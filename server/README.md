@@ -92,6 +92,13 @@ python -m prompt_guard inspect                                  # 대화형 입�
 | green | `status=complete` 이고 `decision=allow`. 현재 정책 통과일 뿐 절대 안전 보장이 아님 |
 | gray | `status` 가 `incomplete`/`error` — 전송 보류. 이때 `decision` 은 절대 `allow` 가 아님 |
 
+## 대시보드 ↔ 개인 연결
+
+대시보드가 사용자별 일회용 **등록 코드**(`POST /v1/admin/enrollments`)를 발급하고, 사용자가 확장프로그램 설정의
+"대시보드 연결"에 코드를 넣으면 개인 토큰(`pgc_…`)이 발급됩니다. 이후 검사 요청의 감사 이벤트에 `client_id` 가 붙어
+대시보드에서 사용자별로 조회·집계(`/v1/admin/audit/events`, `/v1/admin/audit/summary`)하고 연결을 해지할 수 있습니다.
+엔드포인트 목록은 [docs/api-contract.md](docs/api-contract.md#대시보드--개인-연결).
+
 ## 탐지 모듈·대시보드 규칙 관리
 
 내장 규칙 외에 대시보드에서 **사용자 규칙(키워드·정규식)**과 **문맥 탐지기(정규식으로 판단할 수 없는 기준을 로컬 모델로 판단)**를
