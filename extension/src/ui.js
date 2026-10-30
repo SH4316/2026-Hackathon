@@ -32,7 +32,7 @@ var PG = (globalThis.PG = globalThis.PG || {});
   --w-green: #10B981; --w-green-fg: #6EE7B7; --w-green-bg: rgba(16,185,129,.14);
   --w-cyan: #06B6D4; --w-cyan-fg: #67E8F9; --w-cyan-bg: rgba(6,182,212,.14);
   --w-send: #059669; --w-dim: .22;
-  position: fixed; z-index: 2147483646; display: grid; gap: 8px; padding: 10px 12px;
+  position: fixed; z-index: 2147483646; display: grid; gap: 8px; padding: 10px 12px; overflow-y: auto;
   background: var(--w-bg); color: var(--w-fg); border: 1px solid var(--w-line2); border-radius: 14px;
   box-shadow: 0 8px 28px rgba(15,23,42,.35); font-size: 13px; line-height: 1.45;
 }
@@ -51,6 +51,16 @@ var PG = (globalThis.PG = globalThis.PG || {});
 .badge[data-state="green"] { border-color: var(--w-green); }
 .badge .reason { font-size: 11px; color: var(--w-mut); }
 .badge .reason:empty { display: none; }
+.site-context { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; overflow-wrap: anywhere; }
+.site-context[data-tone="yellow"] { color: var(--yellow); background: var(--yellow-bg); }
+.badge .site-context { border-color: var(--w-amber); color: var(--w-amber-fg); background: var(--w-amber-bg); }
+.site-context summary { cursor: pointer; font-weight: 600; line-height: 1.5; }
+.site-context summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.site-context dl { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 3fr); gap: 6px 12px; margin: 10px 0; }
+.site-context dt { font-weight: 600; }
+.site-context dd { margin: 0; }
+.site-context p { margin: 8px 0 0; line-height: 1.6; }
+.site-context .context-help { border-top: 1px solid currentColor; padding-top: 8px; }
 .badge .wrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .badge .brand { display: inline-flex; align-items: center; gap: 8px; background: var(--w-soft); border: 1px solid var(--w-line2); border-radius: 999px; padding: 4px 10px; font-weight: 700; }
 .badge .lamps { display: inline-flex; gap: 5px; padding-left: 8px; border-left: 1px solid var(--w-line2); }
@@ -107,6 +117,10 @@ var PG = (globalThis.PG = globalThis.PG || {});
 .sub { color: var(--muted); font-size: 13px; margin: 0; }
 .body { padding: 14px 20px; display: grid; gap: 14px; }
 .section-title { font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 6px; letter-spacing: .02em; }
+.entry-copy { margin: 0; overflow-wrap: anywhere; }
+.policy-sources { margin: 0 0 12px; padding-left: 20px; }
+.policy-sources a { color: var(--primary); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.entry-policy :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .preview {
   white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto;
   background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
@@ -224,6 +238,26 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     return el;
   }
 
+  function contextDetails(snapshot) {
+    if (!snapshot) return null;
+    const provider = PG.PROVIDER_LABELS[snapshot.provider] || "알 수 없는 서비스";
+    const model = snapshot.model.value || "모델 미확인";
+    const detail = h("details", { class: "site-context", dataset: { tone: snapshot.uncertain ? "yellow" : "known" } },
+      h("summary", null, `${provider} · ${model} · ${snapshot.uncertain ? "이용 환경 확인 필요" : "화면 상태 확인됨"}`));
+    const value = (field) => {
+      const f = snapshot[field];
+      if (f.status !== "observed") return f.value ? `${f.value} (확인 불가)` : "확인 불가";
+      return `${typeof f.value === "boolean" ? f.value ? "ON" : "OFF" : f.value} · 화면에서 확인`;
+    };
+    detail.append(h("dl", null,
+      [["model", "선택 모델"], ["account", "계정·공간"], ["plan", "요금제"], ["training", "학습·활동 설정"],
+        ["temporary", "임시 대화"], ["policy", "정책 범위"]].flatMap(([field, label]) =>
+        [h("dt", null, label), h("dd", { dataset: { field, status: snapshot[field].status } }, value(field))])),
+      h("p", { class: "context-help" }, "계정 메뉴와 개인정보 설정을 열면 표시된 상태를 확인합니다. 화면에 없는 항목은 확인 불가로 표시합니다."),
+      h("p", null, "학습 OFF·유료 계정만으로 안전하다고 판단하지 않습니다. 모델별 정책이 확인될 때까지 제공사 기본 기준과 주의를 적용합니다."));
+    return detail;
+  }
+
   // ── 위젯 ──
   // vm: { visible, lamp, chip, reason, preview:{parts:[{text,token}],label,note}|null, busy,
   //       canSanitize, canApply, canRevert, canForce, notice, noticeTone, chipClickable }
@@ -237,6 +271,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     const refs = {};
     const dots = ["r", "y", "g"].map((c) => h("i", { class: `dot ${c}` }));
     refs.reason = h("div", { class: "reason" });
+    refs.context = h("div", { class: "context-slot" });
     refs.chip = h("button", { class: "chip-w", type: "button", tabindex: "-1" });
     refs.phead = h("div", { class: "phead" });
     refs.pbody = h("div", { class: "pbody" });
@@ -258,7 +293,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       h("div", { class: "wrow" },
         h("div", { class: "brand" }, h("span", null, "SafePrompt"), h("span", { class: "lamps" }, dots)),
         refs.chip),
-      refs.pbox, refs.notice,
+      refs.context, refs.pbox, refs.notice,
       h("div", { class: "acts" }, refs.force, refs.revert, refs.san, refs.apply));
     rootEl.append(refs.root);
     window.addEventListener("scroll", reposition, true);
@@ -278,6 +313,16 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     W.root.hidden = !vm.visible;
     W.root.dataset.state = vm.lamp;
     W.reason.textContent = vm.reason || "";
+    const contextKey = vm.siteContext ? `${vm.siteContext.revision}` : "";
+    if (W.contextKey !== contextKey) {
+      const wasOpen = !!W.context.querySelector("details")?.open;
+      const detail = contextDetails(vm.siteContext);
+      if (detail) detail.open = wasOpen;
+      W.context.replaceChildren(...(detail ? [detail] : []));
+      detail?.addEventListener("toggle", reposition);
+      W.contextKey = contextKey;
+    }
+    W.context.hidden = !vm.siteContext;
     W.chip.textContent = vm.chip || "";
     if (vm.chipClickable) { W.chip.dataset.clickable = ""; W.chip.title = "자세히 보기"; }
     else { delete W.chip.dataset.clickable; W.chip.title = ""; }
@@ -310,6 +355,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     const r = anchor.getBoundingClientRect();
     const width = Math.min(Math.max(r.width, 340), 640, window.innerWidth - 16);
     W.root.style.width = `${width}px`;
+    W.root.style.maxHeight = `${Math.min(window.innerHeight - 16, Math.max(140, r.top > 200 ? r.top - 16 : window.innerHeight - r.bottom - 16))}px`;
     W.root.style.left = `${Math.min(Math.max(8, r.left), window.innerWidth - width - 8)}px`;
     if (r.top > 200) {
       W.root.style.top = "";
@@ -540,6 +586,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       ? `${relevant.length}개 항목이 발견되었습니다.`
       : result.ai_assessment && result.ai_assessment.decision !== "allow"
         ? "기기 내 AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다."
+        : result.site_context?.uncertain ? "내용 검사는 통과했지만, 모델·계정 설정 또는 모델별 정책이 확인되지 않았습니다."
         : "탐지된 항목은 없지만 전송 대상의 정책상 확인이 필요합니다.";
 
     const ack = canSendAnyway
@@ -555,6 +602,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     openModal(h("div", { class: "card" },
       header(tone, icon, title, [summary, destinationLine(result.destination)].filter(Boolean).join(" ")),
       h("div", { class: "body" },
+        contextDetails(result.site_context?.uncertain ? result.site_context : null),
         h("div", null, h("p", { class: "section-title" }, "입력 내용"), preview(text, findings)),
         findings.length ? h("div", null, h("p", { class: "section-title" }, "탐지 항목"), findingList(findings)) : null,
         notices(result.notices,
@@ -568,6 +616,52 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
         incomplete ? h("button", { onclick: opts.onRetry }, "다시 검사") : null,
         sendBtn,
         canSanitize ? h("button", { class: "primary", onclick: opts.onSanitize }, "안전 다듬기") : null)));
+  }
+
+  // 진입 안내는 전송 승인과 별개다. 닫아도 본문/파일 검사를 우회하지 않는다.
+  function showEntryPolicy(policy) {
+    const training = policy.kind === "training-enabled";
+    const observedDate = new Date(policy.observedAt);
+    const evidence = training
+      ? h("div", null,
+          h("p", { class: "section-title" }, "화면에서 확인한 설정"),
+          h("p", { class: "entry-copy" }, "학습·모델 개선: ON"),
+          h("p", { class: "sub" }, "실제 학습 여부는 임시 대화·계정 정책에 따라 달라질 수 있습니다."),
+          Number.isFinite(observedDate.getTime())
+            ? h("p", { class: "fine" }, `확인 시각: ${observedDate.toLocaleString("ko-KR")}`) : null)
+      : h("div", null, h("p", { class: "section-title" }, "확인한 공식 정책"),
+          h("ul", { class: "policy-sources" }, policy.items.map(item =>
+            h("li", null, h("p", { class: "entry-copy" }, item.text),
+              h("a", { href: item.source, target: "_blank", rel: "noopener noreferrer" }, item.kind === "retention" ? "데이터 수집·보관 정책 원문" : "학습 정책 원문")))),
+          h("p", { class: "fine" }, `정책 확인일: ${policy.checkedAt} · 일반 소비자 서비스 기준`));
+    const card = h("div", { class: "card entry-policy", "aria-labelledby": "pg-entry-title" },
+      header(training ? "yellow" : "red", "!", training
+        ? "모델 학습 옵션이 켜져 있습니다"
+        : "입력 데이터 수집을 거부할 수 없는 사이트입니다", policy.name),
+      h("div", { class: "body" },
+        h("p", { class: "entry-copy" }, training
+          ? "이 페이지에서 학습·모델 개선 옵션이 ON인 것을 확인했습니다. 입력한 대화가 모델 학습에 사용될 수 있습니다."
+          : "이 사이트의 일반 소비자 서비스는 입력 데이터를 필수로 수집하며, 모델 학습에서 제외하는 선택권을 제공하지 않는 것으로 확인되었습니다."),
+        h("p", { class: "entry-copy" }, training
+          ? "학습을 원하지 않으면 사이트의 개인정보·데이터 설정에서 해당 옵션을 꺼 주세요."
+          : "개인정보나 회사 기밀을 입력하지 마세요. 다른 서비스를 이용하거나 조직에서 승인한 경로를 확인하세요."),
+        evidence),
+      h("div", { class: "foot" },
+        h("p", { class: "fine" }, "이 안내를 닫아도 전송 전 개인정보 검사는 계속 적용됩니다."),
+        h("button", { class: "primary", onclick: closeModal }, "확인하고 닫기")));
+    card.querySelector(".title").id = "pg-entry-title";
+    // 진입 직후 키보드 포커스가 뒤쪽 사이트로 빠지지 않도록 제한한다.
+    card.addEventListener("keydown", event => {
+      if (event.key !== "Tab") return;
+      const controls = [...card.querySelectorAll("a[href], button")];
+      const first = controls[0], last = controls.at(-1), active = card.getRootNode().activeElement;
+      if (event.shiftKey && active === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
+    });
+    openModal(card);
+    overlayEl.setAttribute("aria-labelledby", "pg-entry-title");
+    overlayEl.dataset.kind = "entry-policy";
+    overlayEl.dataset.policyKey = policy.key;
   }
 
   // ── 테스트 모드 진단 패널 ──
@@ -648,7 +742,10 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
         resolve(v);
       };
       const hasSensitive = files.some((f) => f.kind === "sensitive");
+      const hasContext = files.some((f) => f.kind === "context");
+      const needsAck = hasSensitive || hasContext;
       const unreadable = files.filter((f) => f.kind === "unreadable");
+      const contextOnly = hasContext && !unreadable.length;
 
       const blocks = files.map((f) => {
         if (f.kind === "unreadable") {
@@ -663,23 +760,23 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
           h("span", { class: "snippet" }, it.before, h("mark", { dataset: { action: it.action } }, it.value), it.after)));
         return h("div", { class: "fileblock" },
           h("h4", null, f.name),
-          h("p", { class: "why" }, `민감정보 ${f.total}건이 있습니다.${f.total > f.items.length ? ` (앞쪽 ${f.items.length}건만 표시)` : ""}`),
+          h("p", { class: "why" }, f.kind === "context" ? "내용 검사는 통과했지만 전송 대상의 이용 환경을 확인해야 합니다." : `확인이 필요한 항목 ${f.total}건이 있습니다.${f.total > f.items.length ? ` (앞쪽 ${f.items.length}건만 표시)` : ""}`),
           h("ul", { class: "hits" }, hits));
       });
 
-      const proceed = h("button", { class: "danger", disabled: hasSensitive, onclick: () => decide(true) }, "그래도 진행");
-      const ack = hasSensitive
+      const proceed = h("button", { class: "danger", disabled: needsAck, onclick: () => decide(true) }, "그래도 진행");
+      const ack = needsAck
         ? h("label", { class: "ack" },
             h("input", { type: "checkbox", onchange: (e) => { proceed.disabled = !e.target.checked; } }),
-            "민감정보가 든 파일이 외부 AI 서비스에 업로드되는 것을 이해했고, 그래도 진행하겠습니다.")
+            hasSensitive ? "민감정보가 든 파일이 외부 AI 서비스에 업로드되는 것을 이해했고, 그래도 진행하겠습니다." : "이용 환경이 확인되지 않은 외부 AI에 파일을 업로드하는 것을 이해했고, 진행하겠습니다.")
         : null;
 
-      const title = hasSensitive ? "첨부하려는 파일에 민감정보가 있습니다" : "읽을 수 없는 파일이지만, 그래도 진행할까요?";
+      const title = hasSensitive ? "첨부하려는 파일에 민감정보가 있습니다" : contextOnly ? "첨부 전에 이용 환경을 확인해 주세요" : "읽을 수 없는 파일이지만, 그래도 진행할까요?";
       const sub = hasSensitive
         ? "아래 위치를 확인하고, 그래도 올릴지 선택하세요."
-        : "내용을 분석할 수 없어 안전한지 알 수 없습니다.";
+        : contextOnly ? "모델·계정 설정 또는 모델별 정책이 확인되지 않았습니다." : "내용을 분석할 수 없어 안전한지 알 수 없습니다.";
       const card = h("div", { class: "card" },
-        header(hasSensitive ? "red" : "gray", hasSensitive ? "✕" : "!", title, sub),
+        header(hasSensitive ? "red" : contextOnly ? "yellow" : "gray", hasSensitive ? "✕" : "!", title, sub),
         h("div", { class: "body" }, blocks,
           hasSensitive && unreadable.length
             ? h("div", { class: "notice" }, h("p", null, "읽을 수 없는 파일은 안전한지 알 수 없습니다.")) : null,
@@ -692,7 +789,8 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     });
   }
 
-  PG.ui = { reviewFiles, setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showForce,
+  PG.ui = { entryPolicyKey: () => overlayEl?.dataset.kind === "entry-policy" ? overlayEl.dataset.policyKey : null,
+            showEntryPolicy, reviewFiles, setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showForce,
             showTokenOverlay, clearTokenOverlay, refreshTokenOverlay, hasTokenOverlay: () => !!ov,
             closeModal, setDiag, hideDiag, toast, isOpen: () => !!overlayEl };
 })();

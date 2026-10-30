@@ -40,10 +40,12 @@ PG.files = (() => {
   }
 
   async function inspectPart(name, text) {
+    const context = PG.siteContext.read();
     const res = await chrome.runtime.sendMessage({
       type: "inspect", text, inputVersion: `file:${name}`, destination: PG.resolveDestination(), stage: "submit",
     }).catch(() => ({ ok: false, error: "network" }));
-    return res?.ok ? res.data : null;
+    PG.siteContext.read();
+    return res?.ok ? PG.siteContext.apply(res.data, context) : null;
   }
 
   // 반환: { state: "ok" | "failed", hits: [{ type, action, start, end }], truncated }
@@ -60,7 +62,10 @@ PG.files = (() => {
                     start: parts[i].start + f.span.start_utf16, end: parts[i].start + f.span.end_utf16 });
       }
       const aiWarning = result.ai_assessment && result.ai_assessment.decision !== "allow";
-      if (result.decision !== "allow" && (aiWarning || !result.findings.length)) {
+      if (result.site_context?.uncertain && !hits.some((h) => h.type === "site_context_uncertain")) {
+        hits.push({ type: "site_context_uncertain", action: "warn", unlocated: true });
+      }
+      if (result.decision !== "allow" && (aiWarning || (!result.findings.length && (result.decision === "block" || !result.site_context?.uncertain)))) {
         hits.push({ type: "local_ai_pii", action: result.decision, unlocated: true });
       }
     }
@@ -181,15 +186,17 @@ PG.files = (() => {
       if (r.truncated) partial = true;
       if (r.hits.length) {
         const items = r.hits.slice(0, MAX_SHOWN).map((h) => h.unlocated ? {
-          where: "위치 미제공", label: "문서 전체 확인 필요", action: h.action,
-          before: "", value: "AI 또는 전송 정책상 확인이 필요합니다.", after: "",
+          where: h.type === "site_context_uncertain" ? "전송 대상" : "위치 미제공",
+          label: h.type === "site_context_uncertain" ? "이용 환경 확인 필요" : "문서 전체 확인 필요", action: h.action,
+          before: "", value: h.type === "site_context_uncertain"
+            ? "모델·계정 설정 또는 모델별 정책을 확인하지 못했습니다." : "AI 또는 전송 정책상 확인이 필요합니다.", after: "",
         } : ({
           where: whereFn(h.start),
           label: PG.findingLabel(h),
           action: h.action,
           ...excerpt(text, h.start, h.end),
         }));
-        asks.push({ name: f.name, kind: "sensitive", total: r.hits.length, items });
+        asks.push({ name: f.name, kind: r.hits.every((h) => h.type === "site_context_uncertain") ? "context" : "sensitive", total: r.hits.length, items });
       } else {
         done.push(`${f.name}(${label})`);
       }
@@ -221,6 +228,7 @@ PG.files = (() => {
   }
 
   function install() {
+    PG.siteContext.subscribe(() => { settingsVersion++; PG.ui.closeModal(); });
     chrome.runtime.sendMessage({ type: "settings" }).then((r) => { if (r?.data) settings = r.data; });
     chrome.storage.onChanged.addListener((c) => {
       if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "personalRules", "blockUnscannableFiles"].some((key) => c[key])) settingsVersion++;
@@ -236,8 +244,10 @@ PG.files = (() => {
       const list = [...input.files];
       e.stopImmediatePropagation();
       PG.hooks.notice("첨부 파일을 검사하는 중…", "info");
+      PG.siteContext.read();
       const version = settingsVersion;
       vet(list).then((ok) => {
+        PG.siteContext.read();
         if (!ok || version !== settingsVersion) { input.value = ""; return; }
         const dt = new DataTransfer();
         list.forEach((f) => dt.items.add(f));
@@ -254,8 +264,10 @@ PG.files = (() => {
       e.preventDefault();
       e.stopImmediatePropagation();
       PG.hooks.notice("첨부 파일을 검사하는 중…", "info");
+      PG.siteContext.read();
       const version = settingsVersion;
       vet(list).then((ok) => {
+        PG.siteContext.read();
         if (!ok || !target || version !== settingsVersion) return;
         const dt = new DataTransfer();
         list.forEach((f) => dt.items.add(f));
@@ -272,8 +284,10 @@ PG.files = (() => {
       e.preventDefault();
       e.stopImmediatePropagation();
       PG.hooks.notice("첨부 파일을 검사하는 중…", "info");
+      PG.siteContext.read();
       const version = settingsVersion;
       vet(list).then((ok) => {
+        PG.siteContext.read();
         if (!ok || !target || version !== settingsVersion) return;
         const dt = new DataTransfer();
         list.forEach((f) => dt.items.add(f));

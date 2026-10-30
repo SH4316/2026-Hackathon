@@ -48,13 +48,16 @@
       "js": [
         "src/labels.js",
         "src/sites.js",
+        "src/site-context.js",
+        "src/entry-policy.js",
         "src/ui.js",
         "src/restore.js",
         "src/pdf.js",
         "src/office.js",
         "src/files.js",
         "src/local.js",
-        "src/content.js"
+        "src/content.js",
+        "src/entry-warning.js"
       ],
       "run_at": "document_idle"
     }

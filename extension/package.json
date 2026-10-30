@@ -11,7 +11,9 @@
     "real-sites": "node tests/real-sites.mjs",
     "real-sites:full": "node tests/real-sites.mjs --full",
     "build:ai": "node scripts/build-ai.mjs",
-    "e2e:ai": "node tests/local-ai.e2e.mjs"
+    "e2e:ai": "node tests/local-ai.e2e.mjs",
+    "e2e:context": "node tests/site-context-dom.mjs && node tests/site-context.e2e.mjs",
+    "e2e:entry": "node tests/entry-warning.e2e.mjs && node tests/training-warning.e2e.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
