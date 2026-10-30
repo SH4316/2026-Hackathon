@@ -45,6 +45,7 @@
         "src/sites.js",
         "src/ui.js",
         "src/restore.js",
+        "src/pdf.js",
         "src/files.js",
         "src/local.js",
         "src/content.js"
@@ -61,7 +62,8 @@
     {
       "resources": [
         "vendor/prompt-guard-rules/src/*.js",
-        "vendor/prompt-guard-rules/data/*.js"
+        "vendor/prompt-guard-rules/data/*.js",
+        "vendor/pdfjs/*.mjs"
       ],
       "matches": [
         "https://chatgpt.com/*",

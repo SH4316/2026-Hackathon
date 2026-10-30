@@ -187,8 +187,65 @@ check("clean text file attached", (await logCount()) === logsBefore + 1 && (awai
 await page.setInputFiles("#file", png);
 await page.waitForTimeout(1200);
 const note = await badge.locator(".wnotice").textContent();
-check("image warned but attached", note.includes("검사하지 못합니다") && (await logCount()) === logsBefore + 2, note.slice(0, 40));
+check("image warned but attached", note.includes("분석할 수 없습니다") && (await logCount()) === logsBefore + 2, note.slice(0, 40));
 await page.screenshot({ path: `${OUT}/10-file-notice.png` });
+
+// 14. 붙여넣기를 직접 처리하는 편집기(input 이벤트 없음): 다른 입력이 없어도 신호등이 갱신된다
+await page.click("#cq");
+await page.evaluate(() => {
+  const dt = new DataTransfer();
+  dt.setData("text/plain", "연락처는 kim@example.com 입니다");
+  document.getElementById("cq").dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+});
+await page.waitForFunction(() => document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge[data-state='red']"), null, { timeout: 5000 }).catch(() => {});
+const pasteChip = await badge.locator(".chip-w").textContent().catch(() => "");
+check("paste without any other input updates the light", pasteChip.includes("Tier 1") && pasteChip.includes("이메일"), pasteChip);
+await page.screenshot({ path: `${OUT}/11-paste-updated.png` });
+await page.locator("#cq").evaluate((el) => { el.textContent = ""; });
+await page.waitForTimeout(500);
+
+// 15. PDF: 글자를 뽑아 검사한다. 비밀이 있으면 막고, 깨끗하면 통과, 글자 없는 스캔본은 경고
+function makePdf(lines) {
+  const body = lines.length
+    ? `BT /F1 12 Tf 14 TL 72 720 Td ${lines.map((l) => `(${l}) Tj T*`).join(" ")} ET`
+    : "0.8 g 100 100 200 200 re f";
+  const objs = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    `<< /Length ${body.length} >>\nstream\n${body}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let out = "%PDF-1.4\n";
+  const offs = [];
+  objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offs.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("");
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(out, "latin1");
+}
+const secretPdf = path.join(tmp, "report.pdf"); fs.writeFileSync(secretPdf, makePdf(["Deploy notes", "aws_access_key_id = AKIAIOSFODNN7EXAMPLE"]));
+const cleanPdf = path.join(tmp, "minutes.pdf"); fs.writeFileSync(cleanPdf, makePdf(["Weekly meeting minutes", "Goal: finish API documentation"]));
+const scanPdf = path.join(tmp, "scan.pdf"); fs.writeFileSync(scanPdf, makePdf([]));
+const mp3 = path.join(tmp, "voice.mp3"); fs.writeFileSync(mp3, Buffer.from("SUQzBAAAAAAA", "base64"));
+const base15 = await logCount();
+await page.setInputFiles("#file", secretPdf);
+await page.waitForFunction(() => /첨부를 막았습니다/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 15000 }).catch(() => {});
+const pdfNote = await badge.locator(".wnotice").textContent().catch(() => "");
+check("PDF with a secret is blocked", pdfNote.includes("report.pdf") && pdfNote.includes("첨부를 막았습니다") && (await logCount()) === base15, pdfNote.slice(0, 70));
+await page.setInputFiles("#file", cleanPdf);
+await page.waitForFunction(() => /검사 완료/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 15000 }).catch(() => {});
+const okNote = await badge.locator(".wnotice").textContent().catch(() => "");
+check("clean PDF is analyzed and attached", okNote.includes("검사 완료") && okNote.includes("PDF") && (await logCount()) === base15 + 1, okNote.slice(0, 70));
+await page.screenshot({ path: `${OUT}/12-pdf-analyzed.png` });
+await page.setInputFiles("#file", scanPdf);
+await page.waitForFunction(() => /스캔본/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 15000 }).catch(() => {});
+const scanNote = await badge.locator(".wnotice").textContent().catch(() => "");
+check("scanned PDF warned (no text layer)", scanNote.includes("스캔본") && (await logCount()) === base15 + 2, scanNote.slice(0, 70));
+await page.setInputFiles("#file", mp3);
+await page.waitForFunction(() => /음성/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 8000 }).catch(() => {});
+const mediaNote = await badge.locator(".wnotice").textContent().catch(() => "");
+check("audio file: clear message, attached", mediaNote.includes("음성") && mediaNote.includes("음성 인식") && (await logCount()) === base15 + 3, mediaNote.slice(0, 70));
 
 // 팝업 확인은 서버가 꺼진 상태를 기준으로 하므로 다시 닫힌 포트로 돌려 둔다
 await sw0.evaluate(() => chrome.storage.local.set({ serverUrl: "http://127.0.0.1:9" }));
