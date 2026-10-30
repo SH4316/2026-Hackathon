@@ -110,7 +110,8 @@ def compile_org(config: dict, reserved_types: set[str], jev_enabled: bool = True
         for p in config.get("jevPrompts") or []:
             if not p.get("enabled", True):
                 continue
-            outputs = {tag: names[tag] for tag in p.get("tagIds") or [] if tag in names}
+            # 임계값 없는 출력은 판정에 쓰이지 않으므로 모델 호출에서도 제외한다. 0은 유효하다.
+            outputs = {tag: names[tag] for tag in p.get("tagIds") or [] if tag in thresholds}
             if (p.get("prompt") or "").strip() and outputs:
                 rules.jev.append(JevPrompt(p["id"], p.get("name") or p["id"], p["prompt"], outputs))
     return rules

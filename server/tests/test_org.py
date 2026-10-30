@@ -151,6 +151,64 @@ def test_jev_threshold_decides():
     assert c3.post("/v1/inspect", json=body("새 촉매")).json()["decision"] == "allow"
 
 
+@pytest.mark.parametrize("mode", [ModelMode.OPTIONAL, ModelMode.REQUIRED, ModelMode.DISABLED])
+@pytest.mark.parametrize("unset", ["null", "missing"])
+def test_unset_jev_thresholds_skip_model_and_preserve_regex(mode, unset):
+    dash = FakeDashboard()
+    tag = dash.config["tags"][1]
+    if unset == "null":
+        tag["jevThreshold"] = None
+    else:
+        del tag["jevThreshold"]
+    model = FakeModel(fail=True)
+    c, _ = org_client(dash=dash, model=model, mode=mode)
+
+    result = c.post("/v1/inspect", json=body("평범한 문장")).json()
+    assert result["status"] == "complete" and result["decision"] == "allow"
+    assert "org_jev_failed" not in result["notices"]
+    assert "org_jev_model_disabled" not in result["notices"]
+
+    matched = c.post("/v1/inspect", json=body("사번 EMP-123456")).json()
+    assert matched["status"] == "complete" and matched["decision"] == "block"
+    assert [finding["type"] for finding in matched["findings"]] == ["emp-id"]
+    sanitized = c.post("/v1/sanitize", json=body("사번 EMP-123456")).json()
+    assert sanitized["status"] == "complete" and sanitized["decision"] == "allow"
+    assert sanitized["sanitized_text"] == "사번 [ORG_EMP_ID_1]"
+    assert model.calls == 0
+
+
+def test_jev_calls_only_outputs_with_thresholds_and_keeps_zero():
+    dash = FakeDashboard()
+    dash.config["tags"] = [
+        {"id": "zero", "name": "제로", "jevThreshold": 0},
+        {"id": "research", "name": "연구", "jevThreshold": 0.7},
+        {"id": "unset", "name": "미설정", "jevThreshold": None},
+        {"id": "missing", "name": "누락"},
+    ]
+    dash.config["jevPrompts"] = [
+        {"id": "mixed", "prompt": "분류 기준", "tagIds": ["zero", "research", "unset", "missing"]},
+        {"id": "unused", "prompt": "미설정 기준", "tagIds": ["unset", "missing"]},
+    ]
+    calls = []
+
+    def handler(request):
+        payload = json.loads(request.content)
+        calls.append(payload)
+        return httpx.Response(200, json={"answers": {
+            "zero": {"type": "noul", "noul": 0},
+            "research": {"type": "noul", "noul": 0.6},
+        }})
+
+    model = ContextModelDetector("decider", "http://decider", "Mapika/decider-4b", 10, 1,
+                                 transport=httpx.MockTransport(handler))
+    c, _ = org_client(dash=dash, model=model, mode=ModelMode.REQUIRED)
+    result = c.post("/v1/inspect", json=body("평범한 문장")).json()
+    assert len(calls) == 1
+    assert set(calls[0]["questions"]) == {"zero", "research"}
+    assert result["status"] == "complete" and result["decision"] == "block"
+    assert [finding["type"] for finding in result["findings"]] == ["zero"]
+
+
 def test_jev_without_span_is_at_least_warn():
     c, _ = org_client(model=FakeModel([JevScore("research", 0.95, ())]))
     r = c.post("/v1/inspect", json=body("평범한 문장")).json()
