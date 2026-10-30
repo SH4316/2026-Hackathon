@@ -51,6 +51,10 @@ var PG = (globalThis.PG = globalThis.PG || {});
 .badge[data-state="green"] { border-color: var(--w-green); }
 .badge .reason { font-size: 11px; color: var(--w-mut); }
 .badge .reason:empty { display: none; }
+.badge .retention-summary { margin: 0; color: var(--w-amber-fg); font-size: 12px; line-height: 1.5; }
+.retention-notice { padding: 10px 12px; border-radius: 8px; background: var(--yellow-bg); color: var(--yellow); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.retention-notice p { margin: 6px 0 0; }
+.retention-notice .retention-title { margin: 0; font-weight: 700; }
 .site-context { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; overflow-wrap: anywhere; }
 .site-context[data-tone="yellow"] { color: var(--yellow); background: var(--yellow-bg); }
 .badge .site-context { border-color: var(--w-amber); color: var(--w-amber-fg); background: var(--w-amber-bg); }
@@ -258,6 +262,24 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     return detail;
   }
 
+  // 학습 설정만으로 서버 보관 기간·삭제 조건을 판단할 수 없다.
+  // 실제 보관이나 기간을 단정하지 않고 외부 AI 전송 대상이 있을 때 가능성을 안내한다.
+  function retentionProvider() {
+    if (PG.isTestHost?.()) return null;
+    const destination = PG.resolveDestination?.();
+    if (!destination || !PG.SITES?.some(site => site.provider === destination.provider && site.hosts.includes(location.hostname))) return null;
+    return PG.PROVIDER_LABELS[destination.provider] || destination.provider;
+  }
+
+  function retentionNotice() {
+    const provider = retentionProvider();
+    if (!provider) return null;
+    return h("section", { class: "retention-notice", "aria-label": "외부 AI 서버 보관 안내" },
+      h("p", { class: "retention-title" }, "전송 후 데이터가 서버에 남을 수 있습니다"),
+      h("p", null, `${provider}에 전송한 대화·파일은 제공사 서버에 보관될 수 있습니다. 학습 OFF·임시 대화·대화 삭제가 즉시 삭제나 미보관을 보장하지는 않습니다.`),
+      h("p", null, "현재 계정의 보관 기간·삭제 조건은 확인되지 않았습니다. 민감정보를 보내기 전에 서비스의 데이터 보관 정책을 확인하세요."));
+  }
+
   // ── 위젯 ──
   // vm: { visible, lamp, chip, reason, preview:{parts:[{text,token}],label,note}|null, busy,
   //       canSanitize, canApply, canRevert, canForce, notice, noticeTone, chipClickable }
@@ -272,6 +294,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     const dots = ["r", "y", "g"].map((c) => h("i", { class: `dot ${c}` }));
     refs.reason = h("div", { class: "reason" });
     refs.context = h("div", { class: "context-slot" });
+    refs.retention = h("p", { class: "retention-summary", hidden: true }, "외부 AI 서버 잔존 가능 · 보관 기간 미확인");
     refs.chip = h("button", { class: "chip-w", type: "button", tabindex: "-1" });
     refs.phead = h("div", { class: "phead" });
     refs.pbody = h("div", { class: "pbody" });
@@ -293,7 +316,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       h("div", { class: "wrow" },
         h("div", { class: "brand" }, h("span", null, "SafePrompt"), h("span", { class: "lamps" }, dots)),
         refs.chip),
-      refs.context, refs.pbox, refs.notice,
+      refs.context, refs.retention, refs.pbox, refs.notice,
       h("div", { class: "acts" }, refs.force, refs.revert, refs.san, refs.apply));
     rootEl.append(refs.root);
     window.addEventListener("scroll", reposition, true);
@@ -323,6 +346,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       W.contextKey = contextKey;
     }
     W.context.hidden = !vm.siteContext;
+    W.retention.hidden = !retentionProvider();
     W.chip.textContent = vm.chip || "";
     if (vm.chipClickable) { W.chip.dataset.clickable = ""; W.chip.title = "자세히 보기"; }
     else { delete W.chip.dataset.clickable; W.chip.title = ""; }
@@ -563,7 +587,8 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       openModal(h("div", { class: "card" },
         header("gray", "!", "검사를 완료하지 못해 전송을 보류했습니다", PG.errorLabel(error)),
         h("div", { class: "body" },
-          notices(null, "설정에서 검사 방식과 AI 준비 상태를 확인한 뒤 다시 시도하세요. 검사를 완료하기 전에는 전송하지 않습니다.")),
+          notices(null, "설정에서 검사 방식과 AI 준비 상태를 확인한 뒤 다시 시도하세요. 검사를 완료하기 전에는 전송하지 않습니다."),
+          retentionNotice()),
         h("div", { class: "foot" },
           h("button", { onclick: closeModal }, "닫기"),
           h("button", { class: "primary", onclick: opts.onRetry }, "다시 검사"))));
@@ -603,6 +628,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       header(tone, icon, title, [summary, destinationLine(result.destination)].filter(Boolean).join(" ")),
       h("div", { class: "body" },
         contextDetails(result.site_context?.uncertain ? result.site_context : null),
+        retentionNotice(),
         h("div", null, h("p", { class: "section-title" }, "입력 내용"), preview(text, findings)),
         findings.length ? h("div", null, h("p", { class: "section-title" }, "탐지 항목"), findingList(findings)) : null,
         notices(result.notices,
@@ -645,7 +671,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
         h("p", { class: "entry-copy" }, training
           ? "학습을 원하지 않으면 사이트의 개인정보·데이터 설정에서 해당 옵션을 꺼 주세요."
           : "개인정보나 회사 기밀을 입력하지 마세요. 다른 서비스를 이용하거나 조직에서 승인한 경로를 확인하세요."),
-        evidence),
+        evidence, retentionNotice()),
       h("div", { class: "foot" },
         h("p", { class: "fine" }, "이 안내를 닫아도 전송 전 개인정보 검사는 계속 적용됩니다."),
         h("button", { class: "primary", onclick: closeModal }, "확인하고 닫기")));
@@ -717,6 +743,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     openModal(h("div", { class: "card" },
       header("red", "!", "민감정보를 그대로 외부 AI에 보냅니다", "이 선택은 이 전송 한 번에만 적용됩니다."),
       h("div", { class: "body" },
+        retentionNotice(),
         opts.aiAssessment && opts.aiAssessment.decision !== "allow"
           ? notices(null, "기기 내 AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다.") : null,
         opts.findings?.length ? h("div", null, h("p", { class: "section-title" }, "보내지는 민감정보"), findingList(opts.findings)) : null,
@@ -777,7 +804,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
         : contextOnly ? "모델·계정 설정 또는 모델별 정책이 확인되지 않았습니다." : "내용을 분석할 수 없어 안전한지 알 수 없습니다.";
       const card = h("div", { class: "card" },
         header(hasSensitive ? "red" : contextOnly ? "yellow" : "gray", hasSensitive ? "✕" : "!", title, sub),
-        h("div", { class: "body" }, blocks,
+        h("div", { class: "body" }, retentionNotice(), blocks,
           hasSensitive && unreadable.length
             ? h("div", { class: "notice" }, h("p", null, "읽을 수 없는 파일은 안전한지 알 수 없습니다.")) : null,
           ack),

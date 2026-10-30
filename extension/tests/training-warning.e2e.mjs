@@ -34,6 +34,8 @@ try {
   assert.match(await modal.innerText(), /모델 학습 옵션이 켜져 있습니다/);
   assert.equal(await modal.locator('.head').getAttribute('data-tone'), 'yellow');
   assert.doesNotMatch(await modal.innerText(), /거부할 수 없는|필수로 수집/);
+  assert.equal(await modal.locator('.retention-notice').count(),1);
+  assert.match(await modal.locator('.retention-notice').innerText(), /제공사 서버에 보관될 수/);
   const shots = path.join(extension, 'tests/shots/training-warning');
   mkdirSync(shots, { recursive: true });
   for (const [theme, width] of [['light', 1100], ['dark', 1100], ['light', 390]]) {
