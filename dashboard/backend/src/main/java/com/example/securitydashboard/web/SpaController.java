@@ -14,6 +14,7 @@ class SpaController {
     "/people/{id:[A-Za-z0-9_-]+}",
     "/settings/monitoring",
     "/settings/metrics",
+    "/settings/jev",
     "/saved-searches",
     "/saved-searches/{id:[A-Za-z0-9_-]+}"
   })

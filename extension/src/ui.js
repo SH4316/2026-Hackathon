@@ -32,7 +32,7 @@ var PG = (globalThis.PG = globalThis.PG || {});
   --w-green: #10B981; --w-green-fg: #6EE7B7; --w-green-bg: rgba(16,185,129,.14);
   --w-cyan: #06B6D4; --w-cyan-fg: #67E8F9; --w-cyan-bg: rgba(6,182,212,.14);
   --w-send: #059669; --w-dim: .22;
-  position: fixed; z-index: 2147483646; display: grid; gap: 8px; padding: 10px 12px;
+  position: fixed; z-index: 2147483646; display: grid; gap: 8px; padding: 10px 12px; overflow-y: auto;
   background: var(--w-bg); color: var(--w-fg); border: 1px solid var(--w-line2); border-radius: 14px;
   box-shadow: 0 8px 28px rgba(15,23,42,.35); font-size: 13px; line-height: 1.45;
 }
@@ -51,6 +51,20 @@ var PG = (globalThis.PG = globalThis.PG || {});
 .badge[data-state="green"] { border-color: var(--w-green); }
 .badge .reason { font-size: 11px; color: var(--w-mut); }
 .badge .reason:empty { display: none; }
+.badge .retention-summary { margin: 0; color: var(--w-amber-fg); font-size: 12px; line-height: 1.5; }
+.retention-notice { padding: 10px 12px; border-radius: 8px; background: var(--yellow-bg); color: var(--yellow); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.retention-notice p { margin: 6px 0 0; }
+.retention-notice .retention-title { margin: 0; font-weight: 700; }
+.site-context { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; overflow-wrap: anywhere; }
+.site-context[data-tone="yellow"] { color: var(--yellow); background: var(--yellow-bg); }
+.badge .site-context { border-color: var(--w-amber); color: var(--w-amber-fg); background: var(--w-amber-bg); }
+.site-context summary { cursor: pointer; font-weight: 600; line-height: 1.5; }
+.site-context summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.site-context dl { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 3fr); gap: 6px 12px; margin: 10px 0; }
+.site-context dt { font-weight: 600; }
+.site-context dd { margin: 0; }
+.site-context p { margin: 8px 0 0; line-height: 1.6; }
+.site-context .context-help { border-top: 1px solid currentColor; padding-top: 8px; }
 .badge .wrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .badge .brand { display: inline-flex; align-items: center; gap: 8px; background: var(--w-soft); border: 1px solid var(--w-line2); border-radius: 999px; padding: 4px 10px; font-weight: 700; }
 .badge .lamps { display: inline-flex; gap: 5px; padding-left: 8px; border-left: 1px solid var(--w-line2); }
@@ -107,6 +121,10 @@ var PG = (globalThis.PG = globalThis.PG || {});
 .sub { color: var(--muted); font-size: 13px; margin: 0; }
 .body { padding: 14px 20px; display: grid; gap: 14px; }
 .section-title { font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 6px; letter-spacing: .02em; }
+.entry-copy { margin: 0; overflow-wrap: anywhere; }
+.policy-sources { margin: 0 0 12px; padding-left: 20px; }
+.policy-sources a { color: var(--primary); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.entry-policy :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .preview {
   white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto;
   background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
@@ -166,6 +184,26 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
 .diag .ok { color: var(--green); font-weight: 600; }
 .diag .bad { color: var(--red); font-weight: 600; }
 .diag .close { position: absolute; top: 6px; right: 8px; border: 0; background: none; padding: 2px 6px; font-size: 14px; }
+.ov-frame {
+  position: fixed; z-index: 2147483645; pointer-events: none; box-sizing: border-box;
+  border: 2px solid rgba(16,163,127,.85); border-radius: 12px; box-shadow: 0 0 0 4px rgba(16,163,127,.15);
+}
+.ov-label {
+  position: absolute; top: -13px; right: 12px; pointer-events: auto; display: flex; align-items: center; gap: 8px;
+  background: var(--bg); color: var(--fg); border: 1px solid rgba(16,163,127,.85); border-radius: 999px;
+  padding: 2px 4px 2px 10px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.12); white-space: nowrap;
+}
+.ov-text { color: #0d7a5f; }
+.ov-revert {
+  border: 0; background: rgba(16,163,127,.12); color: #0d7a5f; border-radius: 999px; padding: 2px 10px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.ov-revert:hover { background: rgba(16,163,127,.22); }
+.ov-mirror {
+  position: fixed; z-index: 2147483644; pointer-events: none; overflow: hidden; color: transparent;
+  white-space: pre-wrap; overflow-wrap: break-word; border-style: solid; border-color: transparent; background: transparent;
+}
+.ov-mirror mark { color: transparent; background: rgba(16,163,127,.28); border-bottom: 2px solid rgba(16,163,127,.95); border-radius: 2px; }
 .toast {
   position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 2147483647;
   background: #1d1d1f; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px;
@@ -204,6 +242,44 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     return el;
   }
 
+  function contextDetails(snapshot) {
+    if (!snapshot) return null;
+    const provider = PG.PROVIDER_LABELS[snapshot.provider] || "알 수 없는 서비스";
+    const model = snapshot.model.value || "모델 미확인";
+    const detail = h("details", { class: "site-context", dataset: { tone: snapshot.uncertain ? "yellow" : "known" } },
+      h("summary", null, `${provider} · ${model} · ${snapshot.uncertain ? "이용 환경 확인 필요" : "화면 상태 확인됨"}`));
+    const value = (field) => {
+      const f = snapshot[field];
+      if (f.status !== "observed") return f.value ? `${f.value} (확인 불가)` : "확인 불가";
+      return `${typeof f.value === "boolean" ? f.value ? "ON" : "OFF" : f.value} · 화면에서 확인`;
+    };
+    detail.append(h("dl", null,
+      [["model", "선택 모델"], ["account", "계정·공간"], ["plan", "요금제"], ["training", "학습·활동 설정"],
+        ["temporary", "임시 대화"], ["policy", "정책 범위"]].flatMap(([field, label]) =>
+        [h("dt", null, label), h("dd", { dataset: { field, status: snapshot[field].status } }, value(field))])),
+      h("p", { class: "context-help" }, "계정 메뉴와 개인정보 설정을 열면 표시된 상태를 확인합니다. 화면에 없는 항목은 확인 불가로 표시합니다."),
+      h("p", null, "학습 OFF·유료 계정만으로 안전하다고 판단하지 않습니다. 모델별 정책이 확인될 때까지 제공사 기본 기준과 주의를 적용합니다."));
+    return detail;
+  }
+
+  // 학습 설정만으로 서버 보관 기간·삭제 조건을 판단할 수 없다.
+  // 실제 보관이나 기간을 단정하지 않고 외부 AI 전송 대상이 있을 때 가능성을 안내한다.
+  function retentionProvider() {
+    if (PG.isTestHost?.()) return null;
+    const destination = PG.resolveDestination?.();
+    if (!destination || !PG.SITES?.some(site => site.provider === destination.provider && site.hosts.includes(location.hostname))) return null;
+    return PG.PROVIDER_LABELS[destination.provider] || destination.provider;
+  }
+
+  function retentionNotice() {
+    const provider = retentionProvider();
+    if (!provider) return null;
+    return h("section", { class: "retention-notice", "aria-label": "외부 AI 서버 보관 안내" },
+      h("p", { class: "retention-title" }, "전송 후 데이터가 서버에 남을 수 있습니다"),
+      h("p", null, `${provider}에 전송한 대화·파일은 제공사 서버에 보관될 수 있습니다. 학습 OFF·임시 대화·대화 삭제가 즉시 삭제나 미보관을 보장하지는 않습니다.`),
+      h("p", null, "현재 계정의 보관 기간·삭제 조건은 확인되지 않았습니다. 민감정보를 보내기 전에 서비스의 데이터 보관 정책을 확인하세요."));
+  }
+
   // ── 위젯 ──
   // vm: { visible, lamp, chip, reason, preview:{parts:[{text,token}],label,note}|null, busy,
   //       canSanitize, canApply, canRevert, canForce, notice, noticeTone, chipClickable }
@@ -217,6 +293,8 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     const refs = {};
     const dots = ["r", "y", "g"].map((c) => h("i", { class: `dot ${c}` }));
     refs.reason = h("div", { class: "reason" });
+    refs.context = h("div", { class: "context-slot" });
+    refs.retention = h("p", { class: "retention-summary", hidden: true }, "외부 AI 서버 잔존 가능 · 보관 기간 미확인");
     refs.chip = h("button", { class: "chip-w", type: "button", tabindex: "-1" });
     refs.phead = h("div", { class: "phead" });
     refs.pbody = h("div", { class: "pbody" });
@@ -238,7 +316,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       h("div", { class: "wrow" },
         h("div", { class: "brand" }, h("span", null, "SafePrompt"), h("span", { class: "lamps" }, dots)),
         refs.chip),
-      refs.pbox, refs.notice,
+      refs.context, refs.retention, refs.pbox, refs.notice,
       h("div", { class: "acts" }, refs.force, refs.revert, refs.san, refs.apply));
     rootEl.append(refs.root);
     window.addEventListener("scroll", reposition, true);
@@ -258,6 +336,17 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     W.root.hidden = !vm.visible;
     W.root.dataset.state = vm.lamp;
     W.reason.textContent = vm.reason || "";
+    const contextKey = vm.siteContext ? `${vm.siteContext.revision}` : "";
+    if (W.contextKey !== contextKey) {
+      const wasOpen = !!W.context.querySelector("details")?.open;
+      const detail = contextDetails(vm.siteContext);
+      if (detail) detail.open = wasOpen;
+      W.context.replaceChildren(...(detail ? [detail] : []));
+      detail?.addEventListener("toggle", reposition);
+      W.contextKey = contextKey;
+    }
+    W.context.hidden = !vm.siteContext;
+    W.retention.hidden = !retentionProvider();
     W.chip.textContent = vm.chip || "";
     if (vm.chipClickable) { W.chip.dataset.clickable = ""; W.chip.title = "자세히 보기"; }
     else { delete W.chip.dataset.clickable; W.chip.title = ""; }
@@ -285,10 +374,12 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
 
   // 입력창 바로 위에 붙이고, 위쪽 공간이 모자라면 아래에 둔다.
   function reposition() {
+    placeOverlay();
     if (!W || !anchor || !anchor.isConnected || W.root.hidden) return;
     const r = anchor.getBoundingClientRect();
     const width = Math.min(Math.max(r.width, 340), 640, window.innerWidth - 16);
     W.root.style.width = `${width}px`;
+    W.root.style.maxHeight = `${Math.min(window.innerHeight - 16, Math.max(140, r.top > 200 ? r.top - 16 : window.innerHeight - r.bottom - 16))}px`;
     W.root.style.left = `${Math.min(Math.max(8, r.left), window.innerWidth - width - 8)}px`;
     if (r.top > 200) {
       W.root.style.top = "";
@@ -307,6 +398,112 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
   }
 
   function hideWidget() { if (W) W.root.hidden = true; }
+
+  // ── 입력창 오버레이: 다듬은 결과를 입력창 위에서 바로 보여 준다 ──
+  // - 치환된 토큰([EMAIL_1] 등)을 입력창 안에서 강조한다.
+  //   contenteditable(ChatGPT·Claude·Gemini): CSS Custom Highlight API 로 원래 글자 위치에 직접 강조
+  //   textarea: 같은 글꼴·여백의 투명 거울 층을 입력창 위에 겹쳐 토큰 부분만 칠한다
+  // - 입력창 테두리와 오른쪽 위 라벨("n건 치환됨 · 원문으로 되돌리기")로 다듬어졌다는 것을 알린다.
+  // - 사용자 텍스트는 textContent/Range 로만 다룬다(innerHTML 사용 안 함).
+  const TOKEN_RE_UI = /\[[A-Z][A-Z0-9_]*_\d+\]/g;
+  let ov = null; // { editor, frame, label, mirror, count }
+
+  function ensureHighlightStyle() {
+    if (document.getElementById("pg-token-highlight-style")) return;
+    const st = document.createElement("style");
+    st.id = "pg-token-highlight-style";
+    st.textContent = "::highlight(pg-token){background-color:rgba(16,163,127,.28);color:inherit;"
+      + "text-decoration:underline 2px rgba(16,163,127,.95);}";
+    (document.head || document.documentElement).append(st);
+  }
+
+  function highlightEditable(el) {
+    if (!globalThis.CSS?.highlights || typeof Highlight === "undefined") return;
+    const ranges = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      for (const m of n.data.matchAll(TOKEN_RE_UI)) {
+        const r = new Range();
+        r.setStart(n, m.index);
+        r.setEnd(n, m.index + m[0].length);
+        ranges.push(r);
+      }
+    }
+    CSS.highlights.set("pg-token", new Highlight(...ranges));
+  }
+
+  const MIRROR_PROPS = ["fontFamily", "fontSize", "fontWeight", "fontStyle", "letterSpacing", "lineHeight",
+    "textTransform", "wordSpacing", "textIndent", "textAlign", "paddingTop", "paddingRight", "paddingBottom",
+    "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "boxSizing",
+    "tabSize", "direction"];
+
+  function renderMirror(ta, mirror) {
+    const cs = getComputedStyle(ta);
+    for (const p of MIRROR_PROPS) mirror.style[p] = cs[p];
+    const value = ta.value;
+    const parts = [];
+    let last = 0;
+    for (const m of value.matchAll(TOKEN_RE_UI)) {
+      if (m.index > last) parts.push(value.slice(last, m.index));
+      parts.push(h("mark", null, m[0]));
+      last = m.index + m[0].length;
+    }
+    parts.push(value.slice(last) + "​"); // 마지막 줄바꿈 높이 유지
+    mirror.replaceChildren(...parts);
+  }
+
+  function placeOverlay() {
+    if (!ov || !ov.editor.isConnected) return;
+    const r = ov.editor.getBoundingClientRect();
+    Object.assign(ov.frame.style, { left: `${r.left - 3}px`, top: `${r.top - 3}px`,
+      width: `${r.width + 6}px`, height: `${r.height + 6}px` });
+    if (ov.mirror) {
+      Object.assign(ov.mirror.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+      ov.mirror.scrollTop = ov.editor.scrollTop;
+      ov.mirror.scrollLeft = ov.editor.scrollLeft;
+    }
+  }
+
+  function showTokenOverlay(editor, count) {
+    ensureRoot();
+    clearTokenOverlay();
+    const revertBtn = h("button", { type: "button", class: "ov-revert",
+      onclick: (e) => { e.stopPropagation(); handlers.revert?.(); },
+      onmousedown: (e) => e.preventDefault() }, "↺ 원문으로 되돌리기");
+    const label = h("div", { class: "ov-label", role: "status" },
+      h("span", { class: "ov-text" }, `SafePrompt · ${count}건 치환됨`), revertBtn);
+    const frame = h("div", { class: "ov-frame" }, label);
+    rootEl.append(frame);
+    let mirror = null;
+    if (editor.tagName === "TEXTAREA") {
+      mirror = h("div", { class: "ov-mirror", "aria-hidden": "true" });
+      rootEl.append(mirror);
+      renderMirror(editor, mirror);
+      editor.addEventListener("scroll", placeOverlay);
+    } else {
+      ensureHighlightStyle();
+      highlightEditable(editor);
+    }
+    ov = { editor, frame, label, mirror, count };
+    placeOverlay();
+  }
+
+  function clearTokenOverlay() {
+    if (!ov) return;
+    ov.frame.remove();
+    ov.mirror?.remove();
+    ov.editor.removeEventListener("scroll", placeOverlay);
+    globalThis.CSS?.highlights?.delete("pg-token");
+    ov = null;
+  }
+
+  // 입력창 DOM 이 다시 그려지면(편집기 재렌더) 강조를 다시 건다.
+  function refreshTokenOverlay() {
+    if (!ov) return;
+    if (ov.mirror) renderMirror(ov.editor, ov.mirror);
+    else highlightEditable(ov.editor);
+    placeOverlay();
+  }
 
   // ── 모달 공통 ──
   // onClose: 사용자가 Esc 등으로 창을 닫았을 때(결정 없이) 한 번 불린다. 결정을 기다리는 창에서 쓴다.
@@ -356,7 +553,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       const { start_utf16: s, end_utf16: e } = f.span;
       if (s < pos) continue;
       box.append(text.slice(pos, s));
-      box.append(h("mark", { dataset: { action: f.action }, title: PG.TYPE_LABELS[f.type] || f.type },
+      box.append(h("mark", { dataset: { action: f.action }, title: PG.findingLabel(f) },
         text.slice(s, e)));
       pos = e;
     }
@@ -368,7 +565,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     return h("ul", { class: "findings" }, findings.map((f) =>
       h("li", null,
         h("span", { class: "chip", dataset: { action: f.action } }, PG.ACTION_LABELS[f.action] || f.action),
-        h("span", { class: "fname" }, PG.TYPE_LABELS[f.type] || f.type),
+        h("span", { class: "fname" }, PG.findingLabel(f)),
         h("span", { class: "fmeta" },
           [f.reason, PG.CONFIDENCE_LABELS[f.confidence]].filter(Boolean).join(" · ")))));
   }
@@ -379,7 +576,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     return h("div", { class: "notice" }, lines.map((l) => h("p", null, l)));
   }
 
-  const FINE = "판정은 현재 조직 정책 기준이며 안전을 보장하지 않습니다. 검사 서버는 원문을 저장하지 않습니다.";
+  const FINE = "판정은 선택한 검사 방식의 기준이며 안전을 보장하지 않습니다. 기기 내 AI는 원문을 저장하거나 외부로 보내지 않습니다.";
 
   // ── 경고 화면 ──
   // opts: { text, result?, error?, onSanitize, onSendAnyway, onRetry }
@@ -390,7 +587,8 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       openModal(h("div", { class: "card" },
         header("gray", "!", "검사를 완료하지 못해 전송을 보류했습니다", PG.errorLabel(error)),
         h("div", { class: "body" },
-          notices(null, "검사 서버가 정상일 때 다시 시도하세요. 검사 없이 자동으로 전송하지 않습니다.")),
+          notices(null, "설정에서 검사 방식과 AI 준비 상태를 확인한 뒤 다시 시도하세요. 검사를 완료하기 전에는 전송하지 않습니다."),
+          retentionNotice()),
         h("div", { class: "foot" },
           h("button", { onclick: closeModal }, "닫기"),
           h("button", { class: "primary", onclick: opts.onRetry }, "다시 검사"))));
@@ -411,7 +609,10 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
 
     const summary = relevant.length
       ? `${relevant.length}개 항목이 발견되었습니다.`
-      : "탐지된 항목은 없지만 전송 대상의 정책상 확인이 필요합니다.";
+      : result.ai_assessment && result.ai_assessment.decision !== "allow"
+        ? "기기 내 AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다."
+        : result.site_context?.uncertain ? "내용 검사는 통과했지만, 모델·계정 설정 또는 모델별 정책이 확인되지 않았습니다."
+        : "탐지된 항목은 없지만 전송 대상의 정책상 확인이 필요합니다.";
 
     const ack = canSendAnyway
       ? h("label", { class: "ack" },
@@ -426,6 +627,8 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     openModal(h("div", { class: "card" },
       header(tone, icon, title, [summary, destinationLine(result.destination)].filter(Boolean).join(" ")),
       h("div", { class: "body" },
+        contextDetails(result.site_context?.uncertain ? result.site_context : null),
+        retentionNotice(),
         h("div", null, h("p", { class: "section-title" }, "입력 내용"), preview(text, findings)),
         findings.length ? h("div", null, h("p", { class: "section-title" }, "탐지 항목"), findingList(findings)) : null,
         notices(result.notices,
@@ -439,6 +642,52 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
         incomplete ? h("button", { onclick: opts.onRetry }, "다시 검사") : null,
         sendBtn,
         canSanitize ? h("button", { class: "primary", onclick: opts.onSanitize }, "안전 다듬기") : null)));
+  }
+
+  // 진입 안내는 전송 승인과 별개다. 닫아도 본문/파일 검사를 우회하지 않는다.
+  function showEntryPolicy(policy) {
+    const training = policy.kind === "training-enabled";
+    const observedDate = new Date(policy.observedAt);
+    const evidence = training
+      ? h("div", null,
+          h("p", { class: "section-title" }, "화면에서 확인한 설정"),
+          h("p", { class: "entry-copy" }, "학습·모델 개선: ON"),
+          h("p", { class: "sub" }, "실제 학습 여부는 임시 대화·계정 정책에 따라 달라질 수 있습니다."),
+          Number.isFinite(observedDate.getTime())
+            ? h("p", { class: "fine" }, `확인 시각: ${observedDate.toLocaleString("ko-KR")}`) : null)
+      : h("div", null, h("p", { class: "section-title" }, "확인한 공식 정책"),
+          h("ul", { class: "policy-sources" }, policy.items.map(item =>
+            h("li", null, h("p", { class: "entry-copy" }, item.text),
+              h("a", { href: item.source, target: "_blank", rel: "noopener noreferrer" }, item.kind === "retention" ? "데이터 수집·보관 정책 원문" : "학습 정책 원문")))),
+          h("p", { class: "fine" }, `정책 확인일: ${policy.checkedAt} · 일반 소비자 서비스 기준`));
+    const card = h("div", { class: "card entry-policy", "aria-labelledby": "pg-entry-title" },
+      header(training ? "yellow" : "red", "!", training
+        ? "모델 학습 옵션이 켜져 있습니다"
+        : "입력 데이터 수집을 거부할 수 없는 사이트입니다", policy.name),
+      h("div", { class: "body" },
+        h("p", { class: "entry-copy" }, training
+          ? "이 페이지에서 학습·모델 개선 옵션이 ON인 것을 확인했습니다. 입력한 대화가 모델 학습에 사용될 수 있습니다."
+          : "이 사이트의 일반 소비자 서비스는 입력 데이터를 필수로 수집하며, 모델 학습에서 제외하는 선택권을 제공하지 않는 것으로 확인되었습니다."),
+        h("p", { class: "entry-copy" }, training
+          ? "학습을 원하지 않으면 사이트의 개인정보·데이터 설정에서 해당 옵션을 꺼 주세요."
+          : "개인정보나 회사 기밀을 입력하지 마세요. 다른 서비스를 이용하거나 조직에서 승인한 경로를 확인하세요."),
+        evidence, retentionNotice()),
+      h("div", { class: "foot" },
+        h("p", { class: "fine" }, "이 안내를 닫아도 전송 전 개인정보 검사는 계속 적용됩니다."),
+        h("button", { class: "primary", onclick: closeModal }, "확인하고 닫기")));
+    card.querySelector(".title").id = "pg-entry-title";
+    // 진입 직후 키보드 포커스가 뒤쪽 사이트로 빠지지 않도록 제한한다.
+    card.addEventListener("keydown", event => {
+      if (event.key !== "Tab") return;
+      const controls = [...card.querySelectorAll("a[href], button")];
+      const first = controls[0], last = controls.at(-1), active = card.getRootNode().activeElement;
+      if (event.shiftKey && active === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
+    });
+    openModal(card);
+    overlayEl.setAttribute("aria-labelledby", "pg-entry-title");
+    overlayEl.dataset.kind = "entry-policy";
+    overlayEl.dataset.policyKey = policy.key;
   }
 
   // ── 테스트 모드 진단 패널 ──
@@ -494,6 +743,9 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     openModal(h("div", { class: "card" },
       header("red", "!", "민감정보를 그대로 외부 AI에 보냅니다", "이 선택은 이 전송 한 번에만 적용됩니다."),
       h("div", { class: "body" },
+        retentionNotice(),
+        opts.aiAssessment && opts.aiAssessment.decision !== "allow"
+          ? notices(null, "기기 내 AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다.") : null,
         opts.findings?.length ? h("div", null, h("p", { class: "section-title" }, "보내지는 민감정보"), findingList(opts.findings)) : null,
         h("label", { class: "ack" },
           h("input", { type: "checkbox", onchange: (e) => { confirmBtn.disabled = !e.target.checked; } }),
@@ -517,7 +769,10 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
         resolve(v);
       };
       const hasSensitive = files.some((f) => f.kind === "sensitive");
+      const hasContext = files.some((f) => f.kind === "context");
+      const needsAck = hasSensitive || hasContext;
       const unreadable = files.filter((f) => f.kind === "unreadable");
+      const contextOnly = hasContext && !unreadable.length;
 
       const blocks = files.map((f) => {
         if (f.kind === "unreadable") {
@@ -532,24 +787,24 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
           h("span", { class: "snippet" }, it.before, h("mark", { dataset: { action: it.action } }, it.value), it.after)));
         return h("div", { class: "fileblock" },
           h("h4", null, f.name),
-          h("p", { class: "why" }, `민감정보 ${f.total}건이 있습니다.${f.total > f.items.length ? ` (앞쪽 ${f.items.length}건만 표시)` : ""}`),
+          h("p", { class: "why" }, f.kind === "context" ? "내용 검사는 통과했지만 전송 대상의 이용 환경을 확인해야 합니다." : `확인이 필요한 항목 ${f.total}건이 있습니다.${f.total > f.items.length ? ` (앞쪽 ${f.items.length}건만 표시)` : ""}`),
           h("ul", { class: "hits" }, hits));
       });
 
-      const proceed = h("button", { class: "danger", disabled: hasSensitive, onclick: () => decide(true) }, "그래도 진행");
-      const ack = hasSensitive
+      const proceed = h("button", { class: "danger", disabled: needsAck, onclick: () => decide(true) }, "그래도 진행");
+      const ack = needsAck
         ? h("label", { class: "ack" },
             h("input", { type: "checkbox", onchange: (e) => { proceed.disabled = !e.target.checked; } }),
-            "민감정보가 든 파일이 외부 AI 서비스에 업로드되는 것을 이해했고, 그래도 진행하겠습니다.")
+            hasSensitive ? "민감정보가 든 파일이 외부 AI 서비스에 업로드되는 것을 이해했고, 그래도 진행하겠습니다." : "이용 환경이 확인되지 않은 외부 AI에 파일을 업로드하는 것을 이해했고, 진행하겠습니다.")
         : null;
 
-      const title = hasSensitive ? "첨부하려는 파일에 민감정보가 있습니다" : "읽을 수 없는 파일이지만, 그래도 진행할까요?";
+      const title = hasSensitive ? "첨부하려는 파일에 민감정보가 있습니다" : contextOnly ? "첨부 전에 이용 환경을 확인해 주세요" : "읽을 수 없는 파일이지만, 그래도 진행할까요?";
       const sub = hasSensitive
         ? "아래 위치를 확인하고, 그래도 올릴지 선택하세요."
-        : "내용을 분석할 수 없어 안전한지 알 수 없습니다.";
+        : contextOnly ? "모델·계정 설정 또는 모델별 정책이 확인되지 않았습니다." : "내용을 분석할 수 없어 안전한지 알 수 없습니다.";
       const card = h("div", { class: "card" },
-        header(hasSensitive ? "red" : "gray", hasSensitive ? "✕" : "!", title, sub),
-        h("div", { class: "body" }, blocks,
+        header(hasSensitive ? "red" : contextOnly ? "yellow" : "gray", hasSensitive ? "✕" : "!", title, sub),
+        h("div", { class: "body" }, retentionNotice(), blocks,
           hasSensitive && unreadable.length
             ? h("div", { class: "notice" }, h("p", null, "읽을 수 없는 파일은 안전한지 알 수 없습니다.")) : null,
           ack),
@@ -561,6 +816,8 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     });
   }
 
-  PG.ui = { reviewFiles, setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showForce,
+  PG.ui = { entryPolicyKey: () => overlayEl?.dataset.kind === "entry-policy" ? overlayEl.dataset.policyKey : null,
+            showEntryPolicy, reviewFiles, setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showForce,
+            showTokenOverlay, clearTokenOverlay, refreshTokenOverlay, hasTokenOverlay: () => !!ov,
             closeModal, setDiag, hideDiag, toast, isOpen: () => !!overlayEl };
 })();

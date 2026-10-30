@@ -1,0 +1,5 @@
+ALTER TABLE config_version_tags
+ ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE config_version_jev_prompts
+ ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE;

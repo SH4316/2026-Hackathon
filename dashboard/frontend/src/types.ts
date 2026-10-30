@@ -20,13 +20,15 @@ export interface DateRange {
 }
 
 export interface Tag {
+  /** Detection participation for this tag only; children keep their own state. */
+  enabled: boolean;
   id: string;
   name: string;
   description: string;
   examples: string[];
   guidance: string;
-  /** Per-tag Jev judgment prompt; preserved verbatim, up to 12000 Unicode code points. */
-  jevPrompt: string;
+  /** Shared by every Jev prompt outputting this tag; null means unset, zero is valid. */
+  jevThreshold: number | null;
   /** Per-tag Python re source; stored verbatim, up to 4000 Unicode code points. */
   pythonRegex: string;
   color: string;
@@ -52,8 +54,35 @@ export interface VersionSummary {
   publishedAt: string | null;
 }
 
+export interface JevPrompt {
+  /** Whether consumers may execute this judgment when an output tag is enabled. */
+  enabled: boolean;
+  id: string;
+  name: string;
+  /** Preserved verbatim, up to 12000 Unicode code points. */
+  prompt: string;
+  /** Existing tags in this version; thresholds live on the shared tags. */
+  tagIds: string[];
+}
+
+export interface JevOutputInput {
+  tagId: string;
+  /** Inclusive 0..1 with up to six fractional digits; null means unset. */
+  threshold: number | null;
+}
+
+export interface SaveJevPromptInput {
+  /** Omitted/null preserves existing state on update; creation defaults to true. */
+  enabled?: boolean | null;
+  revision: number;
+  name: string;
+  prompt: string;
+  outputs: JevOutputInput[];
+}
+
 export interface ConfigVersion extends VersionSummary {
   tags: Tag[];
+  jevPrompts: JevPrompt[];
   policyStates: PolicyDefinition[];
 }
 
@@ -62,16 +91,21 @@ export interface CreateVersionInput {
   baseVersionId?: string;
 }
 
+/** Omitted/null enabled preserves existing tags and defaults new tags to true. */
+export type SaveTagInput = Omit<Tag, "enabled"> & { enabled?: boolean | null };
+
 export interface SaveVersionInput {
   revision: number;
   name: string;
-  tags: Tag[];
+  tags: SaveTagInput[];
   policyStates: PolicyDefinition[];
 }
 
 /** Mutable details for one tag in one version; tree structure stays unchanged. */
-export type SaveTagDetailsInput = Omit<Tag, "id" | "parentId" | "order"> & {
+export type SaveTagDetailsInput = Omit<Tag, "id" | "parentId" | "order" | "enabled"> & {
   revision: number;
+  /** Omitted/null preserves the stored state. */
+  enabled?: boolean | null;
 };
 
 export interface Person {

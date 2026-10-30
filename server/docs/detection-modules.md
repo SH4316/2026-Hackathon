@@ -38,9 +38,11 @@
 }
 ```
 
-- 서버가 켜진 탐지기들로 시스템 프롬프트를 만듭니다. 관리자는 앞부분 템플릿(`{detectors}` 자리표시자 필수)만 바꿀 수 있고,
-  **응답 형식(JSON)·문서 속 지시 무시 규칙은 서버가 항상 덧붙입니다.**
-- 모델 응답은 허용된 type 이고 원문에 실제로 있는 구간만 받아들입니다. 모델은 규칙 탐지 결과를 취소할 수 없습니다.
+- `PG_MODEL_API=decider` 는 켜진 탐지기별 기준·예문을 독립적인 Noul 질문으로 보내고, 참일 확률 **0.5 이상**이면 입력 전체를 분류 후보로 만듭니다.
+  입력 전체 span 은 분류 단위이고 근거 추출 구간이 아닙니다. `action=mask` 면 전체 입력을 마스킹합니다.
+- 기존 `ollama`·`openai` 는 시스템 프롬프트로 구간을 추출합니다. 관리자는 앞부분 템플릿(`{detectors}` 필수)을 바꿀 수 있고,
+  응답 형식·문서 속 지시 무시 규칙은 서버가 덧붙입니다. 허용된 type 이고 원문에 실제로 있는 구간만 받아들입니다.
+- Decider 에서도 사용자 템플릿은 탐지 기준에 포함되며, 응답은 생성형 JSON 이 아닌 typed 확률입니다. 모델은 규칙 탐지 결과를 취소할 수 없습니다.
 - 모델 실패·시간 초과 시 `optional` 은 incomplete(회색), `required` 는 error 이며 allow 로 처리하지 않습니다.
 - 기본 탐지기 5종은 `policies/detectors.yaml` 에 있고, 처음 실행 때 저장소에 들어갑니다.
 
@@ -49,13 +51,21 @@
 | 변수 | 설명 |
 |---|---|
 | `PG_MODEL_MODE` | `disabled` \| `optional` \| `required` |
-| `PG_MODEL_API` | `ollama`(기본, `/api/chat`) \| `openai`(llama.cpp server·vLLM 등 OpenAI 호환 `/v1/chat/completions`) |
-| `PG_MODEL_BASE_URL` | 예: `http://model:11434`(Ollama), `http://llama:8080`(llama.cpp) |
+| `PG_MODEL_API` | `decider`(`/v1/systemone`, Noul 확률) \| `ollama`(기본, `/api/chat`) \| `openai`(`/v1/chat/completions`) |
+| `PG_MODEL_BASE_URL` | 예: `http://decider:8000`(루트 Compose), `http://decider:11434`(기존 compose.local.yaml) |
 | `PG_MODEL_NAME` | 모델 이름. 정하지 않으면 모델 검사를 하지 않음 |
 | `PG_MODEL_API_KEY` | OpenAI 호환 로컬 서버가 키를 요구할 때만 |
 | `PG_MODEL_TIMEOUT_S`, `PG_MODEL_MAX_CONCURRENCY` | 시간 초과, 동시 호출 수 |
 
-모델·하드웨어("4GB" 의미)는 아직 미정입니다(`docs/open-questions.md`). 모델 서버는 내부 네트워크에만 두고 원문을 외부로 보내지 않습니다.
+루트 `compose.yml` 은 실제 [Mapika Decider 4B](https://huggingface.co/Mapika/decider-4b)를 공식
+[`/v1/systemone` 계약](https://github.com/Mapika/decider)으로 연결합니다. `answers.<태그>.type=noul` 과 유한한 0~1 `noul` 값이
+요청한 모든 태그에 있어야 성공입니다. `/health` 의 `ok=true` 와 모델 ID 일치로 준비 상태를 확인합니다.
+기존 `compose.local.yaml` 은 Ollama 의 Qwen3 Instruct 경로입니다. 모델 정확도 평가는 진행 전이며 모델 서버는 내부 네트워크에 둡니다.
+
+대시보드 조직 Jev 판정은 각 태그의 `jevThreshold` 를 사용합니다. Decider 에서 임계값을 넘으면 입력 전체에 조직 `tag_action` 을 적용하고,
+대시보드 기록도 전체 입력을 그 태그의 분류 단위로 씁니다. 기본 `mask` 기록은 전체 입력을 토큰 하나로 치환합니다.
+태그·프롬프트의 `enabled=false` 는 각각 제외하며 부모·자식 태그는 독립적입니다. 필드가 없는 이전 설정은 기본 활성입니다.
+비활성 태그를 출력에서 뺀 뒤 출력이 없으면 모델 호출을 생략합니다.
 
 ## 관리 API (대시보드용)
 

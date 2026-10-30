@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   Link,
   NavLink,
+  Navigate,
   Route,
   Routes,
   useLocation,
@@ -37,6 +38,7 @@ import {
 } from "./ui";
 import { Trend, MetricTree, ServiceChart, PolicyChart } from "./charts";
 import { MetricSettings } from "./MetricSettings";
+import { JevSettings } from "./JevSettings";
 import { SavedSearches, SavedSearchDetail } from "./SavedSearches";
 import type { Person, Filters } from "./types";
 const navigation: {
@@ -49,8 +51,8 @@ const navigation: {
   { to: "/events", label: "탐지 이력", icon: "events" },
   { to: "/people", label: "사람 관리", icon: "people" },
   { to: "/settings/metrics", label: "메트릭 설정", icon: "tree" },
+  { to: "/settings/jev", label: "Jev 설정", icon: "code" },
   { to: "/saved-searches", label: "저장된 검색", icon: "save" },
-  { to: "/settings/monitoring", label: "감시 연동", icon: "settings" },
 ];
 export default function App() {
   return (
@@ -75,15 +77,21 @@ function Shell() {
         <Link className="brand" to="/">
           <span className="brand-symbol">
             <svg width="25" height="25" viewBox="0 0 48 48" fill="none">
-              <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z"
-                    fill="#0F172A" stroke="#3B82F6" strokeWidth="3.2" strokeLinejoin="round"/>
-              <circle cx="24" cy="15" r="3.5" fill="#EF4444"/>
-              <circle cx="24" cy="24" r="3.5" fill="#F59E0B"/>
-              <circle cx="24" cy="33" r="3.5" fill="#10B981"/>
+              <path
+                d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z"
+                fill="#0F172A"
+                stroke="#3B82F6"
+                strokeWidth="3.2"
+                strokeLinejoin="round"
+              />
+              <circle cx="24" cy="15" r="3.5" fill="#EF4444" />
+              <circle cx="24" cy="24" r="3.5" fill="#F59E0B" />
+              <circle cx="24" cy="33" r="3.5" fill="#10B981" />
             </svg>
           </span>
           <span className="brand-name">
-            Safe<span className="brand-accent">Prompt</span><span>AI 보안 관제 대시보드</span>
+            Safe<span className="brand-accent">Prompt</span>
+            <span>AI 보안 관제 대시보드</span>
           </span>
         </Link>
         <div className="workspace-label">워크스페이스</div>
@@ -99,9 +107,6 @@ function Shell() {
             >
               <Icon name={n.icon} size={19} />
               <span>{n.label}</span>
-              {n.to === "/settings/monitoring" && (
-                <span className="nav-soon">준비 중</span>
-              )}
             </NavLink>
           ))}
         </nav>
@@ -139,7 +144,15 @@ function Shell() {
             <span>수동 갱신</span>
           </div>
         </header>
-        <main id="main" tabIndex={-1}>
+        <main
+          id="main"
+          tabIndex={-1}
+          className={
+            location.pathname.startsWith("/settings/")
+              ? "configuration-page"
+              : undefined
+          }
+        >
           <Routes>
             <Route path="/" element={<Overview />} />
             <Route path="/events" element={<Events />} />
@@ -147,11 +160,20 @@ function Shell() {
             <Route path="/people" element={<People />} />
             <Route path="/people/:id" element={<PersonDetail />} />
             <Route path="/settings/metrics" element={<MetricSettings />} />
+            <Route path="/settings/jev" element={<JevSettings />} />
             <Route path="/saved-searches" element={<SavedSearches />} />
             <Route path="/saved-searches/:id" element={<SavedSearchDetail />} />
             <Route
               path="/settings/monitoring"
-              element={<MonitoringSettings />}
+              element={
+                <Navigate
+                  to={{
+                    pathname: "/settings/metrics",
+                    search: location.search,
+                  }}
+                  replace
+                />
+              }
             />
             <Route
               path="*"
@@ -891,100 +913,6 @@ function EventDetail() {
           </Panel>
         </div>
       )}
-    </>
-  );
-}
-function MonitoringSettings() {
-  const { versions } = useWorkspace();
-  const active = versions.find((v) => v.isActive);
-  const r = useResource(
-    (signal) =>
-      active ? api.version(active.id, signal) : Promise.resolve(null),
-    [active?.id],
-  );
-  return (
-    <>
-      <PageTitle
-        title="감시 연동"
-        description="외부 감지 엔진의 연동 설정을 위한 화면입니다."
-        action={
-          <span className="badge preparing">
-            <Icon name="lock" size={13} />
-            준비 중
-          </span>
-        }
-      />
-      <div className="settings-notice">
-        <span className="notice-icon">
-          <Icon name="lock" size={22} />
-        </span>
-        <div>
-          <h2>감지 엔진 설정은 준비 중입니다</h2>
-          <p>
-            태그와 정책 상태는 메트릭 설정에서 관리할 수 있습니다. 외부 분류기는
-            활성 설정 API를 읽고 감지 결과를 전송합니다.
-          </p>
-          <Link className="text-link" to="/settings/metrics">
-            메트릭 설정으로 이동
-            <Icon name="arrow" size={14} />
-          </Link>
-        </div>
-      </div>
-      <Panel
-        title="활성 버전의 수집 항목"
-        description={
-          active
-            ? active.name + " · " + (r.data?.tags.length ?? 0) + "개 태그"
-            : "활성 버전 없음"
-        }
-      >
-        {r.data ? (
-          <div
-            className="monitoring-catalog"
-            role="region"
-            tabIndex={0}
-            aria-label="활성 버전의 수집 태그 목록"
-          >
-            <fieldset disabled className="settings-fields">
-              {r.data.tags.map((t) => (
-                <label className="setting-row" key={t.id}>
-                  <span>
-                    <span className="setting-label">{t.name}</span>
-                    <span className="setting-description">{t.description}</span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    className="checkbox"
-                    checked
-                    readOnly
-                    aria-label={t.name + " 감시"}
-                  />
-                </label>
-              ))}
-              {!r.data.tags.length && (
-                <p className="compact-empty">
-                  활성 버전에 등록된 태그가 없습니다.
-                </p>
-              )}
-            </fieldset>
-          </div>
-        ) : (
-          <EmptyState
-            icon="tree"
-            title="활성 설정을 먼저 준비하세요"
-            description="메트릭 버전을 발행·활성화하면 여기에서 수집 항목을 확인할 수 있습니다."
-          />
-        )}
-        <div className="settings-save panel-save">
-          <span>
-            <Icon name="lock" size={14} />이 화면에서 감지 엔진의 동작은 변경할
-            수 없습니다.
-          </span>
-          <button className="button button-primary" disabled>
-            연동 설정 저장
-          </button>
-        </div>
-      </Panel>
     </>
   );
 }

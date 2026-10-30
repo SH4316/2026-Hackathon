@@ -1,11 +1,11 @@
 // 파일 첨부 검사. 입력창 텍스트와 달리 첨부는 사이트가 곧바로 업로드하므로,
 // 이벤트를 먼저 멈추고 검사한 뒤 사용자가 허락한 경우에만 같은 이벤트를 다시 보낸다.
-//  - 텍스트·코드 파일, PDF(pdf.js), 글자로 된 문서(Word·Excel·PowerPoint·한글 hwpx·OpenDocument·RTF): 내용을 서버에서 검사한다.
+//  - 텍스트·코드 파일, PDF(pdf.js), 글자로 된 문서(Word·Excel·PowerPoint·한글 hwpx·OpenDocument·RTF): 선택한 서버/기기 내 AI로 검사한다.
 //    민감정보가 있으면 어디에 있는지(PDF 는 쪽, 문서는 문단·시트와 셀·슬라이드, 텍스트는 줄) 보여 주고 "그래도 진행할지" 묻는다.
 //  - 읽을 수 없는 파일(음성·영상·이미지·스캔본 PDF·구형 doc/xls/ppt/hwp·암호 문서 등): "읽을 수 없는 파일이라 안전한지 알 수 없다, 그래도 진행할지" 묻는다.
 //    (설정에서 '묻지 않고 막기'로 바꿀 수 있다)
 //  - 서버 글자 수 제한(50,000자)을 넘는 내용은 나눠서 모두 검사한다.
-//  - 검사 서버가 응답하지 못하면 묻지 않고 막는다(자동 폴백 없음).
+//  - 선택한 검사 경로가 완료되지 않으면 묻지 않고 막는다.
 var PG = (globalThis.PG = globalThis.PG || {});
 
 PG.files = (() => {
@@ -17,6 +17,7 @@ PG.files = (() => {
   const MAX_SHOWN = 30; // 확인 창에 보여 줄 민감 위치 수
   const CONTEXT = 28; // 민감 값 앞뒤로 보여 줄 글자 수
   let reentry = false;
+  let settingsVersion = 0;
   let settings = { enabled: true, blockUnscannableFiles: false };
 
   const isText = (f) => (f.type.startsWith("text/") || TEXT_EXT.test(f.name)) && f.size <= MAX_BYTES;
@@ -39,10 +40,12 @@ PG.files = (() => {
   }
 
   async function inspectPart(name, text) {
+    const context = PG.siteContext.read();
     const res = await chrome.runtime.sendMessage({
-      type: "inspect", text, inputVersion: `file:${name}`, destination: PG.resolveDestination(),
+      type: "inspect", text, inputVersion: `file:${name}`, destination: PG.resolveDestination(), stage: "submit",
     }).catch(() => ({ ok: false, error: "network" }));
-    return res?.ok ? res.data : null;
+    PG.siteContext.read();
+    return res?.ok ? PG.siteContext.apply(res.data, context) : null;
   }
 
   // 반환: { state: "ok" | "failed", hits: [{ type, action, start, end }], truncated }
@@ -54,9 +57,16 @@ PG.files = (() => {
       const result = await inspectPart(`${name}#${i + 1}`, parts[i].text);
       if (!result || result.status !== "complete") return { state: "failed", hits: [], truncated };
       for (const f of result.findings) {
-        if (f.action !== "mask" && f.action !== "block") continue;
-        hits.push({ type: f.type, action: f.action,
+        if (!["mask", "block", "warn"].includes(f.action)) continue;
+        hits.push({ type: f.type, rule_id: f.rule_id, reason: f.reason, action: f.action,
                     start: parts[i].start + f.span.start_utf16, end: parts[i].start + f.span.end_utf16 });
+      }
+      const aiWarning = result.ai_assessment && result.ai_assessment.decision !== "allow";
+      if (result.site_context?.uncertain && !hits.some((h) => h.type === "site_context_uncertain")) {
+        hits.push({ type: "site_context_uncertain", action: "warn", unlocated: true });
+      }
+      if (result.decision !== "allow" && (aiWarning || (!result.findings.length && (result.decision === "block" || !result.site_context?.uncertain)))) {
+        hits.push({ type: "local_ai_pii", action: result.decision, unlocated: true });
       }
     }
     return { state: "ok", hits, truncated };
@@ -170,18 +180,23 @@ PG.files = (() => {
 
       const r = await inspectAll(f.name, text);
       if (r.state === "failed") {
-        PG.hooks.notice(`${f.name}: 검사를 완료하지 못해 첨부를 막았습니다. 서버 연결을 확인하세요.`, "warn");
+        PG.hooks.notice(`${f.name}: 검사를 완료하지 못해 첨부를 막았습니다. 검사 설정과 AI 준비 상태를 확인하세요.`, "warn");
         return false;
       }
       if (r.truncated) partial = true;
       if (r.hits.length) {
-        const items = r.hits.slice(0, MAX_SHOWN).map((h) => ({
+        const items = r.hits.slice(0, MAX_SHOWN).map((h) => h.unlocated ? {
+          where: h.type === "site_context_uncertain" ? "전송 대상" : "위치 미제공",
+          label: h.type === "site_context_uncertain" ? "이용 환경 확인 필요" : "문서 전체 확인 필요", action: h.action,
+          before: "", value: h.type === "site_context_uncertain"
+            ? "모델·계정 설정 또는 모델별 정책을 확인하지 못했습니다." : "AI 또는 전송 정책상 확인이 필요합니다.", after: "",
+        } : ({
           where: whereFn(h.start),
-          label: PG.TYPE_LABELS[h.type] || h.type,
+          label: PG.findingLabel(h),
           action: h.action,
           ...excerpt(text, h.start, h.end),
         }));
-        asks.push({ name: f.name, kind: "sensitive", total: r.hits.length, items });
+        asks.push({ name: f.name, kind: r.hits.every((h) => h.type === "site_context_uncertain") ? "context" : "sensitive", total: r.hits.length, items });
       } else {
         done.push(`${f.name}(${label})`);
       }
@@ -213,8 +228,10 @@ PG.files = (() => {
   }
 
   function install() {
+    PG.siteContext.subscribe(() => { settingsVersion++; PG.ui.closeModal(); });
     chrome.runtime.sendMessage({ type: "settings" }).then((r) => { if (r?.data) settings = r.data; });
     chrome.storage.onChanged.addListener((c) => {
+      if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "personalRules", "blockUnscannableFiles"].some((key) => c[key])) settingsVersion++;
       if (c.enabled) settings.enabled = c.enabled.newValue !== false;
       if (c.blockUnscannableFiles) settings.blockUnscannableFiles = !!c.blockUnscannableFiles.newValue;
     });
@@ -227,8 +244,11 @@ PG.files = (() => {
       const list = [...input.files];
       e.stopImmediatePropagation();
       PG.hooks.notice("첨부 파일을 검사하는 중…", "info");
+      PG.siteContext.read();
+      const version = settingsVersion;
       vet(list).then((ok) => {
-        if (!ok) { input.value = ""; return; }
+        PG.siteContext.read();
+        if (!ok || version !== settingsVersion) { input.value = ""; return; }
         const dt = new DataTransfer();
         list.forEach((f) => dt.items.add(f));
         input.files = dt.files;
@@ -244,8 +264,11 @@ PG.files = (() => {
       e.preventDefault();
       e.stopImmediatePropagation();
       PG.hooks.notice("첨부 파일을 검사하는 중…", "info");
+      PG.siteContext.read();
+      const version = settingsVersion;
       vet(list).then((ok) => {
-        if (!ok || !target) return;
+        PG.siteContext.read();
+        if (!ok || !target || version !== settingsVersion) return;
         const dt = new DataTransfer();
         list.forEach((f) => dt.items.add(f));
         redispatch(target, new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX, clientY }));
@@ -261,8 +284,11 @@ PG.files = (() => {
       e.preventDefault();
       e.stopImmediatePropagation();
       PG.hooks.notice("첨부 파일을 검사하는 중…", "info");
+      PG.siteContext.read();
+      const version = settingsVersion;
       vet(list).then((ok) => {
-        if (!ok || !target) return;
+        PG.siteContext.read();
+        if (!ok || !target || version !== settingsVersion) return;
         const dt = new DataTransfer();
         list.forEach((f) => dt.items.add(f));
         if (text) dt.setData("text/plain", text);

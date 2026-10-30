@@ -30,6 +30,7 @@ CASES = [
     ("Group id  :   027693", "id_number"),
     ("학번: 2024123456", "id_number"),
     ("PERSON 1: David 943063077874", "id_number"),
+    ("주문 2023101512345", "id_number"),
     ("591 Smith Centers Apt. 656, Joshuamouth, RI 95963", "street_address"),
     ("서울특별시 종로구 세종대로 110", "street_address"),
     ("https://www.linkedin.com/in/mmartinez", "url_personal"),
@@ -50,6 +51,12 @@ def test_detects(text, expected):
     "주민번호 아님 991399-1234567",       # 잘못된 날짜
     "카드 아님 4111 1111 1111 1112",      # Luhn 불일치
     "날짜 20240229 기준",                  # 8자리 날짜는 식별번호 아님
+    "예산 1500000000 원",                   # 단위가 붙은 금액
+    "인구 51000000 명",                     # 단위가 붙은 수량
+    "총 100000000",                         # 끝이 0000 인 어림수
+    "11111111 123456789 987654321",         # 반복·연속 숫자
+    "시각 1700000000",                      # 유닉스 시각
+    "₩123456789",                           # 통화 기호 뒤 금액
     "버전 +1 2 3",                          # 국제번호 자릿수 부족
     "ID: ABCDEFG",                          # 키워드 뒤 값에 숫자 4개 미만
     "90 Thousand Sq. Kilometers",           # 면적 표현은 주소 아님

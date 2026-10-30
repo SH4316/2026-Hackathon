@@ -5,7 +5,7 @@ import { ipAddress, ipNetwork } from "./ipaddress.js";
 import { pyInt, pyRegExp } from "./pyre.js";
 import { cardOk, jwtHeaderOk, rrnDateOk, validDate } from "./validators.js";
 
-export const RULESET_VERSION = "rules-0.2.0";
+export const RULESET_VERSION = "rules-0.2.1";
 
 const NB = String.raw`(?<![A-Za-z0-9])`; // 영숫자 경계(한글 인접은 허용)
 const NA = String.raw`(?![A-Za-z0-9])`;
@@ -18,12 +18,21 @@ const intlPhoneVerdict = (v) => { const n = countDigits(v); return n >= 8 && n <
 // 키워드 뒤 식별번호는 숫자가 4개 이상
 const hasDigitsVerdict = (v) => (countDigits(v) >= 4 ? { confidence: "medium" } : null);
 // 8자리는 YYYYMMDD 날짜(1900~2099)면 제외
-function notDate8Verdict(v) {
+// 구분자 없는 긴 숫자 중 식별번호가 아닐 가능성이 큰 것을 뺀다(rules.py _id_digits 와 같음).
+function idDigitsVerdict(v) {
   const c = [...v];
   if (c.length === 8) {
     const y = pyInt(c.slice(0, 4).join("")), m = pyInt(c.slice(4, 6).join("")), d = pyInt(c.slice(6, 8).join(""));
-    if (y >= 1900 && y <= 2099 && validDate(y, m, d)) return null;
+    if (y >= 1900 && y <= 2099 && validDate(y, m, d)) return null; // YYYYMMDD 날짜
   }
+  const digits = c.map((ch) => pyInt(ch));
+  const steps = new Set(digits.slice(1).map((d, i) => d - digits[i]));
+  const only = (x) => steps.size === 1 && steps.has(x);
+  if (steps.size === 0 || only(0) || only(1) || only(-1)) return null; // 반복·연속 숫자
+  if (c.slice(-4).every((ch) => pyInt(ch) === 0)) return null;          // 끝이 0000 인 어림수
+  const n = pyInt(v);
+  if ((c.length === 10 && n >= 1_400_000_000 && n < 2_000_000_000) ||
+      (c.length === 13 && n >= 1_400_000_000_000 && n < 2_000_000_000_000)) return null; // 유닉스 시각(2014~2033)
   return { confidence: "low" };
 }
 
@@ -69,8 +78,12 @@ export const RULES = [
       String.raw`\b(?:student|employee|member|customer|roll|pin|account|user)?\s{0,3}(?:id|no\.?|number|#))` +
       String.raw`\s{0,10}[:：#]\s{0,10}([A-Z0-9][A-Z0-9-]{4,19})(?![A-Za-z0-9])`,
     "medium", { group: 1, ignoreCase: true, validate: hasDigitsVerdict, reason: "식별번호 키워드 뒤 값" }),
-  rule("long_digit_id", "id_number", String.raw`(?<![\w.,/=&?#-])\d{8,16}(?![\w.,/-])`, "low",
-    { validate: notDate8Verdict, reason: "구분자 없는 8~16자리 숫자(식별번호 후보, 날짜 제외)" }),
+  rule("long_digit_id", "id_number",
+    String.raw`(?<![\w.,/=&?#$₩€£¥-])\d{8,16}(?![\w.,/-])` +
+      String.raw`(?!\s(?:원|달러|엔|위안|유로|억|만|천|명|개|건|회|배|점|%|퍼센트|원정|km|kg|mb|gb|kb|ms|bytes?|` +
+      String.raw`won|usd|krw|eur|jpy|dollars?|people|users?|times|views|rows|records)(?![A-Za-z]))`,
+    "low", { ignoreCase: true, validate: idDigitsVerdict,
+             reason: "구분자 없는 8~16자리 숫자(식별번호 후보: 날짜·금액·수량·시각·반복/연속 숫자 제외)" }),
   rule("us_street_address", "street_address",
     String.raw`(?<![\w-])\d{1,6}\s+(?:[A-Z][a-z]+\s+){1,3}` +
       String.raw`(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Place|Pl|Way|` +

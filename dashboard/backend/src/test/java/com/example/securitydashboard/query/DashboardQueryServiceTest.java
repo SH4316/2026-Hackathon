@@ -48,7 +48,8 @@ class DashboardQueryServiceTest {
             List.of(),
             List.of(
                 new PolicyDefinition("allowed", "Current label", "", "#123456", 0),
-                new PolicyDefinition("new", "Unused policy", "", "#654321", 1)));
+                new PolicyDefinition("new", "Unused policy", "", "#654321", 1)),
+            List.of());
     var query = new DashboardQuery("", "", new MapSqlParameterSource());
     when(configs.view("selected")).thenReturn(selected);
     when(repository.query(filter, "selected", "snapshot")).thenReturn(query);
@@ -133,6 +134,7 @@ class DashboardQueryServiceTest {
                 1,
                 filter.from(),
                 filter.from(),
+                List.of(),
                 List.of(),
                 List.of()));
 

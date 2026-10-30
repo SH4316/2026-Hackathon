@@ -1,7 +1,7 @@
 // 입력 감지 → 검사 → 전송 가로채기.
 // - 입력이 바뀌면 이전 결과를 무효화하고(input_version), 늦게 온 응답은 버린다.
 // - 전송 시점의 텍스트와 검사한 텍스트가 정확히 같고 '검사 완료 + allow' 일 때만 그대로 보낸다.
-// - 서버 오류·시간 초과는 전송을 보류한다(자동 폴백 없음).
+// - 선택한 검사 방식의 완료 결과만 사용한다. 기기 내 AI를 켜면 서버 연결 없이도 검사한다.
 // - 브라우저 안의 규칙 엔진(PG.local)은 입력 즉시 위험을 알려 주는 '임시 표시'일 뿐, 전송 근거가 되지 않는다.
 // - 테스트 모드: 어떤 경우에도 실제로 전송하지 않고, 진단 패널에 감지·가로채기 결과를 보여 준다.
 (() => {
@@ -14,9 +14,10 @@
   const SETTLE_MS = 500;
 
   let enabled = true;
+  let settingsVersion = 0;
   let editor = null;
   let version = 0;
-  let latest = null; // { version, text, result, error } 서버 검사 결과
+  let latest = null; // { version, text, result, error } 선택한 검사 방식의 결과
   let localEntry = null; // { text, result } 브라우저 규칙 엔진의 임시 결과
   let bypass = null; // { text, until } 사용자가 승인한 다음 1회 전송
   let prepared = null; // 정제 결과 { original, sanitized, result, entries, verified }
@@ -50,11 +51,28 @@
     setTestMode(!!r?.data?.testMode);
   });
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.enabled) {
-      enabled = changes.enabled.newValue !== false;
-      refresh();
+    if (changes.enabled) enabled = changes.enabled.newValue !== false;
+    if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "personalRules"].some((key) => changes[key])) {
+      settingsVersion++;
+      version++;
+      latest = null; bypass = null; prepared = null;
+      PG.ui.closeModal();
+      if (editor) scheduleInspect(editor);
+      else refresh();
     }
+    if (changes.aiState && ["ready", "error"].includes(changes.aiState.newValue?.phase) && editor) scheduleInspect(editor);
     if (changes.testMode) setTestMode(!!changes.testMode.newValue);
+  });
+
+  // A model/account/route change invalidates both text results and one-shot approvals.
+  PG.siteContext.read();
+  PG.siteContext.subscribe(() => {
+    settingsVersion++;
+    version++;
+    latest = null; localEntry = null; bypass = null; prepared = null;
+    PG.ui.closeModal();
+    if (editor?.isConnected) scheduleInspect(editor);
+    else refresh();
   });
 
   // ── 입력창 ──
@@ -126,7 +144,7 @@
     const counts = new Map();
     for (const f of findings || []) {
       if (f.action === "allow") continue;
-      const label = PG.TYPE_LABELS[f.type] || f.type;
+      const label = PG.findingLabel(f);
       counts.set(label, (counts.get(label) || 0) + 1);
     }
     return [...counts].map(([l, n]) => `${l} ${n}건`).join(", ");
@@ -165,6 +183,9 @@
     if (!hasText) { prepared = null; applied = null; }
     if (prepared && !activePrepared(text)) prepared = null;
     if (applied && text !== applied.sanitized) applied = null;
+    // 입력창 오버레이는 다듬은 문장이 그대로 있을 때만 보인다(사용자가 고치거나 보내면 사라짐).
+    if (applied) PG.ui.refreshTokenOverlay();
+    else PG.ui.clearTokenOverlay();
     const prep = activePrepared(text);
 
     let lamp = "idle";
@@ -180,14 +201,20 @@
       } else lamp = "checking";
     }
 
+    const siteContext = PG.siteContext.current();
+    const contextWarning = siteContext?.uncertain;
+    if (contextWarning && lamp === "idle") lamp = "yellow";
     const sum = summary(result?.findings);
     let chip = "";
     if (lamp === "checking") chip = "검사 중…";
     else if (lamp === "red") chip = `Tier 1 차단${sum ? ` · ${sum}` : ""}`;
-    else if (lamp === "yellow") chip = `Tier 2 주의${sum ? ` · ${sum}` : ""}`;
+    else if (lamp === "yellow") chip = contextWarning && !sum && (!result?.ai_assessment || result.ai_assessment.decision === "allow")
+      ? "이용 환경 확인 필요" : `Tier 2 주의${sum ? ` · ${sum}` : ""}`;
     else if (lamp === "green") chip = prep ? "안전: 정제 완료 (Safe to Send)" : "Tier 3 안전 · 검사 통과";
     else if (lamp === "gray") chip = latest?.error ? "검사 불가 · 전송 보류" : "검사 미완료 · 전송 보류";
-    if (provisional) chip += " (서버 확인 중)";
+    if (provisional) chip += " (검사 확인 중)";
+    else if (result?.inspection_source === "local_ai") chip += " · 기기 내 검사";
+    else if (result?.inspection_source === "server_and_local_ai") chip += " · 서버 + 기기 내 AI";
 
     const serverResult = !prep && latest && latest.text === text ? latest.result : null;
     const complete = serverResult?.status === "complete";
@@ -197,11 +224,17 @@
       && findings.some((f) => f.action === "mask" || f.action === "warn");
 
     PG.ui.renderWidget({
-      visible: hasText || !!notice,
+      visible: hasText || !!notice || !!contextWarning,
+      siteContext: PG.isTestHost() ? null : siteContext,
       lamp,
       chip,
-      reason: lamp === "idle" ? "" : destinationText(result?.destination),
-      preview: prep ? previewOf(prep, text) : null,
+      reason: lamp === "idle" ? "" : [destinationText(result?.destination),
+        result?.ai_assessment?.decision !== "allow" && result?.ai_assessment
+          ? "AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다." : "",
+        result?.notices?.includes("server_unavailable_local_check") ? "서버 연결 실패 · 기기 내 AI와 기본 규칙으로 검사했습니다." : "",
+      ].filter(Boolean).join(" "),
+      // 정제 오버레이가 입력창에 표시된 동안 위젯 미리보기는 중복하지 않는다.
+      preview: prep && text !== prep.sanitized ? previewOf(prep, text) : null,
       busy,
       canSanitize,
       canApply: !!prep && text !== prep.sanitized,
@@ -217,18 +250,21 @@
   function localInspect(text) {
     if (!PG.local || text.length > MAX_LOCAL_CHARS) return null;
     try {
-      return { text, result: PG.local.inspect(text, { destination: PG.resolveDestination() }) };
+      return { text, result: PG.siteContext.apply(PG.local.inspect(text, { destination: PG.resolveDestination() })) };
     } catch {
       return null;
     }
   }
 
-  async function inspect(text) {
+  // stage: draft(입력 중) | submit(전송 직전). 조직 서버는 submit 만 대시보드에 기록한다.
+  async function inspect(text, stage = "draft") {
+    const context = PG.siteContext.read();
     const v = ++version;
     const res = await chrome.runtime.sendMessage({
-      type: "inspect", text, inputVersion: v, destination: PG.resolveDestination(),
+      type: "inspect", text, inputVersion: v, destination: PG.resolveDestination(), stage,
     }).catch(() => ({ ok: false, error: "network" }));
-    const entry = { version: v, text, result: res?.ok ? res.data : null, error: res?.ok ? null : res?.error };
+    PG.siteContext.read(); // Catch a page change even before the observer callback runs.
+    const entry = { version: v, text, result: res?.ok ? PG.siteContext.apply(res.data, context) : null, error: res?.ok ? null : res?.error };
     // 응답이 늦게 와서 더 새로운 요청이 있으면 버린다
     if (v !== version) return null;
     if (entry.result && String(entry.result.input_version) !== String(v)) return null;
@@ -291,7 +327,7 @@
 
   window.addEventListener("focusin", (e) => {
     const ed = editorFrom(e.target);
-    if (ed) trackEditor(ed);
+    if (ed) { trackEditor(ed); PG.siteContext.read(); refresh(); }
   }, true);
 
   // 붙여넣기·잘라내기·끌어놓기·조합 입력이 끝난 직후 편집기가 내용을 바꾸는 시점이 사이트마다 달라서 여러 번 확인한다.
@@ -316,11 +352,13 @@
     setTimeout(() => { if (!getText(ed).trim()) refresh(); }, 400);
   }
 
-  function triggerSend(ed, text) {
+  function triggerSend(ed, text, approvedSettings = settingsVersion) {
+    PG.siteContext.read();
+    if (approvedSettings !== settingsVersion) return;
     if (testMode) { dryRun(ed, "승인 후 전송"); return; }
     const wait = SETTLE_MS - (Date.now() - lastProgrammaticSet);
     if (wait > 0) {
-      setTimeout(() => { if (getText(ed) === text) triggerSend(ed, text); }, wait);
+      setTimeout(() => { if (getText(ed) === text) triggerSend(ed, text, approvedSettings); }, wait);
       return;
     }
     afterSend(ed);
@@ -334,16 +372,17 @@
   }
 
   function openWarning(ed, entry) {
+    const approvedSettings = settingsVersion;
     PG.ui.showWarning({
       text: entry.text,
       result: entry.result,
       error: entry.error,
       onRetry: () => { PG.ui.closeModal(); gate(ed, entry.text); },
       onSendAnyway: () => {
-        if (getText(ed) === entry.text) triggerSend(ed, entry.text);
+        if (getText(ed) === entry.text) triggerSend(ed, entry.text, approvedSettings);
       },
       // 정제는 위젯의 '안전 다듬기' 한 경로로만 한다(경고 창 → 별도 정제 창 경로는 중복이라 제거).
-      // 경고 창을 닫고 위젯에서 미리보기 → [입력창에 넣기] → 사용자가 직접 전송.
+      // 경고 창을 닫고 바로 입력창에 반영 → 오버레이로 바뀐 부분 표시 → 사용자가 직접 전송.
       onSanitize: () => {
         PG.ui.closeModal();
         editor = ed;
@@ -364,16 +403,22 @@
     try {
       const entry = latest && latest.text === text && latest.result ? latest : await inspect(text);
       if (!entry?.result) { setNotice(`정제하지 못했습니다. ${PG.errorLabel(entry?.error || "network")}`, "warn"); return; }
+      const context = PG.siteContext.read();
+      const v = ++version;
       const res = await chrome.runtime.sendMessage({
-        type: "sanitize", text, inputVersion: ++version, destination: PG.resolveDestination(),
+        type: "sanitize", text, inputVersion: v, destination: PG.resolveDestination(),
       }).catch(() => ({ ok: false, error: "network" }));
       if (!res?.ok) { setNotice(`정제하지 못했습니다. ${PG.errorLabel(res?.error)}`, "warn"); return; }
-      if (getText(ed) !== text) return; // 정제하는 사이 입력이 바뀜
-      const result = res.data;
+      PG.siteContext.read();
+      if (getText(ed) !== text || version !== v) return; // 입력·검사 설정이 바뀐 정제 결과는 폐기
+      const result = PG.siteContext.apply(res.data, context);
       if (result.sanitized_text == null) { setNotice("정제하지 못했습니다.", "warn"); return; }
       const built = PG.restore.buildTokenMap(text, entry.result.findings, result.sanitized_text);
       prepared = { original: text, sanitized: result.sanitized_text, result, entries: built.entries, verified: built.verified };
       stat("sanitized");
+      // 미리보기 단계를 두지 않고 바로 입력창에 넣는다. 바뀐 부분은 입력창 위 오버레이로 보여 주고,
+      // [원문으로 되돌리기]로 언제든 되돌릴 수 있다. 전송은 여전히 사용자가 직접 한다.
+      applyPrepared();
     } finally {
       busy = false;
       refresh();
@@ -389,7 +434,9 @@
     else PG.restore.cancel();
     clearTimeout(timer);
     setText(ed, p.sanitized);
-    PG.ui.toast("정제문을 입력창에 넣었습니다. 확인한 뒤 직접 전송하세요.");
+    const count = (p.result.changes || []).reduce((a, c) => a + c.count, 0);
+    if (count) PG.ui.showTokenOverlay(ed, count);
+    PG.ui.toast("민감정보를 토큰으로 바꿨습니다. 강조된 부분을 확인하고 직접 전송하세요.");
   }
 
   function revert() {
@@ -399,6 +446,7 @@
     applied = null;
     prepared = null; // 원문으로 돌아갔으므로 정제 미리보기도 닫는다
     PG.restore.cancel();
+    PG.ui.clearTokenOverlay();
     setText(ed, original);
   }
 
@@ -408,12 +456,15 @@
     const text = getText(ed);
     const result = latest && latest.text === text ? latest.result : null;
     if (!result || result.status !== "complete") return;
+    if (result.decision === "warn") { openWarning(ed, latest); return; }
+    const approvedSettings = settingsVersion;
     PG.ui.showForce({
+      aiAssessment: result.ai_assessment,
       findings: result.findings.filter((f) => f.action !== "allow"),
       onConfirm: () => {
         if (getText(ed) !== text) return;
         stat("forced");
-        triggerSend(ed, text);
+        triggerSend(ed, text, approvedSettings);
       },
     });
   }
@@ -431,6 +482,7 @@
 
   // 전송 허용 여부. true 면 원래 이벤트를 그대로 둔다.
   function gateSync(ed, text) {
+    PG.siteContext.read();
     if (!enabled || !text.trim()) return true;
     if (consumeBypass(text)) return true;
     const ok = !!latest && latest.text === text && passed(latest.result);
@@ -441,7 +493,7 @@
   async function gate(ed, text) {
     clearTimeout(timer);
     refresh();
-    const entry = await inspect(text);
+    const entry = await inspect(text, "submit");
     if (!entry) return;
     if (getText(ed) !== text) { scheduleInspect(ed); return; } // 검사 중 입력이 바뀜 → 보내지 않음
     refresh();

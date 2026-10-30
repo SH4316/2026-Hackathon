@@ -37,6 +37,8 @@ class AuditEvent:
     policy_version: str
     detector_versions: dict[str, str]
     duration_ms: int
+    # 대시보드에서 연결한 개인 클라이언트(개인 토큰으로 인증한 요청만). 정적 API 키 요청은 None.
+    client_id: str | None = None
 
     @classmethod
     def new(cls, **kw) -> AuditEvent:
@@ -68,14 +70,45 @@ class AuditStore:
                                 json.dumps(asdict(event), ensure_ascii=False)))
             self._conn.commit()
 
-    def list(self, limit: int = 100, since: str | None = None) -> list[dict]:
-        sql = "SELECT payload FROM audit_events"
-        args: list = []
+    def list(self, limit: int = 100, since: str | None = None, until: str | None = None,
+             client_id: str | None = None) -> list[dict]:
+        where, args = [], []
         if since:
-            sql += " WHERE occurred_at > ?"
+            where.append("occurred_at > ?")
             args.append(since)
+        if until:
+            where.append("occurred_at <= ?")
+            args.append(until)
+        if client_id:
+            where.append("json_extract(payload, '$.client_id') = ?")
+            args.append(client_id)
+        sql = "SELECT payload FROM audit_events"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
         sql += " ORDER BY occurred_at DESC LIMIT ?"
         args.append(limit)
         with self._lock:
             rows = self._conn.execute(sql, args).fetchall()
         return [json.loads(r[0]) for r in rows]
+
+    def summary(self, since: str | None = None, until: str | None = None,
+                client_id: str | None = None, max_events: int = 100_000) -> dict:
+        """대시보드 집계. 서버 '검사 판정' 기준이며 실제 전송·차단 수가 아니다."""
+        events = self.list(limit=max_events, since=since, until=until, client_id=client_id)
+        by: dict[str, Counter] = {k: Counter() for k in
+                                  ("endpoint", "decision", "status", "client_type", "destination_tier")}
+        types: Counter = Counter()
+        clients: dict[str, Counter] = {}
+        for e in events:
+            for k, c in by.items():
+                c[e.get(k) or "unknown"] += 1
+            types.update(e.get("finding_counts") or {})
+            cid = e.get("client_id")
+            if cid:
+                clients.setdefault(cid, Counter())[e.get("decision") or "unknown"] += 1
+        return {
+            "events": len(events), "truncated": len(events) >= max_events,
+            **{f"by_{k}": dict(c) for k, c in by.items()},
+            "finding_types": dict(types),
+            "by_client": {cid: {"events": sum(c.values()), "decision": dict(c)} for cid, c in clients.items()},
+        }

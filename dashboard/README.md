@@ -11,7 +11,7 @@
 | 패키지 | 책임 |
 | --- | --- |
 | `api` | 공통 페이지 응답 `api.model.Page<T>` |
-| `configuration` | 태그·정책 초안, 게시·활성화와 버전 조회 |
+| `configuration` | 태그·정책·Jev 설정, 초안·게시·활성화와 버전 조회 |
 | `person` | 사람 등록과 사람별 조회 연결 |
 | `event` | 프롬프트·탐지 저장, 재전송 검증과 원자적 수집 |
 | `detector` | 탐지기 계약 검증·구간 변환·이미지 디코딩, 원본 메타데이터 수집·조회 |
@@ -72,7 +72,7 @@ docker compose -f compose-dev.yml up --build --force-recreate -d --wait backend
 docker compose -f compose-dev.yml logs --tail=100 backend
 ```
 
-로그에서 `Successfully validated 6 migrations`와 V2·V3·V4·V5·V6 적용 또는 현재 스키마 버전 `6`을 확인합니다. V3는 탐지 결과 메타데이터·파일 이름·이미지 원본 바이트를 보관하는 테이블을 추가하고 기존 데이터를 보존합니다. V4는 태그별 Jev 판단 프롬프트, V5는 Python 정규식 저장 필드를 추가하며 기존 태그의 값은 각각 빈 문자열입니다. V6는 감지 태그에 수집 시점의 이름·색을 보관하고, 기존 감지에는 해당 수집 버전의 이름·색을 채워 이력을 유지합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
+로그에서 `Successfully validated 8 migrations`와 V2·V3·V4·V5·V6·V7·V8 적용 또는 현재 스키마 버전 `8`을 확인합니다. V3는 탐지 결과 메타데이터·파일 이름·이미지 원본 바이트를 보관하는 테이블을 추가하고 기존 데이터를 보존합니다. V4는 태그별 Jev 판단 프롬프트, V5는 Python 정규식 저장 필드를 추가하며 기존 태그의 값은 각각 빈 문자열입니다. V6는 감지 태그에 수집 시점의 이름·색을 보관하고, 기존 감지에는 해당 수집 버전의 이름·색을 채워 이력을 유지합니다. V7은 기존 태그의 비어 있지 않은 Jev 프롬프트를 독립 설정으로 옮기고 태그 임계값을 `null`로 초기화하며, 태그·이벤트·정책을 보존합니다. V8은 태그와 독립 Jev 판단에 `enabled`를 추가하고 기존 값을 모두 `true`로 보존하며 이벤트·저장 검색을 유지합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
 
 SQL은 게시 버전 `demo-v1`, `demo-v2`, 14개 원본 분류와 개인정보 하위 태그, 사용자 정의 정책 3종, 이름에 `데모`가 붙은 가상 사람 6명, 서울 기준 최근 완료된 30일의 이벤트를 만듭니다. V2는 같은 태그 ID를 기술정보·업무정보 묶음으로 재구성합니다. 각 분류의 하위 예시와 판단 지침을 포함하며 초안으로 복제한 뒤 모두 편집할 수 있습니다. 프롬프트는 합성 자료로 표시되고 이름·전화번호·이메일도 가상 값입니다. 시간대·날짜별 이벤트 수, 서비스, 정책, 감지 0건, 여러 태그를 가진 동일 구간과 같은 텍스트의 서로 다른 구간을 포함합니다.
 
@@ -131,25 +131,31 @@ java -jar build/libs/ai-security-dashboard.jar
 
 ## 데이터와 조회 기준
 
-설정은 버전별 태그 트리와 정책 목록입니다. 태그에는 ID·이름·설명·예시·판단 참고사항·Jev 판단 프롬프트·Python 정규식·색·부모·순서가 있습니다. 태그 추가·삭제·부모·순서와 버전 이름·정책 목록은 초안에서 편집하며, 게시하면 고정됩니다. 태그의 이름·색·설명·예시·판단 참고사항·Jev 프롬프트·Python 정규식은 게시 후에도 편집할 수 있습니다. 게시 버전 하나만 활성화할 수 있고 `revision`으로 동시 수정을 확인합니다. 태그와 정책의 ID는 복제한 버전에도 유지되지만, 세부 정보 수정은 **현재 선택한 버전의 해당 태그에만** 적용됩니다. 같은 ID를 가진 다른 버전의 태그는 바뀌지 않습니다. 이름으로 코드나 의미를 추론하지 않습니다.
+설정은 버전별 태그 트리·정책 목록·독립적인 Jev 프롬프트 목록입니다. 태그에는 ID·이름·사용 여부(`enabled`)·설명·예시·판단 참고사항·Jev 임계값·Python 정규식·색·부모·순서가 있습니다. 태그 추가·삭제·부모·순서와 버전 이름·정책 목록은 초안에서 편집하며, 게시하면 고정됩니다. 태그의 사용 여부·이름·색·설명·예시·판단 참고사항·Jev 임계값·Python 정규식과 독립 Jev 설정은 게시 후에도 편집할 수 있습니다. 게시 버전 하나만 활성화할 수 있고 `revision`으로 동시 수정을 확인합니다. 태그와 정책의 ID는 복제한 버전에도 유지되지만, 세부 정보 수정은 **현재 선택한 버전의 해당 태그에만** 적용됩니다. 같은 ID를 가진 다른 버전의 태그는 바뀌지 않습니다. 이름으로 코드나 의미를 추론하지 않습니다.
 
 태그 편집 영역의 **세부 정보 저장**은 선택한 태그만 저장하고, 다른 태그나 트리·정책의 미저장 변경은 화면에 유지합니다. 새로 추가한 태그는 먼저 **초안 저장**으로 트리에 저장한 뒤 세부 정보만 저장할 수 있습니다. **초안 저장**은 태그 세부 정보를 포함한 초안 전체를 저장하며, 두 저장 방식 모두 최신 버전 `revision`을 사용합니다. 충돌 시 입력은 유지되므로 다른 창의 변경을 확인한 뒤 다시 편집할 수 있습니다.
 
-`/settings/metrics`에서 태그별 **Jev 판단 프롬프트**를 편집하면 API의 `tags[].jevPrompt`로 저장합니다. 최대 12,000 Unicode 코드 포인트이며 이모지 하나는 한 글자로 셉니다. 줄바꿈과 앞뒤 공백을 그대로 보존합니다. 새 태그와 기존 태그의 초기값은 빈 문자열이고, 상위 태그의 프롬프트를 자동으로 상속하지 않습니다. `guidance`에 해당하는 판단 참고사항은 별도 맥락 필드입니다. 복제 시 프롬프트를 함께 복사하며 이후 각 버전에서 독립적으로 편집합니다.
+사이드바의 **Jev 설정**(`/settings/jev`)에서 선택한 버전의 프롬프트를 만들고 이름·판단 프롬프트·출력 태그를 편집합니다. 프롬프트는 API의 `jevPrompts[]`에 독립적으로 저장하며, 한 프롬프트가 태그 트리의 여러 기존 태그를 출력할 수 있습니다. 새 출력 태그가 필요하면 메트릭 설정에서 초안 트리에 먼저 저장합니다. 새 프롬프트 생성은 버전당 100개까지 허용하며, 마이그레이션으로 그 수를 넘는 기존 설정도 보존하고 조회·편집·복제할 수 있습니다. 최대 12,000 Unicode 코드 포인트이며 이모지 하나는 한 글자로 셉니다. 줄바꿈과 앞뒤 공백을 그대로 보존하고 `guidance`는 별도 맥락 필드로 유지합니다.
 
-같은 화면의 **Python 정규식**은 태그별 `pythonRegex`로 저장하며 최대 4,000 Unicode 코드 포인트입니다. Python `re` 문법의 역슬래시·인라인 플래그·이름 있는 그룹·줄바꿈을 그대로 보존합니다. 예를 들어 `(?i)\b(?P<label>internal|confidential)\b`를 입력할 수 있습니다. JSON에서는 역슬래시를 `\\`로 인코딩합니다. 비워 두면 빈 문자열이며 상위 태그에서 자동으로 상속하지 않습니다. Jev 프롬프트와 독립적으로 편집·복제·게시합니다. 대시보드는 패턴을 실행하거나 Java·JavaScript 문법으로 검사하지 않고, Python 구문 검증과 실행은 연결된 탐지기에서 수행합니다.
+각 출력 태그의 **Jev 임계값**은 `tags[].jevThreshold`로 저장하며 메트릭 설정에서도 편집할 수 있습니다. 0 이상 1 이하, 소수점 여섯 자리까지 허용하고 비우면 `null`(미설정)입니다. `0`은 유효한 설정값이며 자동 기본값이나 부모 상속은 없습니다. 여러 프롬프트가 같은 태그를 출력하면 해당 버전의 태그 임계값을 공유합니다. 연결된 탐지기는 임계값이 설정된 태그에 대해 `점수 >= 임계값`을 판정 기준으로 사용할 수 있습니다. Jev 저장은 프롬프트·출력 연결·선택한 태그 임계값을 한 번에 반영합니다. 출력 선택 해제나 프롬프트 삭제는 태그와 임계값을 보존합니다. 초안 트리에서 태그를 삭제하면 해당 출력 연결만 제거합니다. 복제 시 프롬프트·연결·임계값을 함께 복사하며 이후 버전별로 독립적으로 편집합니다.
 
-연결하는 쪽은 게시·활성화된 설정을 `GET /api/v1/classifier-config`로 읽어 각 태그의 `jevPrompt`와 `pythonRegex`를 사용합니다. 초안이나 비활성 버전을 저장해도 활성 설정은 바뀌지 않습니다. **활성 게시 버전의 세부 정보를 저장하면 같은 버전 ID의 다음 설정 조회부터 즉시 반영되고 `revision`이 증가합니다.** 연결된 분류기는 설정을 다시 조회해 해당 revision을 적용해야 합니다. 대시보드는 설정을 저장·제공하며 외부 Jev·탐지기 실행 요청, 배포, 자동 재로딩은 수행하지 않습니다. 일반 DB를 처음 만들 때 태그나 프롬프트·정규식 예시를 자동 생성하지 않습니다.
+V7은 기존 태그의 비어 있지 않은 `jev_prompt`를 원문 그대로 독립 프롬프트로 옮겨 원래 태그에 연결합니다. 공백·탭·줄바꿈만 있는 기존 값도 원문을 보존하며, 길이가 0인 빈 값은 프롬프트를 만들지 않고 임계값은 모두 미설정으로 둡니다. 이전 DB 열은 이력으로 남지만 `tags[].jevPrompt`는 API에서 제거되어 해당 입력은 거부합니다.
+
+`/settings/metrics`의 **Python 정규식**은 태그별 `pythonRegex`로 저장하며 최대 4,000 Unicode 코드 포인트입니다. Python `re` 문법의 역슬래시·인라인 플래그·이름 있는 그룹·줄바꿈을 그대로 보존합니다. 예를 들어 `(?i)\b(?P<label>internal|confidential)\b`를 입력할 수 있습니다. JSON에서는 역슬래시를 `\\`로 인코딩합니다. 비워 두면 빈 문자열이며 상위 태그에서 자동으로 상속하지 않습니다. Jev 프롬프트와 독립적으로 편집·복제·게시합니다. 대시보드는 패턴을 실행하거나 Java·JavaScript 문법으로 검사하지 않고, Python 구문 검증과 실행은 연결된 탐지기에서 수행합니다.
+
+태그의 ‘태그 사용’과 독립 Jev 판단의 ‘Jev 판단 사용’은 현재 선택한 버전에 저장합니다. 기존 ‘세부 정보 저장’·‘초안 저장’·‘판단 저장’으로 반영하며 게시 후에도 변경할 수 있습니다. 새 태그·판단과 V8 이전의 기존 항목은 기본적으로 사용합니다. API 응답의 `tags[].enabled`·`jevPrompts[].enabled`는 항상 boolean입니다. 요청에서 `enabled`를 생략하거나 `null`로 보내면 기존 항목은 유지하고 새 항목은 `true`로 만듭니다. 사용하지 않는 항목도 내용·출력 태그·임계값은 보존됩니다. 부모를 사용하지 않아도 자식의 사용 여부는 바뀌지 않습니다. Jev 결과 태그 영역의 ‘사용 안 함’ 표시는 태그 상태를 알려주며 연결 선택·임계값 편집은 계속 가능합니다.
+
+연결하는 쪽은 게시·활성화된 설정을 `GET /api/v1/classifier-config`로 읽어 독립 `jevPrompts`와 출력 태그의 `jevThreshold`, 각 태그의 `pythonRegex`를 사용합니다. 설정은 사용 여부와 관계없이 모든 태그·판단을 반환합니다. 소비자는 `tag.enabled`인 태그의 정규식만 실행하고, Jev 결과는 `prompt.enabled && outputTag.enabled`일 때만 사용해야 합니다. 사용할 출력 태그가 하나도 없는 Jev 판단은 건너뜁니다. 실제 `server`의 설정 조회·정규식/Jev 실행 연결은 이 변경에 포함하지 않습니다. 초안이나 비활성 버전을 저장해도 활성 설정은 바뀌지 않습니다. **활성 게시 버전의 태그 세부 정보나 Jev 설정을 저장하면 같은 버전 ID의 다음 설정 조회부터 즉시 반영되고 `revision`이 증가합니다.** 연결된 분류기는 설정을 다시 조회해 해당 revision을 적용해야 합니다. 대시보드는 설정을 저장·제공하며 외부 Jev·탐지기 실행 요청, 배포, 자동 재로딩은 수행하지 않습니다. 일반 DB를 처음 만들 때 태그나 프롬프트·정규식 예시를 자동 생성하지 않습니다.
 
 이벤트는 원문 프롬프트와 감지 구간을 저장합니다. 구간은 Unicode 코드 포인트의 `[start,end)`이며 JavaScript 문자열 인덱스와 이모지에서 차이가 날 수 있습니다. 같은 범위의 입력은 태그 합집합을 가진 감지 한 건으로 합칩니다. 서로 다른 겹치는 범위는 별개입니다. 감지 없는 이벤트도 유효합니다. 등록된 사람과 현재 활성 버전이 필요합니다. `(sourceId,eventId)`가 같은 동일 요청은 `200`, 새 이벤트는 `201`, 다른 내용의 재사용은 `409`입니다. 같은 요청 재전송은 나중에 활성 버전이 바뀌어도 기존 이벤트를 반환합니다.
 
-`versionId` 필터는 **과거 전체 이벤트를 해석할 게시 버전**을 선택합니다. 수집 버전으로 이벤트를 제한하지 않습니다. 이력 목록·상세에는 수집 당시의 태그 이름·색과 정책 이름이 유지됩니다. 그래프 제목·범례는 선택한 버전의 현재 태그 이름·색을 사용합니다. 세부 정보 수정은 집계 수치와 저장 검색의 이벤트 구성·필터·트리를 바꾸지 않습니다. 선택한 트리에서 제거된 태그만 가진 구간은 미매핑으로 집계합니다. 태그 필터는 자신과 모든 하위 태그를 포함합니다. 여러 태그가 붙어도 감지 구간 한 개는 한 번만 셉니다. 부모 수치는 자식 수치의 합이 아니라 구간의 합집합입니다.
+`versionId` 필터는 **과거 전체 이벤트를 해석할 게시 버전**을 선택합니다. 수집 버전으로 이벤트를 제한하지 않습니다. 이력 목록·상세에는 수집 당시의 태그 이름·색과 정책 이름이 유지됩니다. 그래프 제목·범례는 선택한 버전의 현재 태그 이름·색을 사용합니다. 사용 여부 변경은 과거 이벤트·필터·집계·저장 검색을 숨기거나 다시 쓰지 않습니다. 수집 API도 비활성 태그의 ID를 계속 허용합니다. 세부 정보 수정은 집계 수치와 저장 검색의 이벤트 구성·필터·트리를 바꾸지 않습니다. 선택한 트리에서 제거된 태그만 가진 구간은 미매핑으로 집계합니다. 태그 필터는 자신과 모든 하위 태그를 포함합니다. 여러 태그가 붙어도 감지 구간 한 개는 한 번만 셉니다. 부모 수치는 자식 수치의 합이 아니라 구간의 합집합입니다.
 
 기본 기간은 서울 기준 최근 7개 날짜, 범위는 시작 포함·종료 제외입니다. 일별 버킷은 서울 날짜, 시간별 버킷은 UTC ISO 시각으로 응답하며 빈 버킷을 채웁니다. 최대 조회는 366일, 시간별 집계는 31일입니다. 프롬프트 `q`는 `%`·`_`도 그대로 찾는 부분 문자열 검색이고, 사람 이름·ID 검색은 별도 `personQuery`입니다. 정책 미수집 `null`은 정책 분포에서 제외합니다. 사람 목록은 등록된 사람을 유지하며 `personQuery`·`personId`만 목록 대상을 제한합니다. 기간·프롬프트·태그 등 이벤트 필터는 각 사람의 통계와 최근 시각에만 적용하므로 일치 이벤트가 없는 사람도 0건으로 표시됩니다.
 
 저장한 검색은 저장 시점의 절대 기간·게시 버전·전체 일치 이벤트 ID를 고정합니다. 새 이벤트 수집이나 활성 버전 변경으로 바뀌지 않습니다. 다시 조회는 저장 필터를 이력으로 가져오는 동작이며 기존 스냅샷을 덮어쓰지 않습니다. 저장 검색 삭제는 원본 이벤트를 삭제하지 않습니다.
 
-화면 경로는 `/`, `/events`, `/events/:id`, `/people`, `/people/:id`, `/settings/metrics`, `/settings/monitoring`, `/saved-searches`, `/saved-searches/:id`입니다. 자동 갱신 없이 진입·필터 변경·명시적 새로고침 때 조회합니다.
+화면 경로는 `/`, `/events`, `/events/:id`, `/people`, `/people/:id`, `/settings/metrics`, `/settings/jev`, `/saved-searches`, `/saved-searches/:id`입니다. 기존 `/settings/monitoring` 주소는 쿼리를 유지한 채 `/settings/metrics`로 이동합니다. 자동 갱신 없이 진입·필터 변경·명시적 새로고침 때 조회합니다.
 
 ## API
 
@@ -159,7 +165,8 @@ java -jar build/libs/ai-security-dashboard.jar
 | --- | --- |
 | `/config-versions`·`/{id}`·`/{id}/publish`·`/{id}/activate` | 초안 생성·편집·게시·활성화 |
 | `/config-versions/{id}/tags/{tagId}` | 선택한 버전의 태그 세부 정보 저장, 게시 버전도 가능 |
-| `/classifier-config` | 예시·참고사항·태그별 `jevPrompt`·`pythonRegex`를 포함한 활성 설정, 없으면 `404 NO_ACTIVE_VERSION` |
+| `/config-versions/{id}/jev-prompts`·`/{promptId}` | 선택한 버전의 독립 Jev 프롬프트 생성·편집·삭제와 출력 태그 임계값 저장 |
+| `/classifier-config` | 모든 `jevPrompts`·태그와 각 `enabled`, 예시·참고사항·태그별 `jevThreshold`·`pythonRegex`를 포함한 활성 설정, 없으면 `404 NO_ACTIVE_VERSION` |
 | `/people`·`/{id}` | 사람 등록과 필터별 통계 |
 | `/events`·`/{id}` | 이벤트 등록·페이지·원문 상세 |
 | `/detector-events`·`/{id}`·`/{id}/images/{imageId}` | 탐지기 결과 수집·원본 결과 상세·이미지 바이트 다운로드 |
@@ -189,7 +196,11 @@ draft=$(curl --fail-with-body -sS "$api/config-versions" \
 version_id=$(jq -r '.id' <<<"$draft")
 updated=$(curl --fail-with-body -sS -X PUT "$api/config-versions/$version_id" \
   -H 'Content-Type: application/json' \
-  --data '{"revision":0,"name":"탐지기 연결 예제","tags":[{"id":"email","name":"이메일","description":"합성 예제 이메일","examples":["hong@example.com"],"guidance":"이메일 구간","jevPrompt":"원문에 이메일 주소가 포함되어 있는지 판단하세요.\n예시: hong@example.com","pythonRegex":"(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b","color":"#2563EB","parentId":null,"order":0}],"policyStates":[{"id":"blocked","name":"차단 판정","description":"검사 서버의 차단 판정을 수집한 예제","color":"#DC2626","order":0}]}')
+  --data '{"revision":0,"name":"탐지기 연결 예제","tags":[{"id":"email","name":"이메일","description":"합성 예제 이메일","examples":["hong@example.com"],"guidance":"이메일 구간","jevThreshold":null,"pythonRegex":"(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b","color":"#2563EB","parentId":null,"order":0}],"policyStates":[{"id":"blocked","name":"차단 판정","description":"검사 서버의 차단 판정을 수집한 예제","color":"#DC2626","order":0}]}')
+updated=$(curl --fail-with-body -sS "$api/config-versions/$version_id/jev-prompts" \
+  -H 'Content-Type: application/json' \
+  --data "$(jq -n --argjson revision "$(jq '.revision' <<<"$updated")" \
+    '{revision:$revision,name:"이메일 검사",prompt:"원문에 이메일 주소가 포함되어 있는지 판단하세요.\n예시: hong@example.com",outputs:[{tagId:"email",threshold:0.75}]}')")
 jq '{revision}' <<<"$updated" > /tmp/dashboard-detector-publish.json
 curl --fail-with-body -sS -X POST "$api/config-versions/$version_id/publish" \
   -H 'Content-Type: application/json' --data-binary @/tmp/dashboard-detector-publish.json
@@ -239,7 +250,7 @@ TEST_DB_URL='jdbc:mysql://127.0.0.1:3306/sending_test?connectionTimeZone=UTC&for
   TEST_DB_USERNAME=sending_test TEST_DB_PASSWORD=sending-test-local ./gradlew test
 ```
 
-`TEST_MIGRATION_DB_URL`은 비워도 되며, 지정하면 해당 폐기 가능한 `_test` DB를 초기화해 V1→V2의 일회성 초기화, V2→V3→V4→V5→V6의 기존 데이터 보존·이력 이름·색 보관과 새 일반 DB의 빈 상태를 검증합니다. HTTP 검증도 별도 테스트 DB를 연결한 JAR를 포트 `8083` 등으로 실행한 뒤 진행합니다. 다음 스크립트는 게시 버전·사람·이벤트를 생성하고 세부 정보 수정의 버전 격리, 이력 이름·색 보존, 저장 검색 구성 유지, 버전 재해석, 동시 재전송, 이모지 구간, 오류 응답을 확인합니다. `smoke_detector_api.py`는 합성 사람·설정·이벤트를 생성하고 새 설정을 게시·활성화하므로 시연 DB와 분리한 테스트 서버에서 실행합니다.
+`TEST_MIGRATION_DB_URL`은 비워도 되며, 지정하면 해당 폐기 가능한 `_test` DB를 초기화해 V1→V2의 일회성 초기화, V2→V3→V4→V5→V6→V7→V8의 기존 데이터 보존·이력 이름·색·독립 Jev·사용 여부 기본값과 새 일반 DB의 빈 상태를 검증합니다. HTTP 검증도 별도 테스트 DB를 연결한 JAR를 포트 `8083` 등으로 실행한 뒤 진행합니다. 다음 스크립트는 게시 버전·사람·이벤트를 생성하고 세부 정보 수정의 버전 격리, 이력 이름·색 보존, 저장 검색 구성 유지, 버전 재해석, 동시 재전송, 이모지 구간, 오류 응답을 확인합니다. `smoke_detector_api.py`는 합성 사람·설정·이벤트를 생성하고 새 설정을 게시·활성화하므로 시연 DB와 분리한 테스트 서버에서 실행합니다.
 
 ```bash
 python3 scripts/smoke_api.py --base-url http://127.0.0.1:8083 --report /tmp/api-smoke.json
@@ -258,12 +269,20 @@ PLAYWRIGHT_MODULE=/tmp/dashboard-browser-tools/node_modules/playwright/index.mjs
   node scripts/smoke_browser.mjs
 ```
 
-태그별 Jev·Python 정규식 전용 검증은 다음 스크립트를 사용합니다. 명시한 로컬 테스트 서버에 합성 설정을 생성·게시·활성화하고 세부 정보와 복제본을 편집합니다. 두 필드의 원문 보존·독립성, 게시 후 세부 정보 편집·구조 잠금, 활성 설정의 revision 갱신과 버전 간 격리를 확인하고, 다섯 화면 너비의 가로 넘침과 데스크톱·모바일 캡처를 기록합니다. 아래 명령의 결과는 `validation/tag-details-browser.json`, 캡처는 `.impeccable/review/tag-details-*.png`이며 이전 Jev 검증 기록을 보존합니다.
+독립 Jev 설정 전용 검증은 다음 스크립트를 사용합니다. 명시한 로컬 테스트 서버에 합성 설정을 생성·게시·활성화하고 프롬프트·여러 출력 태그·공유 임계값을 편집합니다. 0과 미설정 구분, 원문 보존, 게시 후 편집, 선택 해제·삭제 시 태그 보존, 복제본 격리와 화면 가로 넘침을 확인합니다. 이전 `jev-browser.json`·`tag-details-browser.json`과 캡처는 당시 검증 기록으로 보존합니다.
 
 ```bash
-DASHBOARD_URL=http://127.0.0.1:8084 \
-  BROWSER_REPORT=validation/tag-details-browser.json BROWSER_SCREENSHOT_PREFIX=tag-details \
-  node scripts/smoke_jev_prompt.mjs
+DASHBOARD_URL=http://127.0.0.1:8085 \
+  BROWSER_REPORT=validation/jev-settings-browser.json BROWSER_SCREENSHOT_PREFIX=jev-settings \
+  node scripts/smoke_jev_settings.mjs
+```
+
+태그·Jev 사용 여부 전용 검증은 합성 설정·사람·이벤트·저장 검색을 만들고 게시 후 토글 저장, 활성 설정 반영, 복제본 격리, 이력·집계 보존, 실제 수정 충돌 후 입력 유지, 이전 감시 경로 이동을 확인합니다. 사용 안 함 상태 두 화면의 데스크톱·모바일 캡처 4개와 5개 너비의 넘침 측정, 변경한 설정 영역의 axe 검사 및 별도 전체 셸 검사 결과를 기록합니다. 이 스크립트도 전용 테스트 DB에서 실행합니다.
+
+```bash
+DASHBOARD_URL=http://127.0.0.1:8086 \
+  BROWSER_REPORT=validation/detection-enabled-browser.json \
+  node scripts/smoke_detection_enabled.mjs
 ```
 
 자동 접근성·가로 넘침 검증은 `scripts/smoke_accessibility.mjs`로 실행할 수 있습니다. 별도 임시 경로에 `@axe-core/playwright`를 설치하고 `AXE_MODULE`을 해당 `dist/index.mjs` 경로로 지정합니다. 이 결과는 자동 검사 범위이며 수동 WCAG 전체 검증을 대신하지 않습니다.

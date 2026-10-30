@@ -4,6 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.audit.events import AuditStore
+from app.clients.store import ClientStore
+from app.org.settings import OrgSettingsStore
 from app.config import Settings
 from app.main import create_app
 from app.policy.engine import Policy
@@ -21,10 +23,12 @@ def memory_store() -> RuleSetStore:
     return RuleSetStore(Path(":memory:"), policy.detectors_seed_path, set(policy.types))
 
 
-def make_client(**overrides) -> TestClient:
+def make_client(dashboard=None, **overrides) -> TestClient:
     opts = {"api_keys": [API_KEY], "admin_keys": [ADMIN_KEY], "policy_path": ROOT / "policies/default.yaml"}
     settings = Settings(**{**opts, **overrides})
-    app = create_app(settings, audit=AuditStore(Path(":memory:")), ruleset_store=memory_store())
+    app = create_app(settings, audit=AuditStore(Path(":memory:")), ruleset_store=memory_store(),
+                     clients=ClientStore(Path(":memory:")), org_settings=OrgSettingsStore(Path(":memory:")),
+                     dashboard=dashboard)
     return TestClient(app, headers={"X-API-Key": API_KEY})
 
 

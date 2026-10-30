@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hmac
 
-from fastapi import Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 
+from app.clients.store import Client, ClientStore
 from app.registry.store import RuleSetStore, actor_id
 from app.services.pipeline import Pipeline
 
@@ -16,13 +17,39 @@ def get_store(request: Request) -> RuleSetStore:
     return request.app.state.ruleset_store
 
 
-def require_api_key(request: Request, x_api_key: str | None = Header(default=None)) -> None:
-    """정적 API 키 인증(초기). CORS 는 인증을 대체하지 않는다."""
+def get_clients(request: Request) -> ClientStore:
+    return request.app.state.clients
+
+
+def _bearer(authorization: str | None) -> str | None:
+    if authorization and authorization[:7].lower() == "bearer ":
+        return authorization[7:].strip()
+    return None
+
+
+def require_api_key(request: Request, x_api_key: str | None = Header(default=None),
+                    authorization: str | None = Header(default=None)) -> Client | None:
+    """정적 API 키 또는 대시보드에서 연결한 개인 토큰(X-API-Key 또는 Authorization: Bearer).
+
+    개인 토큰이면 그 클라이언트를 돌려주고 request.state.client 에 둔다(감사 이벤트의 client_id).
+    CORS 는 인증을 대체하지 않는다.
+    """
     settings = request.app.state.settings
-    if settings.auth_disabled:
-        return
-    if not x_api_key or not any(hmac.compare_digest(x_api_key, k) for k in settings.api_keys):
+    key = x_api_key or _bearer(authorization)
+    client = request.app.state.clients.authenticate(key) if key else None
+    request.state.client = client
+    if client or settings.auth_disabled:
+        return client
+    if not key or not any(hmac.compare_digest(key, k) for k in settings.api_keys):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid api key")
+    return None
+
+
+def require_client(client: Client | None = Depends(require_api_key)) -> Client:
+    """개인 토큰으로만 호출할 수 있는 엔드포인트(내 연결 정보·연결 해제)."""
+    if client is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "client token required")
+    return client
 
 
 def require_admin(request: Request, x_admin_key: str | None = Header(default=None)) -> str:

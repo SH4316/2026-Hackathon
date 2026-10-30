@@ -1,0 +1,27 @@
+# API 버전: 검사 API 만 띄운다. 모델은 띄우지 않고 .env 설정을 따른다.
+#   cp .env.example .env
+#   docker compose -f compose.api.yaml up -d
+#
+# - 규칙만 사용: PG_MODEL_MODE=disabled (기본)
+# - 이미 있는 모델 서버 사용: PG_MODEL_MODE=optional|required, PG_MODEL_API=ollama|openai,
+#   PG_MODEL_BASE_URL=<조직 내부 모델 서버>, PG_MODEL_NAME=<모델명>
+#   예) 다른 장비의 compose.local.yaml decider, 조직 GPU 서버의 vLLM·llama.cpp server
+#   원문이 이 주소로 전송되므로 조직 밖 상용 API 주소를 넣지 않는다.
+services:
+  api:
+    build: .
+    env_file: .env
+    ports:
+      - "${PG_BIND:-127.0.0.1:8000}:8000"
+    volumes:
+      - audit-data:/srv/data
+      - ./policies:/srv/policies:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  audit-data: {}

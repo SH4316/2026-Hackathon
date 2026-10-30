@@ -30,7 +30,7 @@ class Settings:
     max_body_bytes: int = 256 * 1024
 
     model_mode: ModelMode = ModelMode.DISABLED
-    model_api: str = "ollama"  # ollama | openai(llama.cpp server·vLLM 등 OpenAI 호환 로컬 서버)
+    model_api: str = "ollama"  # decider(확률 분류) | ollama | openai(OpenAI 호환 로컬 서버)
     model_api_key: str = ""    # OpenAI 호환 로컬 서버가 키를 요구할 때만
     model_base_url: str = "http://model:11434"
     model_name: str = ""
@@ -41,6 +41,16 @@ class Settings:
     ruleset_db_path: Path = Path("data/ruleset.sqlite3")
     # 대시보드용 관리 키(규칙·탐지기 편집). 일반 API 키와 분리한다.
     admin_keys: list[str] = field(default_factory=list)
+    # 대시보드에서 연결한 개인 클라이언트(등록 코드 → 개인 토큰)
+    clients_db_path: Path = Path("data/clients.sqlite3")
+    enrollment_ttl_minutes: int = 24 * 60
+    # 대시보드 웹 화면의 출처(브라우저에서 관리 API 를 직접 호출할 때). CORS 는 인증을 대체하지 않는다.
+    cors_origins: list[str] = field(default_factory=list)
+    # 조직 관리: 대시보드 주소가 있으면 대시보드 규칙(태그 정규식·Jev)을 적용하고 판정을 기록한다.
+    dashboard_url: str = ""
+    dashboard_timeout_s: float = 5.0
+    dashboard_refresh_s: float = 30.0
+    org_db_path: Path = Path("data/org.sqlite3")
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -60,4 +70,11 @@ class Settings:
             audit_db_path=Path(os.getenv("PG_AUDIT_DB_PATH", "data/audit.sqlite3")),
             ruleset_db_path=Path(os.getenv("PG_RULESET_DB_PATH", "data/ruleset.sqlite3")),
             admin_keys=_env_list("PG_ADMIN_KEYS"),
+            clients_db_path=Path(os.getenv("PG_CLIENTS_DB_PATH", "data/clients.sqlite3")),
+            enrollment_ttl_minutes=int(os.getenv("PG_ENROLLMENT_TTL_MINUTES", str(24 * 60))),
+            cors_origins=_env_list("PG_CORS_ORIGINS"),
+            dashboard_url=os.getenv("PG_DASHBOARD_URL", ""),
+            dashboard_timeout_s=float(os.getenv("PG_DASHBOARD_TIMEOUT_S", "5")),
+            dashboard_refresh_s=float(os.getenv("PG_DASHBOARD_REFRESH_S", "30")),
+            org_db_path=Path(os.getenv("PG_ORG_DB_PATH", "data/org.sqlite3")),
         )

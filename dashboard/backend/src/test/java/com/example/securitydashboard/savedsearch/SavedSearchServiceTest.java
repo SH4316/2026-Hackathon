@@ -43,6 +43,7 @@ class SavedSearchServiceTest {
             clock.instant(),
             clock.instant(),
             List.of(),
+            List.of(),
             List.of());
     when(configs.view(null)).thenReturn(version);
     when(queries.metrics(any(EventFilter.class), anyString()))

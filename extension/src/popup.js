@@ -1,3 +1,5 @@
+import { initAIControls } from "./ai-controls.js";
+void initAIControls();
 const statusEl = document.getElementById("status");
 const detailEl = document.getElementById("detail");
 const enabledEl = document.getElementById("enabled");
@@ -11,19 +13,26 @@ enabledEl.addEventListener("change", () => chrome.storage.local.set({ enabled: e
 testModeEl.addEventListener("change", () => chrome.storage.local.set({ testMode: testModeEl.checked }));
 document.getElementById("options").addEventListener("click", () => chrome.runtime.openOptionsPage());
 
-chrome.runtime.sendMessage({ type: "health" }).then((res) => {
+async function health() {
+const res = await chrome.runtime.sendMessage({ type: "health" });
   if (res?.ok) {
     statusEl.dataset.state = "ok";
     statusEl.textContent = "연결됨";
     const d = res.data;
     detailEl.textContent = `정책 ${d.policy_version} · 모델 ${d.model_mode}` +
       (d.model_ready === false ? " (준비 안 됨)" : "");
+  } else if (res?.error === "server_disabled") {
+    statusEl.dataset.state = "off";
+    statusEl.textContent = "꺼짐";
+    detailEl.textContent = "기기 내 AI를 켜면 서버 없이 검사할 수 있습니다.";
   } else {
     statusEl.dataset.state = "error";
     statusEl.textContent = res?.error === "http_503" ? "준비 안 됨" : "연결 안 됨";
-    detailEl.textContent = "검사할 수 없으면 전송을 보류합니다. 설정에서 서버 주소를 확인하세요.";
+    detailEl.textContent = "기기 내 AI가 켜져 있으면 기기에서 검사합니다. 서버 주소는 설정에서 확인하세요.";
   }
-});
+}
+void health();
+chrome.storage.onChanged.addListener((c) => { if (c.serverEnabled || c.serverUrl || c.apiKey) void health(); });
 
 chrome.storage.local.get({ stats: {} }).then(({ stats }) => {
   document.getElementById("stats").textContent =

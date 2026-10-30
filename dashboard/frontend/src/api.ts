@@ -8,6 +8,7 @@ import type {
   Person,
   SavedSearch,
   SaveSearchInput,
+  SaveJevPromptInput,
   SaveTagDetailsInput,
   SaveVersionInput,
   SecurityEvent,
@@ -85,7 +86,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 }
 
-function json(method: "POST" | "PUT", body: unknown): RequestInit {
+function json(method: "POST" | "PUT" | "DELETE", body: unknown): RequestInit {
   return {
     method,
     headers: { "Content-Type": "application/json" },
@@ -118,6 +119,35 @@ export const api = {
     return request(
       `/config-versions/${resourceId(versionId)}/tags/${resourceId(tagId)}`,
       json("PUT", input),
+    );
+  },
+  createJevPrompt(
+    versionId: string,
+    input: SaveJevPromptInput,
+  ): Promise<ConfigVersion> {
+    return request(
+      `/config-versions/${resourceId(versionId)}/jev-prompts`,
+      json("POST", input),
+    );
+  },
+  saveJevPrompt(
+    versionId: string,
+    promptId: string,
+    input: SaveJevPromptInput,
+  ): Promise<ConfigVersion> {
+    return request(
+      `/config-versions/${resourceId(versionId)}/jev-prompts/${resourceId(promptId)}`,
+      json("PUT", input),
+    );
+  },
+  deleteJevPrompt(
+    versionId: string,
+    promptId: string,
+    revision: number,
+  ): Promise<ConfigVersion> {
+    return request(
+      `/config-versions/${resourceId(versionId)}/jev-prompts/${resourceId(promptId)}`,
+      json("DELETE", { revision }),
     );
   },
   publishVersion(id: string, revision: number): Promise<ConfigVersion> {

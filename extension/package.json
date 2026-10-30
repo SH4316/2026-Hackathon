@@ -9,9 +9,18 @@
     "e2e": "node tests/e2e.mjs",
     "real-sites:login": "node tests/real-sites.mjs --login",
     "real-sites": "node tests/real-sites.mjs",
-    "real-sites:full": "node tests/real-sites.mjs --full"
+    "real-sites:full": "node tests/real-sites.mjs --full",
+    "build:ai": "node scripts/build-ai.mjs",
+    "e2e:ai": "node tests/local-ai.e2e.mjs",
+    "e2e:context": "node tests/site-context-dom.mjs && node tests/site-context.e2e.mjs",
+    "e2e:entry": "node tests/entry-warning.e2e.mjs && node tests/training-warning.e2e.mjs"
   },
   "devDependencies": {
-    "playwright": "1.52.0"
+    "esbuild": "0.25.12",
+    "playwright": "1.56.1"
+  },
+  "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
+    "onnxruntime-web": "1.31.1"
   }
 }

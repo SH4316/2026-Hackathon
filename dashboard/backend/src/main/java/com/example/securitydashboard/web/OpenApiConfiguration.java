@@ -5,6 +5,7 @@ import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.examples.Example;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.ArraySchema;
+import io.swagger.v3.oas.models.media.BooleanSchema;
 import io.swagger.v3.oas.models.media.ComposedSchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.DateTimeSchema;
@@ -149,6 +150,7 @@ class OpenApiConfiguration {
               "/api/v1/events",
               "/api/v1/people",
               "/api/v1/config-versions",
+              "/api/v1/config-versions/{versionId}/jev-prompts",
               "/api/v1/saved-searches")) {
         var op = api.getPaths().get(path).getPost();
         var original = op.getResponses().get("200");
@@ -262,14 +264,16 @@ class OpenApiConfiguration {
                               List.of("김예시"),
                               "guidance",
                               "맥락과 범위를 함께 확인하세요.",
-                              "jevPrompt",
-                              "입력에 개인을 식별할 수 있는 정보가 포함되어 있는지 판단하세요.\n맥락을 함께 확인하세요.",
+                              "jevThreshold",
+                              0.8,
                               "pythonRegex",
                               "(?i)(?P<email>[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,})",
                               "color",
                               "#315EA8",
                               "order",
-                              0)),
+                              0,
+                              "enabled",
+                              true)),
                       "policyStates",
                       List.of(
                           Map.of(
@@ -283,6 +287,36 @@ class OpenApiConfiguration {
                               "#C68524",
                               "order",
                               0)))));
+      var jevExample =
+          new Example()
+              .value(
+                  Map.of(
+                      "revision",
+                      2,
+                      "name",
+                      "개인정보 판단",
+                      "prompt",
+                      "개인 식별 정보 여부를 판단하고 해당 출력 태그를 선택하세요.\n맥락을 확인하세요.",
+                      "outputs",
+                      List.of(Map.of("tagId", "pii", "threshold", 0.8)),
+                      "enabled",
+                      true));
+      media(api, "/api/v1/config-versions/{versionId}/jev-prompts")
+          .addExamples("판단 프롬프트와 출력 태그 추가", jevExample);
+      var jevItem =
+          api.getPaths().get("/api/v1/config-versions/{versionId}/jev-prompts/{promptId}");
+      jevItem
+          .getPut()
+          .getRequestBody()
+          .getContent()
+          .get("application/json")
+          .addExamples("판단 프롬프트와 출력 태그 저장", jevExample);
+      jevItem
+          .getDelete()
+          .getRequestBody()
+          .getContent()
+          .get("application/json")
+          .addExamples("판단 프롬프트 삭제", new Example().value(Map.of("revision", 3)));
       api.getPaths()
           .get("/api/v1/config-versions/{id}/tags/{tagId}")
           .getPut()
@@ -299,9 +333,10 @@ class OpenApiConfiguration {
                           "description", "개인 식별 정보",
                           "examples", List.of("김예시"),
                           "guidance", "맥락과 범위를 함께 확인하세요.",
-                          "jevPrompt", "개인을 식별할 수 있는 정보인지 판단하세요.\n맥락을 함께 확인하세요.",
+                          "jevThreshold", 0.8,
                           "pythonRegex", "(?i)(?P<email>[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,})",
-                          "color", "#315EA8")));
+                          "color", "#315EA8",
+                          "enabled", true)));
     };
   }
 
@@ -331,18 +366,17 @@ class OpenApiConfiguration {
                 ._default("#64748B")
                 .description("#RRGGBB 색상. 대문자로 저장하며 생략·null·빈 값이면 #64748B입니다."));
     details.addRequiredItem("name");
-    api.getComponents()
-        .getSchemas()
-        .get("Tag")
-        .addProperty(
-            "jevPrompt",
-            nullableString()
-                .maxLength(12000)
-                ._default("")
-                .description(
-                    "태그별 Jev 판단 프롬프트. 최대 12000 Unicode code point이며 공백과 줄바꿈을 그대로 보존합니다."
-                        + " 입력에서 생략하거나 null이면 빈 문자열로 저장하고 응답은 항상 문자열입니다."
-                        + " guidance와 별개이며 부모 프롬프트를 상속하지 않습니다. 저장·조회만 하며 Jev를 실행하지 않습니다."));
+    var threshold =
+        new Schema<>()
+            .types(new LinkedHashSet<>(List.of("number", "null")))
+            .minimum(java.math.BigDecimal.ZERO)
+            .maximum(java.math.BigDecimal.ONE)
+            .multipleOf(new java.math.BigDecimal("0.000001"))
+            .description(
+                "태그의 공통 Jev 출력 임계값. null은 임계값 사용 안 함이며 0은 유효한 값입니다."
+                    + " 소수점 아래 최대 6자리만 허용하며 초과 자릿수는 반올림하지 않고 거부합니다."
+                    + " 같은 태그를 출력하는 모든 Jev 프롬프트에 공통으로 적용하며 다른 버전은 바꾸지 않습니다.");
+    api.getComponents().getSchemas().get("Tag").addProperty("jevThreshold", threshold);
     api.getComponents()
         .getSchemas()
         .get("Tag")
@@ -356,8 +390,68 @@ class OpenApiConfiguration {
                         + " 입력에서 생략하거나 null이면 빈 문자열로 저장하고 응답은 항상 문자열입니다. 부모 패턴을 상속하지 않습니다. 대시보드에서는"
                         + " 문법 검사나 실행을 하지 않으며 Python 문법의 유효성은 탐지기가 판단합니다."));
     var tag = api.getComponents().getSchemas().get("Tag");
-    details.addProperty("jevPrompt", (Schema<?>) tag.getProperties().get("jevPrompt"));
+    tag.addProperty(
+            "enabled",
+            new BooleanSchema().description("선택한 버전의 태그 사용 여부. 부모·자식과 독립적이며 비활성 태그도 조회에 포함합니다."))
+        .addRequiredItem("enabled");
+    var tagInput = api.getComponents().getSchemas().get("TagInput");
+    tagInput
+        .additionalProperties(false)
+        .addProperty("jevThreshold", (Schema<?>) tag.getProperties().get("jevThreshold"))
+        .addProperty("pythonRegex", (Schema<?>) tag.getProperties().get("pythonRegex"))
+        .addProperty(
+            "enabled",
+            nullableBoolean().description("생략하거나 null이면 같은 버전·같은 ID의 기존 값을 유지하며 새 태그는 true입니다."));
+    details.addProperty("jevThreshold", (Schema<?>) tag.getProperties().get("jevThreshold"));
     details.addProperty("pythonRegex", (Schema<?>) tag.getProperties().get("pythonRegex"));
+    details.addProperty(
+        "enabled", nullableBoolean().description("생략하거나 null이면 선택한 버전의 기존 enabled 값을 유지합니다."));
+    var schemas = api.getComponents().getSchemas();
+    var prompt =
+        new StringSchema()
+            .maxLength(12000)
+            .description(
+                "독립적인 Jev 판단 프롬프트. 최대 12000 Unicode code point이며 공백·줄바꿈을 그대로 보존합니다."
+                    + " 생략하거나 null이면 빈 문자열이며 빈 값도 저장할 수 있습니다. 저장·조회만 하며 Jev를 실행하지 않습니다.");
+    schemas
+        .get("JevPrompt")
+        .description("선택한 버전의 독립적인 Jev 판단 프롬프트. 출력 tagIds는 같은 버전의 기존 태그를 참조합니다.")
+        .addProperty("prompt", prompt)
+        .addProperty(
+            "tagIds", new ArraySchema().maxItems(1000).uniqueItems(true).items(new StringSchema()))
+        .addProperty(
+            "enabled",
+            new BooleanSchema()
+                .description("선택한 버전의 프롬프트 사용 여부. 출력 태그의 enabled와 독립적이며 출력 연결은 유지합니다."))
+        .addRequiredItem("enabled");
+    var save = schemas.get("SaveJevPrompt");
+    save.description(
+            "초안과 게시 버전의 Jev 프롬프트를 저장합니다. 출력 태그를 새로 만들지 않으며 트리 구조는 바꾸지 않습니다."
+                + " 새 프롬프트 추가는 버전당 최대 100개입니다. 기존 데이터 마이그레이션과 복제는 모든 정의를 보존합니다."
+                + " 출력에서 제외한 태그와 그 임계값은 유지합니다. 알 수 없는 필드는 400입니다.")
+        .additionalProperties(false)
+        .addProperty("name", new StringSchema().minLength(1).maxLength(80))
+        .addProperty(
+            "prompt",
+            nullableString().maxLength(12000)._default("").description(prompt.getDescription()))
+        .addProperty(
+            "outputs",
+            new ArraySchema()
+                .maxItems(1000)
+                .items(new Schema<>().$ref("#/components/schemas/JevOutput"))
+                .description("같은 버전의 기존 태그. tagId 중복은 허용하지 않으며 빈 목록은 허용합니다."))
+        .addProperty(
+            "enabled",
+            nullableBoolean().description("생략하거나 null이면 새 프롬프트는 true이며 기존 프롬프트는 기존 값을 유지합니다."));
+    save.addRequiredItem("name");
+    save.addRequiredItem("outputs");
+    schemas
+        .get("JevOutput")
+        .additionalProperties(false)
+        .addProperty("tagId", new StringSchema().pattern("^[A-Za-z0-9_-]{1,80}$"))
+        .addProperty("threshold", threshold)
+        .addRequiredItem("tagId");
+    schemas.get("DeleteJevPrompt").additionalProperties(false);
   }
 
   private static void detectorSchemas(OpenAPI api) {
@@ -377,6 +471,10 @@ class OpenApiConfiguration {
 
   private static Schema<?> nullableString() {
     return new Schema<>().types(new LinkedHashSet<>(List.of("string", "null")));
+  }
+
+  private static Schema<?> nullableBoolean() {
+    return new Schema<>().types(new LinkedHashSet<>(List.of("boolean", "null")));
   }
 
   private static void parameter(

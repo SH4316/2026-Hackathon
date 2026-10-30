@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
     routes = ["/", "/events", "/events/1", "/people", "/people/demo-person", "/settings/metrics",
-              "/settings/monitoring", "/saved-searches", "/saved-searches/demo-snapshot"]
+              "/settings/jev", "/settings/monitoring", "/saved-searches", "/saved-searches/demo-snapshot"]
     html = None
     for route in routes:
         status, content_type, body = fetch(base, route)
@@ -56,12 +56,24 @@ def main():
     assert specification["servers"][0]["url"] == "/"
     for path in ["/api/v1/config-versions", "/api/v1/classifier-config", "/api/v1/events",
                  "/api/v1/config-versions/{id}/tags/{tagId}",
+                 "/api/v1/config-versions/{versionId}/jev-prompts",
+                 "/api/v1/config-versions/{versionId}/jev-prompts/{promptId}",
                  "/api/v1/metrics", "/api/v1/people", "/api/v1/saved-searches"]:
         assert path in specification["paths"], f"OpenAPI route absent: {path}"
+    schemas = specification["components"]["schemas"]
+    for name in ["Tag", "JevPrompt"]:
+        schema = schemas[name]
+        assert schema["properties"]["enabled"]["type"] == "boolean", f"{name}.enabled must be a response boolean"
+        assert "enabled" in schema.get("required", []), f"{name}.enabled response must be required"
+    for name in ["TagInput", "UpdateTagDetails", "SaveJevPrompt"]:
+        schema = schemas[name]
+        assert set(schema["properties"]["enabled"]["type"]) == {"boolean", "null"}, f"{name}.enabled must accept boolean/null"
+        assert "enabled" not in schema.get("required", []), f"{name}.enabled input must remain optional"
     jar_hash = None
     if args.jar:
         with zipfile.ZipFile(args.jar) as archive:
             assert "BOOT-INF/classes/static/index.html" in archive.namelist()
+            assert "BOOT-INF/classes/db/migration/V8__detection_enabled_flags.sql" in archive.namelist(), "V8 enabled migration missing from JAR"
             assert not any("afterMigrate__demo.sql" in name for name in archive.namelist()), "development seed leaked into JAR"
             for asset in assets:
                 assert "BOOT-INF/classes/static" + asset in archive.namelist(), f"asset missing from JAR: {asset}"
@@ -70,7 +82,10 @@ def main():
               "baseUrl": base, "spaRoutes": routes, "assets": assets,
               "missingResourcesReturn404": True, "apiReturnsJson": True,
               "swaggerUiServed": True, "openApiRelativeServer": True, "devSqlExcludedFromJar": True,
-              "jarSha256": jar_hash}
+              "jarSha256": jar_hash,
+              "enabledContract": {"requiredBooleanResponses": ["Tag", "JevPrompt"],
+                                  "optionalNullableBooleanInputs": ["TagInput", "UpdateTagDetails", "SaveJevPrompt"],
+                                  "V8IncludedInJar": bool(args.jar)}}
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
