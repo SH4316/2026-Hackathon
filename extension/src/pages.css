@@ -3,7 +3,7 @@
    Brand System v1.2 | Deep Navy Dark + Light Mode Support
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+/* System fonts are available while offline; no remote font requests. */
 
 :root {
   /* Base */
@@ -344,3 +344,22 @@ button[type="submit"] { background: var(--sp-blue); border-color: var(--sp-blue)
 .pill { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--sp-bg-sub); }
 .pill[data-state="ok"] { background: var(--sp-green-bg); color: var(--sp-green); }
 .pill[data-state="error"] { background: var(--sp-red-bg); color: var(--sp-red); }
+
+/* Inspection switches share the existing SafePrompt surface and color tokens. */
+.inspection-controls .sp-toggle-row { margin-top: 0; min-height: 28px; }
+.sp-help { color: var(--sp-text-secondary); font-size: 12px; line-height: 1.5; margin: 8px 0 0; }
+#aiStatus { font-weight: 600; }
+#aiProgress { width: 100%; height: 8px; margin-top: 10px; accent-color: var(--sp-blue); }
+#aiRetry { margin-top: 10px; }
+#inspectionMode { padding-top: 10px; border-top: 1px solid var(--sp-border-faint); }
+.sp-switch input { width: 38px; height: 22px; margin: 0; cursor: pointer; z-index: 1; inset: 0; }
+.sp-switch input:focus-visible + .sp-switch-track { outline: 2px solid var(--sp-blue); outline-offset: 4px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--sp-blue); outline-offset: 3px; }
+button:disabled { opacity: .55; cursor: default; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Keep support text readable in both system themes. */
+.sp-detail, .sp-hint { color: var(--sp-text-secondary); }

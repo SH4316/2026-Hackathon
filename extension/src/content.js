@@ -1,7 +1,7 @@
 // 입력 감지 → 검사 → 전송 가로채기.
 // - 입력이 바뀌면 이전 결과를 무효화하고(input_version), 늦게 온 응답은 버린다.
 // - 전송 시점의 텍스트와 검사한 텍스트가 정확히 같고 '검사 완료 + allow' 일 때만 그대로 보낸다.
-// - 서버 오류·시간 초과는 전송을 보류한다(자동 폴백 없음).
+// - 선택한 검사 방식의 완료 결과만 사용한다. 기기 내 AI를 켜면 서버 연결 없이도 검사한다.
 // - 브라우저 안의 규칙 엔진(PG.local)은 입력 즉시 위험을 알려 주는 '임시 표시'일 뿐, 전송 근거가 되지 않는다.
 // - 테스트 모드: 어떤 경우에도 실제로 전송하지 않고, 진단 패널에 감지·가로채기 결과를 보여 준다.
 (() => {
@@ -14,9 +14,10 @@
   const SETTLE_MS = 500;
 
   let enabled = true;
+  let settingsVersion = 0;
   let editor = null;
   let version = 0;
-  let latest = null; // { version, text, result, error } 서버 검사 결과
+  let latest = null; // { version, text, result, error } 선택한 검사 방식의 결과
   let localEntry = null; // { text, result } 브라우저 규칙 엔진의 임시 결과
   let bypass = null; // { text, until } 사용자가 승인한 다음 1회 전송
   let prepared = null; // 정제 결과 { original, sanitized, result, entries, verified }
@@ -50,10 +51,16 @@
     setTestMode(!!r?.data?.testMode);
   });
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.enabled) {
-      enabled = changes.enabled.newValue !== false;
-      refresh();
+    if (changes.enabled) enabled = changes.enabled.newValue !== false;
+    if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey"].some((key) => changes[key])) {
+      settingsVersion++;
+      version++;
+      latest = null; bypass = null; prepared = null;
+      PG.ui.closeModal();
+      if (editor) scheduleInspect(editor);
+      else refresh();
     }
+    if (changes.aiState && ["ready", "error"].includes(changes.aiState.newValue?.phase) && editor) scheduleInspect(editor);
     if (changes.testMode) setTestMode(!!changes.testMode.newValue);
   });
 
@@ -187,7 +194,9 @@
     else if (lamp === "yellow") chip = `Tier 2 주의${sum ? ` · ${sum}` : ""}`;
     else if (lamp === "green") chip = prep ? "안전: 정제 완료 (Safe to Send)" : "Tier 3 안전 · 검사 통과";
     else if (lamp === "gray") chip = latest?.error ? "검사 불가 · 전송 보류" : "검사 미완료 · 전송 보류";
-    if (provisional) chip += " (서버 확인 중)";
+    if (provisional) chip += " (검사 확인 중)";
+    else if (result?.inspection_source === "local_ai") chip += " · 기기 내 검사";
+    else if (result?.inspection_source === "server_and_local_ai") chip += " · 서버 + 기기 내 AI";
 
     const serverResult = !prep && latest && latest.text === text ? latest.result : null;
     const complete = serverResult?.status === "complete";
@@ -200,7 +209,11 @@
       visible: hasText || !!notice,
       lamp,
       chip,
-      reason: lamp === "idle" ? "" : destinationText(result?.destination),
+      reason: lamp === "idle" ? "" : [destinationText(result?.destination),
+        result?.ai_assessment?.decision !== "allow" && result?.ai_assessment
+          ? "AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다." : "",
+        result?.notices?.includes("server_unavailable_local_check") ? "서버 연결 실패 · 기기 내 AI와 기본 규칙으로 검사했습니다." : "",
+      ].filter(Boolean).join(" "),
       preview: prep ? previewOf(prep, text) : null,
       busy,
       canSanitize,
@@ -316,11 +329,12 @@
     setTimeout(() => { if (!getText(ed).trim()) refresh(); }, 400);
   }
 
-  function triggerSend(ed, text) {
+  function triggerSend(ed, text, approvedSettings = settingsVersion) {
+    if (approvedSettings !== settingsVersion) return;
     if (testMode) { dryRun(ed, "승인 후 전송"); return; }
     const wait = SETTLE_MS - (Date.now() - lastProgrammaticSet);
     if (wait > 0) {
-      setTimeout(() => { if (getText(ed) === text) triggerSend(ed, text); }, wait);
+      setTimeout(() => { if (getText(ed) === text) triggerSend(ed, text, approvedSettings); }, wait);
       return;
     }
     afterSend(ed);
@@ -334,13 +348,14 @@
   }
 
   function openWarning(ed, entry) {
+    const approvedSettings = settingsVersion;
     PG.ui.showWarning({
       text: entry.text,
       result: entry.result,
       error: entry.error,
       onRetry: () => { PG.ui.closeModal(); gate(ed, entry.text); },
       onSendAnyway: () => {
-        if (getText(ed) === entry.text) triggerSend(ed, entry.text);
+        if (getText(ed) === entry.text) triggerSend(ed, entry.text, approvedSettings);
       },
       // 정제는 위젯의 '안전 다듬기' 한 경로로만 한다(경고 창 → 별도 정제 창 경로는 중복이라 제거).
       // 경고 창을 닫고 위젯에서 미리보기 → [입력창에 넣기] → 사용자가 직접 전송.
@@ -364,11 +379,12 @@
     try {
       const entry = latest && latest.text === text && latest.result ? latest : await inspect(text);
       if (!entry?.result) { setNotice(`정제하지 못했습니다. ${PG.errorLabel(entry?.error || "network")}`, "warn"); return; }
+      const v = ++version;
       const res = await chrome.runtime.sendMessage({
-        type: "sanitize", text, inputVersion: ++version, destination: PG.resolveDestination(),
+        type: "sanitize", text, inputVersion: v, destination: PG.resolveDestination(),
       }).catch(() => ({ ok: false, error: "network" }));
       if (!res?.ok) { setNotice(`정제하지 못했습니다. ${PG.errorLabel(res?.error)}`, "warn"); return; }
-      if (getText(ed) !== text) return; // 정제하는 사이 입력이 바뀜
+      if (getText(ed) !== text || version !== v) return; // 입력·검사 설정이 바뀐 정제 결과는 폐기
       const result = res.data;
       if (result.sanitized_text == null) { setNotice("정제하지 못했습니다.", "warn"); return; }
       const built = PG.restore.buildTokenMap(text, entry.result.findings, result.sanitized_text);
@@ -408,12 +424,14 @@
     const text = getText(ed);
     const result = latest && latest.text === text ? latest.result : null;
     if (!result || result.status !== "complete") return;
+    const approvedSettings = settingsVersion;
     PG.ui.showForce({
+      aiAssessment: result.ai_assessment,
       findings: result.findings.filter((f) => f.action !== "allow"),
       onConfirm: () => {
         if (getText(ed) !== text) return;
         stat("forced");
-        triggerSend(ed, text);
+        triggerSend(ed, text, approvedSettings);
       },
     });
   }

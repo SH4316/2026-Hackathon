@@ -379,7 +379,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     return h("div", { class: "notice" }, lines.map((l) => h("p", null, l)));
   }
 
-  const FINE = "판정은 현재 조직 정책 기준이며 안전을 보장하지 않습니다. 검사 서버는 원문을 저장하지 않습니다.";
+  const FINE = "판정은 선택한 검사 방식의 기준이며 안전을 보장하지 않습니다. 기기 내 AI는 원문을 저장하거나 외부로 보내지 않습니다.";
 
   // ── 경고 화면 ──
   // opts: { text, result?, error?, onSanitize, onSendAnyway, onRetry }
@@ -390,7 +390,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       openModal(h("div", { class: "card" },
         header("gray", "!", "검사를 완료하지 못해 전송을 보류했습니다", PG.errorLabel(error)),
         h("div", { class: "body" },
-          notices(null, "검사 서버가 정상일 때 다시 시도하세요. 검사 없이 자동으로 전송하지 않습니다.")),
+          notices(null, "설정에서 검사 방식과 AI 준비 상태를 확인한 뒤 다시 시도하세요. 검사를 완료하기 전에는 전송하지 않습니다.")),
         h("div", { class: "foot" },
           h("button", { onclick: closeModal }, "닫기"),
           h("button", { class: "primary", onclick: opts.onRetry }, "다시 검사"))));
@@ -411,7 +411,9 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
 
     const summary = relevant.length
       ? `${relevant.length}개 항목이 발견되었습니다.`
-      : "탐지된 항목은 없지만 전송 대상의 정책상 확인이 필요합니다.";
+      : result.ai_assessment && result.ai_assessment.decision !== "allow"
+        ? "기기 내 AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다."
+        : "탐지된 항목은 없지만 전송 대상의 정책상 확인이 필요합니다.";
 
     const ack = canSendAnyway
       ? h("label", { class: "ack" },
@@ -494,6 +496,8 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     openModal(h("div", { class: "card" },
       header("red", "!", "민감정보를 그대로 외부 AI에 보냅니다", "이 선택은 이 전송 한 번에만 적용됩니다."),
       h("div", { class: "body" },
+        opts.aiAssessment && opts.aiAssessment.decision !== "allow"
+          ? notices(null, "기기 내 AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다.") : null,
         opts.findings?.length ? h("div", null, h("p", { class: "section-title" }, "보내지는 민감정보"), findingList(opts.findings)) : null,
         h("label", { class: "ack" },
           h("input", { type: "checkbox", onchange: (e) => { confirmBtn.disabled = !e.target.checked; } }),

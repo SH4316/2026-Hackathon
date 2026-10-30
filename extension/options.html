@@ -7,6 +7,23 @@
 </head>
 <body class="options">
   <h1>Prompt Guard 설정</h1>
+  <section class="sp-card inspection-controls" aria-label="검사 방식">
+    <label class="sp-toggle-row">
+      <span class="sp-label">서버 검사</span>
+      <span class="sp-switch"><input id="serverEnabled" type="checkbox" role="switch"><span class="sp-switch-track"></span></span>
+    </label>
+    <div class="sp-divider"></div>
+    <label class="sp-toggle-row">
+      <span class="sp-label">기기 내 AI 검사</span>
+      <span class="sp-switch"><input id="localAiEnabled" type="checkbox" role="switch" aria-describedby="aiHelp"><span class="sp-switch-track"></span></span>
+    </label>
+    <p id="aiHelp" class="sp-help">처음 켤 때 모델 약 266 MB를 다운로드합니다. 이후에는 인터넷 없이 사용할 수 있습니다.</p>
+    <p id="aiStatus" class="sp-help" role="status" aria-live="polite">상태 확인 중…</p>
+    <progress id="aiProgress" aria-label="AI 모델 다운로드" hidden></progress>
+    <button id="aiRetry" type="button" hidden>모델 준비 다시 시도</button>
+    <p id="inspectionMode" class="sp-help"></p>
+  </section>
+  <p class="muted small">검사 방식 스위치는 즉시 적용됩니다. 기기 내 AI는 개인정보 유무를 판단하며, 사내 사용자 규칙은 서버 검사에 적용됩니다.</p>
   <form id="form">
     <label>검사 서버 주소
       <input id="serverUrl" type="url" required placeholder="http://127.0.0.1:8000">
@@ -36,6 +53,6 @@
       <span id="msg" class="muted" role="status"></span>
     </div>
   </form>
-  <script src="src/options.js"></script>
+  <script type="module" src="src/options.js"></script>
 </body>
 </html>
