@@ -13,7 +13,7 @@ const EMP = { id: "my_emp", label: "사번", pattern: "(?<![A-Z0-9])EMP-\\d{6}(?
               token: "MY_EMP_ID", case_sensitive: true, enabled: true };
 
 test("서버 사용자 규칙과 같은 정규식 제한을 적용한다", () => {
-  for (const bad of ["(a+)+", "(?P<x>a)", "(?i)abc", "\\1", "a*", "x{301}".repeat(80)]) {
+  for (const bad of ["(a+)+", "(?P<x>a)", "(?i)abc", "\\1", "a*", "x".repeat(4001)]) {
     assert.throws(() => checkPattern(bad), undefined, bad);
   }
   assert.throws(() => checkPattern("[unclosed"), /문법 오류/);
@@ -72,4 +72,23 @@ test("정제: block 규칙은 치환하지 않고 남은 항목으로 돌려준�
 test("브라우저 엔진에도 개인 규칙이 들어간다", () => {
   const r = localGuard([EMP]).inspect("EMP-123456", { destination: dest });
   assert.deepEqual(r.findings.map((f) => f.type), ["my_emp"]);
+});
+
+
+test("개인 패턴 길이 4000자는 허용하고 4001자는 거부한다", () => {
+  assert.ok(checkPattern("x".repeat(4000)));
+  assert.throws(() => checkPattern("x".repeat(4001)), /4000/);
+});
+
+test("서버 custom_rules와 조직 정규식을 즉시 검사에 쓰며 Python 전용 문법은 기록하고 건너뛴다", () => {
+  const bundle = { ruleset_version: 42, modules: { custom_rules: true }, context_detectors: [],
+    custom_rules: [{ id: "distributed", label: "서버 배포", kind: "keywords", keywords: ["배포비밀"], action: "block", token: "DIST" }],
+    org_rules: { tag_action: "mask", regex: [
+      { tag_id: "org1", type: "org1", name: "조직 사번", token: "ORG1", pattern: "ORG-\\d{4}" },
+      { tag_id: "org2", type: "org2", name: "Python 규칙", token: "ORG2", pattern: "(?P<python>secret)" },
+    ] } };
+  const guard = localGuard([], bundle);
+  assert.equal(guard.inspect("배포비밀").decision, "block");
+  assert.equal(guard.inspect("ORG-１２３４").findings[0].type, "org1");
+  assert.equal(guard.skippedRules[0].id, "org2");
 });

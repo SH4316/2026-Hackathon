@@ -12,10 +12,12 @@ export async function initAIControls() {
 
   function render() {
     const org = !!settings.linkedClient?.managed;
+    const master = document.getElementById("enabled");
+    if (master) { master.checked = settings.enabled || org; master.disabled = org; }
     server.checked = settings.serverEnabled || org;
     server.disabled = org; // 조직 관리 중에는 서버 검사(대시보드 규칙)를 끌 수 없다
     ai.checked = settings.localAiEnabled;
-    const phase = !settings.localAiEnabled || !settings.enabled ? "off" : current.phase;
+    const phase = !settings.localAiEnabled || (!settings.enabled && !org) ? "off" : current.phase;
     const messages = {
       off: settings.localAiEnabled ? "전체 검사가 꺼져 있습니다." : "꺼짐 · 켜면 모델을 준비합니다.",
       idle: "AI 모델 준비를 시작합니다…",
@@ -30,8 +32,8 @@ export async function initAIControls() {
     progress.hidden = phase !== "downloading";
     progress.max = current.total || 265651170;
     progress.value = current.loaded || 0;
-    retry.hidden = !settings.localAiEnabled || !settings.enabled || !["error", "idle"].includes(phase);
-    mode.textContent = !settings.enabled ? "전체 검사가 꺼져 있어 전송을 검사하지 않습니다."
+    retry.hidden = !settings.localAiEnabled || (!settings.enabled && !org) || !["error", "idle"].includes(phase);
+    mode.textContent = !settings.enabled && !org ? "전체 검사가 꺼져 있어 전송을 검사하지 않습니다."
       : org ? `조직 관리 · ${settings.linkedClient.label}: 조직 서버(대시보드 규칙)${settings.localAiEnabled
         ? "와 기기 내 AI가 함께" : "가"} 검사합니다. 서버에 연결할 수 없으면 전송을 보류합니다.`
       : settings.serverEnabled && settings.localAiEnabled ? "서버와 기기 내 AI가 함께 검사합니다. 서버 연결 실패 시 기기 내 검사로 계속합니다."

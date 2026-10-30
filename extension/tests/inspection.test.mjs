@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { runInspection } from "../src/inspection.js";
+import { localGuard } from "../src/personal.js";
 import { createGuard } from "../vendor/prompt-guard-rules/src/index.js";
 
 const guard = createGuard();
@@ -127,4 +128,19 @@ test("org-managed: server (dashboard rules) and local AI are combined, stricter 
   assert.equal(strictAI.data.inspection_source, "server_and_local_ai");
   const strictServer = await run({ settings, server: async () => ({ ok: true, data: { ...base, decision: "warn" } }) });
   assert.equal(strictServer.data.decision, "warn");
+});
+
+
+test("distributed organization and custom rules survive serverless AI inspection", async () => {
+  const guard = localGuard([], { ruleset_version: 2, custom_rules: [
+    { id: "distributed", label: "배포 규칙", token: "DISTRIBUTED", action: "block", kind: "keywords", keywords: ["합성기밀"] },
+  ], context_detectors: [], org_rules: { tag_action: "block", regex: [
+    { type: "org", name: "조직 코드", token: "ORG", pattern: "ORG-\\d{4}" },
+  ] } });
+  for (const text of ["합성기밀", "ORG-１２３４"]) {
+    const r = await run({ guard, request: { ...request, text }, settings: { serverEnabled: false, localAiEnabled: true },
+      server: () => assert.fail("server must stay off") });
+    assert.equal(r.data.decision, "block");
+    assert.equal(r.data.inspection_source, "local_ai");
+  }
 });

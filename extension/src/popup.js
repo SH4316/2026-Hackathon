@@ -5,8 +5,8 @@ const detailEl = document.getElementById("detail");
 const enabledEl = document.getElementById("enabled");
 
 const testModeEl = document.getElementById("testMode");
-chrome.storage.local.get({ enabled: true, testMode: false }).then(({ enabled, testMode }) => {
-  enabledEl.checked = enabled;
+chrome.storage.local.get({ enabled: true, testMode: false, linkedClient: null }).then(({ enabled, testMode, linkedClient }) => {
+  enabledEl.checked = enabled || !!linkedClient?.managed;
   testModeEl.checked = testMode;
 });
 enabledEl.addEventListener("change", () => chrome.storage.local.set({ enabled: enabledEl.checked }));

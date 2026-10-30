@@ -5,6 +5,7 @@
   "description": "프롬프트를 기기 내 AI와 선택한 검사 서버로 확인하고 민감정보 전송을 제어합니다.",
   "permissions": [
     "storage",
+    "alarms",
     "offscreen",
     "unlimitedStorage"
   ],

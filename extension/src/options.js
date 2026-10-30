@@ -4,11 +4,11 @@ const $ = (id) => document.getElementById(id);
 const msg = $("msg");
 
 chrome.storage.local
-  .get({ serverUrl: "http://127.0.0.1:8000", apiKey: "", enabled: true, testMode: false, blockUnscannableFiles: false })
+  .get({ serverUrl: "http://127.0.0.1:8000", apiKey: "", enabled: true, linkedClient: null, testMode: false, blockUnscannableFiles: false })
   .then((s) => {
     $("serverUrl").value = s.serverUrl;
     $("apiKey").value = s.apiKey;
-    $("enabled").checked = s.enabled;
+    $("enabled").checked = s.enabled || !!s.linkedClient?.managed;
     $("blockUnscannableFiles").checked = s.blockUnscannableFiles;
     $("testMode").checked = s.testMode;
   });
