@@ -1,6 +1,7 @@
 """검사·정제 오케스트레이션.
 
-규칙 탐지 + (선택) 모델 탐지 → 병합 → 정책(목적지 등급으로 강화) → 판단.
+내장 규칙 + 사용자 규칙 모듈 + 문맥(로컬 모델) 모듈 → 병합 → 정책(목적지 등급으로 강화) → 판단.
+사용자 규칙·문맥 탐지기·모듈 조합은 대시보드에서 편집하는 ruleset 에서 온다(버전별로 컴파일해 캐시).
 검사 오류·모델 오류·시간 초과는 절대 allow 로 귀결되지 않는다.
 """
 
@@ -15,9 +16,12 @@ from app.audit.events import AuditEvent, AuditStore, count
 from app.config import ModelMode, Settings
 from app.detection.base import Candidate
 from app.detection.merge import Merged, merge
-from app.detection.model import ModelUnavailable, OllamaDetector
+from app.detection.custom import CustomRuleDetector
+from app.detection.model import ContextModelDetector, ModelUnavailable
 from app.detection.rules import RuleDetector
-from app.policy.engine import Destination, Policy, Tier, decide
+from app.policy.engine import Destination, Policy, Tier, TypePolicy, decide
+from app.registry.schema import ContextDetector, RuleSet, RuleSetBody
+from app.registry.store import StaticRuleSet, load_seed
 from app.sanitize.replacer import Replacement, apply, assign_tokens
 from app.schemas import (
     Action, Change, Decision, DestinationOut, Finding, InspectRequest, InspectResponse,
@@ -41,20 +45,55 @@ def utf16_index(text: str, idx: int) -> int:
     return len(text[:idx].encode("utf-16-le")) // 2
 
 
+@dataclass(frozen=True)
+class CompiledRuleSet:
+    ruleset: RuleSet
+    policy: Policy
+    custom: CustomRuleDetector
+    context: list[ContextDetector]  # 켜진 문맥 탐지기(모듈이 꺼져 있으면 빈 목록)
+
+
+def compile_ruleset(base: Policy, rs: RuleSet) -> CompiledRuleSet:
+    items = [*rs.custom_rules, *rs.context_detectors]
+    policy = base.with_custom_types({
+        i.id: TypePolicy(category=i.category, severity=i.severity, action=i.action, token=i.token)
+        for i in items})
+    custom = CustomRuleDetector(rs.custom_rules if rs.modules.custom_rules else [])
+    context = [d for d in rs.context_detectors if d.enabled] if rs.modules.context_model else []
+    return CompiledRuleSet(rs, policy, custom, context)
+
+
 class Pipeline:
     def __init__(self, settings: Settings, policy: Policy, audit: AuditStore,
-                 rules: RuleDetector | None = None, model: OllamaDetector | None = None,
-                 today: Callable[[], date] = date.today) -> None:
+                 rules: RuleDetector | None = None, model: ContextModelDetector | None = None,
+                 today: Callable[[], date] = date.today, ruleset_source=None) -> None:
         self.settings = settings
-        self.policy = policy
+        self.base_policy = policy
         self.audit = audit
         self.rules = rules or RuleDetector()
         self.model = model
         self.today = today  # 목적지 근거 만료 판단용(테스트·골든 벡터에서 고정)
+        if ruleset_source is None:
+            seed = load_seed(policy.detectors_seed_path) if policy.detectors_seed_path else RuleSetBody()
+            ruleset_source = StaticRuleSet(seed)
+        self.ruleset_source = ruleset_source  # current() -> RuleSet
+        self._compiled: CompiledRuleSet | None = None
+
+    @property
+    def compiled(self) -> CompiledRuleSet:
+        rs = self.ruleset_source.current()
+        if self._compiled is None or self._compiled.ruleset.version != rs.version:
+            self._compiled = compile_ruleset(self.base_policy, rs)
+        return self._compiled
+
+    @property
+    def policy(self) -> Policy:
+        """내장 유형 + 현재 ruleset 의 사용자 유형을 합친 정책."""
+        return self.compiled.policy
 
     @property
     def detector_versions(self) -> dict[str, str]:
-        v = {"rules": self.rules.version}
+        v = {"rules": self.rules.version, "ruleset": f"rs-{self.compiled.ruleset.version}"}
         if self.model is not None and self.settings.model_mode is not ModelMode.DISABLED:
             v["model"] = self.model.version
         return v
@@ -65,19 +104,20 @@ class Pipeline:
                                                 today=self.today())
 
     async def analyze(self, text: str, tier: Tier) -> Analysis:
-        candidates: list[Candidate] = self.rules.detect(text)
+        c = self.compiled
+        candidates: list[Candidate] = self.rules.detect(text) + c.custom.detect(text)
         notices: list[str] = []
         status = Status.COMPLETE
         mode = self.settings.model_mode
         model_mandatory = mode is ModelMode.REQUIRED or self.policy.model_required
 
-        if mode is ModelMode.DISABLED or self.model is None:
+        if mode is ModelMode.DISABLED or self.model is None or not c.context:
             if self.policy.model_required:
                 status = Status.INCOMPLETE
                 notices.append("model_check_required_but_disabled")
         else:
             try:
-                candidates += await self.model.detect(text)
+                candidates += await self.model.detect(text, c.context, c.ruleset.prompt_template)
             except ModelUnavailable:
                 status = Status.ERROR if model_mandatory else Status.INCOMPLETE
                 notices.append("model_check_failed")

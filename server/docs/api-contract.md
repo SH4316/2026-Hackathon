@@ -48,6 +48,11 @@ api_free, cloud, self_hosted). 생략하거나 모르는 값이면 기본 등급
 응답: `sanitized_text`, `changes[]`(type, token, count), `remaining_findings[]`, 재검사 기준 `decision`/`signal`.
 `action=block` 구간(예: 반출 금지 자료)은 치환하지 않으므로 정제 후에도 차단됨.
 
+## GET /v1/rules/bundle
+
+클라이언트 배포용 규칙 묶음(ETag, `If-None-Match` → 304). 대시보드 관리 API 와 함께 [detection-modules.md](detection-modules.md) 참고.
+응답 `detector_versions.ruleset` 은 판정에 쓴 ruleset 버전(`rs-<n>`)입니다.
+
 ## GET /v1/audit/events?limit=&since=
 
 대시보드용 원문 없는 이벤트. 서버 판정 기록이며 실제 전송·차단 결과가 아님.

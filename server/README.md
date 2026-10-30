@@ -92,6 +92,12 @@ python -m prompt_guard inspect                                  # 대화형 입�
 | green | `status=complete` 이고 `decision=allow`. 현재 정책 통과일 뿐 절대 안전 보장이 아님 |
 | gray | `status` 가 `incomplete`/`error` — 전송 보류. 이때 `decision` 은 절대 `allow` 가 아님 |
 
+## 탐지 모듈·대시보드 규칙 관리
+
+내장 규칙 외에 대시보드에서 **사용자 규칙(키워드·정규식)**과 **문맥 탐지기(정규식으로 판단할 수 없는 기준을 로컬 모델로 판단)**를
+추가·조합하고, 바뀐 규칙은 `/v1/rules/bundle` 로 각 클라이언트에 배포합니다. 관리 API, 프롬프트 설정, 모델 env 는
+[docs/detection-modules.md](docs/detection-modules.md) 를 보세요.
+
 ## 전송 목적지 등급
 
 `policies/destinations.yaml` 은 [AI 모델별 데이터 정책 정리](../docs/ai-model-data-policy.md)(정정판 JSON: `docs/ai-model-data-policy.json`)를 근거로

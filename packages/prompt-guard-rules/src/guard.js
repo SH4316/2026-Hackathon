@@ -1,6 +1,7 @@
 // 검사·정제 파이프라인(server/app/services/pipeline.py 의 규칙 부분).
 // 로컬 모델 문맥 탐지는 포함하지 않는다. 정책이 모델 검사를 요구하면 status=incomplete 로 표시한다.
 import defaultBundle from "../data/policy.js";
+import { customDetector } from "./custom.js";
 import { merge } from "./merge.js";
 import { Policy, decide } from "./policy.js";
 import { codePointIndex } from "./pyre.js";
@@ -13,14 +14,18 @@ const STATUS_ORDER = ["complete", "incomplete", "error"];
 /**
  * @param {object} [options]
  * @param {object|Policy} [options.policy] 정책 번들(기본: 서버 정책을 내보낸 data/policy.js)
+ * @param {object} [options.ruleset] 서버 /v1/rules/bundle 응답(기본: 정책 번들에 든 초기 ruleset)
  * @param {() => (Date|string)} [options.today] 목적지 근거 만료 판단 기준일
  */
-export function createGuard({ policy = defaultBundle, today = () => new Date() } = {}) {
-  const pol = policy instanceof Policy ? policy : new Policy(policy);
-  const detectorVersions = { rules: RULESET_VERSION };
+export function createGuard({ policy = defaultBundle, ruleset, today = () => new Date() } = {}) {
+  const base = policy instanceof Policy ? policy : new Policy(policy);
+  const rs = ruleset ?? (policy instanceof Policy ? null : policy.ruleset) ?? null;
+  const pol = rs ? base.withCustomTypes([...rs.custom_rules, ...rs.context_detectors]) : base;
+  const custom = customDetector(rs && rs.modules?.custom_rules !== false ? rs.custom_rules : []);
+  const detectorVersions = { rules: RULESET_VERSION, ...(rs ? { ruleset: `rs-${rs.ruleset_version}` } : {}) };
 
   function candidates(text) {
-    return detect(text).map((c) => ({
+    return [...detect(text), ...custom.detect(text)].map((c) => ({
       ...c, cpStart: codePointIndex(text, c.start), cpEnd: codePointIndex(text, c.end),
     }));
   }
@@ -130,5 +135,9 @@ export function createGuard({ policy = defaultBundle, today = () => new Date() }
   const inspectRequest = (req) => withIds(req, inspect(req.text, { destination: req.context?.destination }));
   const sanitizeRequest = (req) => withIds(req, sanitize(req.text, { destination: req.context?.destination }));
 
-  return { policy: pol, inspect, sanitize, inspectRequest, sanitizeRequest, detect: candidates };
+  return {
+    policy: pol, inspect, sanitize, inspectRequest, sanitizeRequest, detect: candidates,
+    rulesetVersion: rs?.ruleset_version ?? null,
+    skippedRules: custom.skipped, // JS 에서 컴파일하지 못한 사용자 규칙
+  };
 }
