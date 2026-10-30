@@ -31,6 +31,13 @@ async function fill(sample, target = "#ta") {
   await page.getByRole("button", { name: sample, exact: true }).click();
 }
 
+// 경고 창에서 '안전 다듬기'를 누르면 경고 창이 닫히고 위젯이 정제 미리보기를 보여 준다(정제 경로는 위젯 하나).
+async function sanitizeViaWidget() {
+  await modal.getByRole("button", { name: "안전 다듬기" }).click();
+  await page.locator(".badge").getByRole("button", { name: "입력창에 넣기" }).waitFor({ timeout: 8000 });
+}
+const widgetApply = () => page.locator(".badge").getByRole("button", { name: "입력창에 넣기" }).click();
+
 try {
 await page.goto(PAGE);
 await page.waitForTimeout(1500); // content script 로드
@@ -52,10 +59,11 @@ check("AWS key blocked (not sent)", (await logCount()) === 1);
 const title = await page.locator(".title").textContent();
 check("red warning title", title.includes("보낼 수 없습니다"), title);
 await page.screenshot({ path: `${OUT}/1-warning-aws.png` });
-await page.getByRole("button", { name: "민감정보 치환하기" }).click();
-await page.getByRole("button", { name: "입력창에 반영" }).waitFor({ timeout: 5000 });
+await sanitizeViaWidget();
 await page.screenshot({ path: `${OUT}/2-sanitized.png` });
-await page.getByRole("button", { name: "입력창에 반영" }).click();
+check("warning window closes and the widget takes over sanitizing (single path)",
+  !(await modal.isVisible()) && (await page.getByRole("button", { name: "이전으로" }).count()) === 0);
+await widgetApply();
 check("applied text stays in editor (no auto-send)", (await logCount()) === 1);
 await page.press("#ta", "Enter");
 await page.waitForTimeout(1500);
@@ -70,8 +78,8 @@ check("contenteditable PII blocked", (await logCount()) === 2);
 const items = await page.locator("ul.findings li .fname").allTextContents();
 check("PII findings listed", ["전화번호", "이메일 주소", "주민등록번호"].every((x) => items.includes(x)), items.join(","));
 await page.screenshot({ path: `${OUT}/3-warning-pii.png` });
-await page.getByRole("button", { name: "민감정보 치환하기" }).click();
-await page.getByRole("button", { name: "입력창에 반영" }).click();
+await sanitizeViaWidget();
+await widgetApply();
 await page.waitForTimeout(300);
 const ceText = await page.locator("#ce").innerText();
 check("sanitized applied to contenteditable", ceText.includes("[PHONE_1]") && !ceText.includes("010-"), ceText);
@@ -135,8 +143,8 @@ await page.screenshot({ path: `${OUT}/7-test-mode.png` });
 await fill("AWS 키");
 await page.press("#ta", "Enter");
 await modal.waitFor({ timeout: 5000 });
-await page.getByRole("button", { name: "민감정보 치환하기" }).click();
-await page.getByRole("button", { name: "입력창에 반영" }).click();
+await sanitizeViaWidget();
+await widgetApply();
 await page.press("#ta", "Enter");
 await page.waitForTimeout(1500);
 check("test mode: sanitized text not sent", (await logCount()) === sentBefore);
@@ -151,11 +159,10 @@ await page.getByRole("button", { name: "AWS 키", exact: true }).click();
 await page.waitForTimeout(100);
 await page.press("#pm", "Enter");
 await modal.waitFor({ timeout: 5000 });
-await page.getByRole("button", { name: "민감정보 치환하기" }).click();
-await page.getByRole("button", { name: "이전으로" }).waitFor({ timeout: 5000 });
+await sanitizeViaWidget();
 check("no auto-send after programmatic replace",
   (await page.getByRole("button", { name: "반영하고 전송" }).count()) === 0);
-await page.getByRole("button", { name: "입력창에 반영" }).click();
+await widgetApply();
 const sentBefore62 = await logCount();
 await page.press("#pm", "Enter"); // 사용자가 치환 결과를 보고 직접 전송
 await page.waitForTimeout(1500);

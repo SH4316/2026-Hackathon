@@ -145,7 +145,6 @@ button.primary { background: var(--primary); color: var(--primary-fg); border-co
 button.danger { color: var(--red); border-color: var(--red); }
 button:disabled { opacity: .45; cursor: not-allowed; }
 button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.loading { padding: 28px 20px; text-align: center; color: var(--muted); }
 .fileblock { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; }
 .fileblock h4 { margin: 0; font-size: 14px; word-break: break-all; }
 .fileblock .why { margin: 0; font-size: 13px; color: var(--muted); }
@@ -439,52 +438,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
         h("button", { onclick: closeModal }, "돌아가서 수정"),
         incomplete ? h("button", { onclick: opts.onRetry }, "다시 검사") : null,
         sendBtn,
-        canSanitize ? h("button", { class: "primary", onclick: opts.onSanitize }, "민감정보 치환하기") : null)));
-  }
-
-  function showLoading(message) {
-    openModal(h("div", { class: "card" }, h("div", { class: "loading" }, message)));
-  }
-
-  // ── 정제 결과 화면 ──
-  // opts: { result?, error?, onApply, onBack }
-  // 치환 후 자동 전송 버튼은 두지 않는다(사이트 내부 상태가 늦게 갱신되면 원문이 전송될 수 있음).
-  function showSanitized(opts) {
-    const { result, error } = opts;
-    if (!result) {
-      openModal(h("div", { class: "card" },
-        header("gray", "!", "정제하지 못했습니다", PG.errorLabel(error)),
-        h("div", { class: "foot" },
-          h("button", { onclick: closeModal }, "닫기"),
-          h("button", { class: "primary", onclick: opts.onBack }, "이전으로"))));
-      return;
-    }
-    const pass = result.status === "complete" && result.decision === "allow";
-    const remaining = result.remaining_findings || [];
-    const [tone, icon, title] = pass
-      ? ["green", "✓", "치환 후 재검사를 통과했습니다"]
-      : ["yellow", "!", "치환했지만 아직 확인이 필요합니다"];
-    const changes = (result.changes || []).map((c) =>
-      `${PG.TYPE_LABELS[c.type] || c.type} → ${c.token}${c.count > 1 ? ` (${c.count}곳)` : ""}`);
-
-    openModal(h("div", { class: "card" },
-      header(tone, icon, title, destinationLine(result.destination)),
-      h("div", { class: "body" },
-        h("div", null, h("p", { class: "section-title" }, "치환된 내용"),
-          preview(result.sanitized_text || "", remaining)),
-        changes.length
-          ? h("div", null, h("p", { class: "section-title" }, "바뀐 항목"),
-              h("ul", { class: "findings" }, changes.map((c) => h("li", null, h("span", { class: "fname" }, c)))))
-          : null,
-        remaining.length
-          ? h("div", null, h("p", { class: "section-title" }, "남은 항목"), findingList(remaining)) : null,
-        notices(result.notices,
-          "수치·이름이 토큰으로 바뀌어 답변 품질이 달라질 수 있습니다. 원래 값은 저장되지 않아 자동 복원되지 않습니다.")),
-      h("div", { class: "foot" },
-        h("p", { class: "fine" }, FINE),
-        h("button", { onclick: opts.onBack }, "이전으로"),
-        h("button", { class: "primary", onclick: () => { closeModal(); opts.onApply(); } },
-          pass ? "입력창에 반영(직접 전송)" : "입력창에 반영"))));
+        canSanitize ? h("button", { class: "primary", onclick: opts.onSanitize }, "안전 다듬기") : null)));
   }
 
   // ── 테스트 모드 진단 패널 ──
@@ -607,6 +561,6 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     });
   }
 
-  PG.ui = { reviewFiles, setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showSanitized, showForce,
-            showLoading, closeModal, setDiag, hideDiag, toast, isOpen: () => !!overlayEl };
+  PG.ui = { reviewFiles, setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showForce,
+            closeModal, setDiag, hideDiag, toast, isOpen: () => !!overlayEl };
 })();

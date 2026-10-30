@@ -342,43 +342,15 @@
       onSendAnyway: () => {
         if (getText(ed) === entry.text) triggerSend(ed, entry.text);
       },
-      onSanitize: () => runSanitize(ed, entry),
+      // 정제는 위젯의 '안전 다듬기' 한 경로로만 한다(경고 창 → 별도 정제 창 경로는 중복이라 제거).
+      // 경고 창을 닫고 위젯에서 미리보기 → [입력창에 넣기] → 사용자가 직접 전송.
+      onSanitize: () => {
+        PG.ui.closeModal();
+        editor = ed;
+        ed.focus();
+        sanitizeInline();
+      },
     });
-  }
-
-  async function runSanitize(ed, entry) {
-    PG.ui.showLoading("민감정보를 치환하고 다시 검사하는 중…");
-    const res = await chrome.runtime.sendMessage({
-      type: "sanitize", text: entry.text, inputVersion: ++version, destination: PG.resolveDestination(),
-    }).catch(() => ({ ok: false, error: "network" }));
-    const result = res?.ok ? res.data : null;
-    if (result) stat("sanitized");
-    PG.ui.showSanitized({
-      result,
-      error: res?.ok ? null : res?.error,
-      onBack: () => openWarning(ed, entry),
-      onApply: () => apply(ed, result, entry),
-    });
-  }
-
-  // 정제문을 입력창에 넣기만 하고 자동 전송하지 않는다.
-  // ChatGPT(ProseMirror+React) 등은 DOM 변경을 비동기로 내부 상태에 반영하므로,
-  // 바로 전송 버튼을 누르면 화면은 정제문인데 원문이 전송될 수 있다(실제 재현됨).
-  // 사용자가 확인 후 직접 전송하면 그 시점에 다시 검사된다.
-  // 답변의 토큰을 되돌릴 수 있게 매핑도 함께 준비한다.
-  function apply(ed, result, entry) {
-    if (!result?.sanitized_text) return;
-    const original = getText(ed);
-    const built = entry?.result
-      ? PG.restore.buildTokenMap(original, entry.result.findings, result.sanitized_text)
-      : { entries: {}, verified: false };
-    prepared = { original, sanitized: result.sanitized_text, result, entries: built.entries, verified: built.verified };
-    applied = { original, sanitized: result.sanitized_text };
-    if (built.verified) PG.restore.begin(built.entries);
-    else PG.restore.cancel();
-    clearTimeout(timer);
-    setText(ed, result.sanitized_text);
-    PG.ui.toast("치환된 내용을 입력창에 넣었습니다. 확인한 뒤 직접 전송하세요.");
   }
 
   // ── 위젯 버튼 ──
