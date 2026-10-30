@@ -1,6 +1,6 @@
 # V2 실행 검증 기록
 
-최신 추가 검증: [백엔드 책임 분리·record 파일 분리](backend-refactor.md). 백엔드 50개 테스트와 실제 MySQL·패키지 HTTP 검증을 통과했고, 전체 OpenAPI 명세가 변경 전과 동일함을 확인했습니다. 이전 [태그별 Jev·Python 정규식](tag-rules.md), [탐지기 HTTP 수집·패키지 정리](detector-ingestion.md)와 아래 V2 기록은 당시 결과로 보존합니다.
+최신 추가 검증: [발행 후 태그 세부 정보 편집](tag-details.md). 현재 선택한 버전에만 적용되는 세부 정보 저장, 발행 트리·정책 고정, 수집 당시 태그 이름·색과 저장 검색 구성 보존을 백엔드 60개·프런트엔드 56개 테스트 및 실제 MySQL/JAR·브라우저·개발 SQL 반복 실행으로 확인했습니다. 이전 [백엔드 책임 분리·record 파일 분리](backend-refactor.md), [태그별 Jev·Python 정규식](tag-rules.md), [탐지기 HTTP 수집·패키지 정리](detector-ingestion.md)와 아래 V2 기록은 당시 결과로 보존합니다.
 
 검증일: 2026-10-30 UTC. 실제 실행한 결과만 기록하며, V1 검증은 [legacy-v1](legacy-v1/README.md)에 보관합니다. V1의 수량 기반 집계 결과를 V2의 근거로 사용하지 않습니다.
 

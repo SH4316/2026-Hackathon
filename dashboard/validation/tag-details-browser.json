@@ -1,0 +1,157 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T18:57:52.936Z",
+  "baseUrl": "http://127.0.0.1:8084",
+  "scope": "Synthetic configuration only on an isolated test DB. Publishes and activates one version; no people or events created. Automated axe and overflow checks do not establish full WCAG conformance.",
+  "fixtures": {
+    "versionId": "v_28991c280d204d6987414b6df1174cf5",
+    "parentId": "jev-parent-mvvc4d3q",
+    "childId": "jev-child-mvvc4d3q",
+    "siblingId": "jev-sibling-mvvc4d3q",
+    "earlierCloneId": "v_c39f7eacff33430cb1e331bbd451da59",
+    "cloneId": "v_aaea2d596b8f4e22ba4de44693994cba"
+  },
+  "checks": [
+    "Parent and child values are independent; empty child does not inherit either field; UI save and reload preserve Jev Korean text, emoji, newlines and leading/trailing whitespace exactly; guidance stays separate.",
+    "Editing Jev leaves Python regex unchanged and editing regex leaves Jev unchanged; Python inline flags, named groups, backslashes and multiline source survive exactly, and the counter uses Unicode code points.",
+    "Published tag details remain editable while parent/add controls stay locked. Saving all mutable fields preserves version identity, active status, policies and tree, increments its revision and immediately appears in classifier config; an earlier clone with the same tag IDs remains unchanged.",
+    "Equal-order root siblings stay in stable ASCII ID order after a published name change that reverses their lexical label order; child placement remains unchanged.",
+    "Clone preserves tag IDs, prompts and regexes; editing its child leaves the published original and active configuration unchanged."
+  ],
+  "screenshots": [
+    {
+      "state": "draft",
+      "width": 390,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-compose-backend/dashboard/.impeccable/review/tag-details-draft-mobile.png"
+    },
+    {
+      "state": "draft",
+      "width": 1440,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-compose-backend/dashboard/.impeccable/review/tag-details-draft-desktop.png"
+    },
+    {
+      "state": "published",
+      "width": 390,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-compose-backend/dashboard/.impeccable/review/tag-details-published-mobile.png"
+    },
+    {
+      "state": "published",
+      "width": 1440,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-compose-backend/dashboard/.impeccable/review/tag-details-published-desktop.png"
+    }
+  ],
+  "responsive": [
+    {
+      "state": "draft",
+      "width": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "viewportWidth": 320,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "viewportWidth": 390,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "viewportWidth": 768,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "viewportWidth": 1280,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "viewportWidth": 1440,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "viewportWidth": 320,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "viewportWidth": 390,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "viewportWidth": 768,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "viewportWidth": 1280,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "viewportWidth": 1440,
+      "overflow": false
+    }
+  ],
+  "axe": [
+    {
+      "state": "draft",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 17
+    },
+    {
+      "state": "draft",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 17
+    },
+    {
+      "state": "published",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 17
+    },
+    {
+      "state": "published",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 17
+    }
+  ],
+  "uncaughtErrors": [],
+  "axeStatus": "PASS"
+}

@@ -55,6 +55,7 @@ def main():
     specification = json.loads(body)
     assert specification["servers"][0]["url"] == "/"
     for path in ["/api/v1/config-versions", "/api/v1/classifier-config", "/api/v1/events",
+                 "/api/v1/config-versions/{id}/tags/{tagId}",
                  "/api/v1/metrics", "/api/v1/people", "/api/v1/saved-searches"]:
         assert path in specification["paths"], f"OpenAPI route absent: {path}"
     jar_hash = None

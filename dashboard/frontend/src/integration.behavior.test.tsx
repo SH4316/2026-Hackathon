@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import { MetricSettings } from "./MetricSettings";
 import {
   EventTable,
@@ -440,13 +440,21 @@ describe("configuration editing", () => {
     ).toBeTruthy();
   });
 
-  it("shows the published Jev prompt and Python regex inside disabled configuration fields", async () => {
+  it("edits and saves published tag details while keeping tree and policy controls locked", async () => {
     const config = published("published_jev", true);
     config.tags[0].jevPrompt = "게시한 판단 기준\n😀";
     config.tags[0].pythonRegex = String.raw`(?i)\bconfidential\b`;
     vi.spyOn(api, "versions").mockResolvedValue([config]);
     vi.spyOn(api, "version").mockResolvedValue(config);
-    const save = vi.spyOn(api, "saveVersion");
+    const fullSave = vi.spyOn(api, "saveVersion");
+    const save = vi.spyOn(api, "saveTagDetails").mockImplementation(async (_id, tagId, input) => {
+      const { revision, ...details } = input;
+      return {
+        ...config,
+        revision: revision + 1,
+        tags: config.tags.map((tag) => tag.id === tagId ? { ...tag, ...details } : tag),
+      };
+    });
     render(
       <MemoryRouter initialEntries={["/settings/metrics?versionId=published_jev"]}>
         <WorkspaceProvider>
@@ -458,14 +466,136 @@ describe("configuration editing", () => {
       name: "Jev 판단 프롬프트",
     });
     expect(prompt.value).toBe(config.tags[0].jevPrompt);
-    expect(prompt.matches(":disabled")).toBe(true);
+    expect(prompt.matches(":disabled")).toBe(false);
     const regex = screen.getByRole<HTMLTextAreaElement>("textbox", {
       name: "Python 정규식",
     });
     expect(regex.value).toBe(config.tags[0].pythonRegex);
-    expect(regex.matches(":disabled")).toBe(true);
+    expect(regex.matches(":disabled")).toBe(false);
+    expect(screen.getByRole("combobox", { name: "상위 태그" }).matches(":disabled")).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "최상위 태그 추가" }).disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "하위 태그" })).toBeNull();
     expect(screen.queryByRole("button", { name: "초안 저장" })).toBeNull();
-    expect(save).not.toHaveBeenCalled();
+    const editedPrompt = "  게시 이후 수정한 기준 😀\n  ";
+    const editedRegex = String.raw`(?im)^\b(?P<label>private)\b$` + "\n  ";
+    fireEvent.change(screen.getByRole("textbox", { name: "태그 이름" }), { target: { value: "수정한 고객 정보" } });
+    fireEvent.change(screen.getByLabelText("태그 색상"), { target: { value: "#654321" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "태그 설명" }), { target: { value: "새 설명" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "태그 예시" }), { target: { value: "새 예시\n두 번째 😀" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "판단 참고사항" }), { target: { value: "새 맥락" } });
+    fireEvent.change(prompt, { target: { value: editedPrompt } });
+    fireEvent.change(regex, { target: { value: editedRegex } });
+    fireEvent.click(screen.getByRole("button", { name: "세부 정보 저장" }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save).toHaveBeenCalledWith(config.id, "tag_1", {
+      revision: 1,
+      name: "수정한 고객 정보",
+      color: "#654321",
+      description: "새 설명",
+      examples: ["새 예시", "두 번째 😀"],
+      guidance: "새 맥락",
+      jevPrompt: editedPrompt,
+      pythonRegex: editedRegex,
+    });
+    await waitFor(() => expect(screen.getByRole<HTMLButtonElement>("button", { name: "세부 정보 저장" }).disabled).toBe(true));
+    expect(prompt.value).toBe(editedPrompt);
+    expect(regex.value).toBe(editedRegex);
+    expect(config.tags[0].name).toBe("고객 정보");
+    expect(fullSave).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "정책 상태 1" }));
+    expect(screen.getByRole("textbox", { name: "정책 상태 이름" }).matches(":disabled")).toBe(true);
+    expect(screen.getByRole("textbox", { name: "정책 설명" }).matches(":disabled")).toBe(true);
+    expect(screen.getByLabelText("정책 색상").matches(":disabled")).toBe(true);
+  });
+
+  it("keeps other unsaved details, tree changes and policies when saving only the selected tag", async () => {
+    const config = draft("draft_partial");
+    config.tags.push({ ...config.tags[0], id: "tag_2", name: "이메일", order: 1 });
+    vi.spyOn(api, "versions").mockResolvedValue([config]);
+    vi.spyOn(api, "version").mockResolvedValue(config);
+    const detailsSave = vi.spyOn(api, "saveTagDetails").mockImplementation(async (_id, tagId, input) => {
+      const { revision, ...details } = input;
+      return { ...config, revision: revision + 1, tags: config.tags.map((tag) => tag.id === tagId ? { ...tag, ...details } : tag) };
+    });
+    const fullSave = vi.spyOn(api, "saveVersion").mockImplementation(async (_id, input) => ({ ...config, ...input, revision: input.revision + 1 }));
+    render(<MemoryRouter initialEntries={["/settings/metrics?versionId=draft_partial"]}><WorkspaceProvider><MetricSettings /></WorkspaceProvider></MemoryRouter>);
+    await screen.findByRole("textbox", { name: "태그 이름" });
+    fireEvent.change(screen.getByRole("textbox", { name: "버전 이름" }), { target: { value: "저장 전 버전 이름" } });
+    fireEvent.click(screen.getByRole("button", { name: "이메일" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Jev 판단 프롬프트" }), { target: { value: "다른 태그의 저장 전 기준" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "상위 태그" }), { target: { value: "tag_1" } });
+    fireEvent.click(screen.getByRole("button", { name: "정책 상태 1" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "정책 상태 이름" }), { target: { value: "저장 전 정책" } });
+    fireEvent.click(screen.getByRole("button", { name: "메트릭 태그 2" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "태그 설명" }), { target: { value: "선택 태그 설명" } });
+    fireEvent.click(screen.getByRole("button", { name: "세부 정보 저장" }));
+    await waitFor(() => expect(detailsSave).toHaveBeenCalledOnce());
+    expect(detailsSave.mock.calls[0][0]).toBe(config.id);
+    expect(detailsSave.mock.calls[0][1]).toBe("tag_1");
+    expect(detailsSave.mock.calls[0][2]).toMatchObject({ revision: 1, description: "선택 태그 설명" });
+    await waitFor(() => expect(screen.getByRole<HTMLButtonElement>("button", { name: "세부 정보 저장" }).disabled).toBe(true));
+    expect(screen.getByRole<HTMLInputElement>("textbox", { name: "버전 이름" }).value).toBe("저장 전 버전 이름");
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "초안 저장" }).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "이메일" }));
+    expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Jev 판단 프롬프트" }).value).toBe("다른 태그의 저장 전 기준");
+    expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "상위 태그" }).value).toBe("tag_1");
+    fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
+    await waitFor(() => expect(fullSave).toHaveBeenCalledOnce());
+    expect(fullSave.mock.calls[0][1]).toMatchObject({ revision: 2, name: "저장 전 버전 이름", policyStates: [expect.objectContaining({ name: "저장 전 정책" })] });
+    expect(fullSave.mock.calls[0][1].tags).toEqual([
+      expect.objectContaining({ id: "tag_1", description: "선택 태그 설명", parentId: null, order: 0 }),
+      expect.objectContaining({ id: "tag_2", jevPrompt: "다른 태그의 저장 전 기준", parentId: "tag_1", order: 0 }),
+    ]);
+  });
+
+  it("retains the selected tag's input and dirty state after a revision conflict", async () => {
+    const config = published("published_conflict", true);
+    vi.spyOn(api, "versions").mockResolvedValue([config]);
+    vi.spyOn(api, "version").mockResolvedValue(config);
+    const save = vi.spyOn(api, "saveTagDetails").mockRejectedValue(new ApiError(409, { code: "REVISION_CONFLICT", message: "다른 창에서 수정했습니다. 새로고침 후 확인하세요." }));
+    render(<MemoryRouter initialEntries={["/settings/metrics?versionId=published_conflict"]}><WorkspaceProvider><MetricSettings /></WorkspaceProvider></MemoryRouter>);
+    const prompt = await screen.findByRole<HTMLTextAreaElement>("textbox", { name: "Jev 판단 프롬프트" });
+    const edited = "  보존할 미저장 기준 😀\n  ";
+    fireEvent.change(prompt, { target: { value: edited } });
+    fireEvent.click(screen.getByRole("button", { name: "세부 정보 저장" }));
+    await screen.findByText("다른 창에서 수정했습니다. 새로고침 후 확인하세요.");
+    expect(prompt.value).toBe(edited);
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "세부 정보 저장" }).disabled).toBe(false);
+    expect(save).toHaveBeenCalledWith(config.id, "tag_1", expect.objectContaining({ revision: 1, jevPrompt: edited }));
+    expect(config.tags[0].jevPrompt).toBe("");
+  });
+
+  it("saves a new tag through the draft before enabling separate detail saves", async () => {
+    const config = draft("draft_new_tag");
+    vi.spyOn(api, "versions").mockResolvedValue([config]);
+    vi.spyOn(api, "version").mockResolvedValue(config);
+    let saved = config;
+    const fullSave = vi.spyOn(api, "saveVersion").mockImplementation(async (_id, input) => {
+      saved = { ...config, ...input, revision: input.revision + 1 };
+      return saved;
+    });
+    const detailsSave = vi.spyOn(api, "saveTagDetails").mockImplementation(async (_id, tagId, input) => {
+      const { revision, ...details } = input;
+      return { ...saved, revision: revision + 1, tags: saved.tags.map((tag) => tag.id === tagId ? { ...tag, ...details } : tag) };
+    });
+    render(<MemoryRouter initialEntries={["/settings/metrics?versionId=draft_new_tag"]}><WorkspaceProvider><MetricSettings /></WorkspaceProvider></MemoryRouter>);
+    await screen.findByRole("textbox", { name: "태그 이름" });
+    fireEvent.click(screen.getByRole("button", { name: "하위 태그" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Jev 판단 프롬프트" }), { target: { value: "새 태그의 기준" } });
+    const saveButton = screen.getByRole<HTMLButtonElement>("button", { name: "세부 정보 저장" });
+    expect(saveButton.disabled).toBe(true);
+    expect(screen.getByText("새 태그의 내용은 ‘초안 저장’으로 함께 저장하세요.")).toBeTruthy();
+    fireEvent.click(saveButton);
+    expect(detailsSave).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
+    await waitFor(() => expect(fullSave).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByRole<HTMLButtonElement>("button", { name: "초안 저장" }).disabled).toBe(true));
+    const newTag = fullSave.mock.calls[0][1].tags.find((tag) => tag.id !== "tag_1")!;
+    expect(newTag).toMatchObject({ parentId: "tag_1", jevPrompt: "새 태그의 기준" });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Jev 판단 프롬프트" }), { target: { value: "저장 후 수정한 기준" } });
+    fireEvent.click(screen.getByRole("button", { name: "세부 정보 저장" }));
+    await waitFor(() => expect(detailsSave).toHaveBeenCalledOnce());
+    expect(detailsSave).toHaveBeenCalledWith(config.id, newTag.id, expect.objectContaining({ revision: 2, jevPrompt: "저장 후 수정한 기준" }));
   });
 
   it("hides the previous editable version while the next version loads", async () => {

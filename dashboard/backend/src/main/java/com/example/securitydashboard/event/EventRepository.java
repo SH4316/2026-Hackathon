@@ -1,11 +1,13 @@
 package com.example.securitydashboard.event;
 
 import com.example.securitydashboard.common.JdbcRows;
+import com.example.securitydashboard.event.model.DetectionTag;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -23,9 +25,10 @@ class EventRepository {
     return jdbc.queryForObject("SELECT COUNT(*) FROM people WHERE id=?", Long.class, personId) > 0;
   }
 
-  long insert(CanonicalEvent event, Instant occurredAt, Instant receivedAt) {
+  long insert(
+      CanonicalEvent event, Map<String, DetectionTag> tags, Instant occurredAt, Instant receivedAt) {
     long eventId = insertEvent(event, occurredAt, receivedAt);
-    insertDetections(eventId, event);
+    insertDetections(eventId, event, tags);
     return eventId;
   }
 
@@ -46,7 +49,7 @@ class EventRepository {
         event.policyStateId());
   }
 
-  private void insertDetections(long eventId, CanonicalEvent event) {
+  private void insertDetections(long eventId, CanonicalEvent event, Map<String, DetectionTag> tags) {
     List<Object[]> detectionTags = new ArrayList<>();
     for (var span : event.detections()) {
       long detectionId =
@@ -57,13 +60,15 @@ class EventRepository {
               span.end(),
               span.text());
       for (String tagId : span.tagIds()) {
-        detectionTags.add(new Object[] {detectionId, event.versionId(), tagId});
+        var tag = Objects.requireNonNull(tags.get(tagId));
+        detectionTags.add(
+            new Object[] {detectionId, event.versionId(), tagId, tag.name(), tag.color()});
       }
     }
     JdbcRows.insert(
         jdbc,
-        "INSERT INTO detection_tags(detection_id,version_id,tag_id) VALUES ",
-        3,
+        "INSERT INTO detection_tags(detection_id,version_id,tag_id,captured_name,captured_color) VALUES ",
+        5,
         detectionTags);
   }
 

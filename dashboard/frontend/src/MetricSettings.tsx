@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { useResource } from "./hooks";
 import {
+  compareTagOrder,
   createId,
   descendantIds,
   flattenTree,
@@ -21,6 +22,35 @@ import {
   useWorkspace,
 } from "./ui";
 
+function tagDetails(tag: Tag) {
+  return {
+    name: tag.name,
+    description: tag.description,
+    examples: tag.examples,
+    guidance: tag.guidance,
+    jevPrompt: tag.jevPrompt || "",
+    pythonRegex: tag.pythonRegex || "",
+    color: tag.color,
+  };
+}
+
+function editableContent(version: ConfigVersion) {
+  return JSON.stringify({
+    name: version.name,
+    tags: version.tags
+      .map((tag) => ({
+        id: tag.id,
+        parentId: tag.parentId,
+        order: tag.order,
+        ...tagDetails(tag),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    policyStates: [...version.policyStates].sort((a, b) =>
+      a.id.localeCompare(b.id),
+    ),
+  });
+}
+
 export function MetricSettings() {
   const ws = useWorkspace();
   const [params, setParams] = useSearchParams();
@@ -35,6 +65,7 @@ export function MetricSettings() {
     [versionId],
   );
   const [version, setVersion] = useState<ConfigVersion | null>(null);
+  const [savedVersion, setSavedVersion] = useState<ConfigVersion | null>(null);
   const [selected, setSelected] = useState("");
   const [tab, setTab] = useState<"tags" | "policies">("tags");
   const [dirty, setDirty] = useState(false);
@@ -46,6 +77,7 @@ export function MetricSettings() {
   useEffect(() => {
     if (r.data) {
       setVersion(r.data);
+      setSavedVersion(r.data);
       setDirty(false);
       setError("");
       setSelected((previous) =>
@@ -58,6 +90,7 @@ export function MetricSettings() {
       );
     } else {
       setVersion(null);
+      setSavedVersion(null);
       setDirty(false);
       setSelected("");
     }
@@ -73,7 +106,7 @@ export function MetricSettings() {
       if (
         anchor &&
         !(anchor as HTMLAnchorElement).target &&
-        !window.confirm("저장하지 않은 초안 변경을 버리고 이동할까요?")
+        !window.confirm("저장하지 않은 변경을 버리고 이동할까요?")
       ) {
         e.preventDefault();
         e.stopPropagation();
@@ -88,12 +121,19 @@ export function MetricSettings() {
   }, [dirty]);
   const editable = version?.status === "DRAFT";
   const tag = version?.tags.find((t) => t.id === selected);
+  const savedTag = savedVersion?.tags.find((t) => t.id === selected);
+  const tagDetailsDirty =
+    !!tag &&
+    !!savedTag &&
+    JSON.stringify(tagDetails(tag)) !== JSON.stringify(tagDetails(savedTag));
   const jevPromptLength = Array.from(tag?.jevPrompt || "").length;
   const pythonRegexLength = Array.from(tag?.pythonRegex || "").length;
   const policy = version?.policyStates.find((p) => p.id === selected);
   const change = (value: ConfigVersion) => {
     setVersion(value);
-    setDirty(true);
+    setDirty(
+      !savedVersion || editableContent(value) !== editableContent(savedVersion),
+    );
     setNotice("");
     setError("");
   };
@@ -116,7 +156,7 @@ export function MetricSettings() {
       });
   };
   const canLeave = () =>
-    !dirty || window.confirm("저장하지 않은 초안 변경을 버릴까요?");
+    !dirty || window.confirm("저장하지 않은 변경을 버릴까요?");
   async function perform(
     action: () => Promise<ConfigVersion>,
     message: string,
@@ -126,12 +166,50 @@ export function MetricSettings() {
     try {
       const next = await action();
       setVersion(next);
+      setSavedVersion(next);
       setDirty(false);
       setNotice(message);
       ws.reload();
       if (next.id !== versionId) setParams({ versionId: next.id });
     } catch (e) {
       setError(e instanceof Error ? e.message : "요청을 처리하지 못했습니다.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function saveTagDetails() {
+    if (!version || !tag || !savedTag || pending) return;
+    setPending(true);
+    setError("");
+    setNotice("");
+    try {
+      const next = await api.saveTagDetails(version.id, tag.id, {
+        revision: version.revision,
+        ...tagDetails(tag),
+        examples: tag.examples.filter((example) => example.trim()),
+      });
+      const updatedTag = next.tags.find((item) => item.id === tag.id)!;
+      // A detail save must not discard edits to another tag or the draft's structure/policies.
+      const merged: ConfigVersion = {
+        ...next,
+        name: version.name,
+        tags: version.tags.map((item) =>
+          item.id === tag.id ? { ...item, ...tagDetails(updatedTag) } : item,
+        ),
+        policyStates: version.policyStates,
+      };
+      setSavedVersion(next);
+      setVersion(merged);
+      setDirty(editableContent(merged) !== editableContent(next));
+      setNotice(
+        "태그 세부 정보를 저장했습니다. 선택한 트리 버전에만 적용됩니다.",
+      );
+      ws.reload();
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "세부 정보를 저장하지 못했습니다.",
+      );
     } finally {
       setPending(false);
     }
@@ -226,7 +304,7 @@ export function MetricSettings() {
     if (tab === "tags" && tag) {
       const siblings = version.tags
         .filter((t) => t.parentId === tag.parentId)
-        .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+        .sort(compareTagOrder);
       const index = siblings.findIndex((t) => t.id === tag.id);
       const target = index + direction;
       if (target < 0 || target >= siblings.length) return;
@@ -262,6 +340,7 @@ export function MetricSettings() {
     try {
       await api.deleteVersion(version.id);
       setVersion(null);
+      setSavedVersion(null);
       setDirty(false);
       setParams({});
       ws.reload();
@@ -293,7 +372,7 @@ export function MetricSettings() {
     <>
       <PageTitle
         title="메트릭 설정"
-        description="태그를 트리로 구성하고, 발행한 버전을 분류기와 공유하세요."
+        description="태그 트리는 버전으로 관리하고, 세부 정보는 각 버전에서 수정하세요."
         action={
           <button
             className="button button-primary"
@@ -383,7 +462,7 @@ export function MetricSettings() {
               ) : (
                 <button
                   className="button button-primary"
-                  disabled={pending || version.isActive}
+                  disabled={pending || dirty || version.isActive}
                   onClick={() =>
                     perform(
                       () => api.activateVersion(version.id),
@@ -463,7 +542,7 @@ export function MetricSettings() {
                 ) : editable ? (
                   "저장된 초안"
                 ) : (
-                  "발행된 버전은 복제해서 수정할 수 있습니다."
+                  "발행된 트리 · 태그 세부 정보는 수정 가능"
                 )}
               </span>
             </div>
@@ -634,22 +713,39 @@ export function MetricSettings() {
                   <div className="editor-detail-header">
                     <div>
                       <h2>{tag.name || "이름 없는 태그"}</h2>
+                      <p className="tag-detail-scope">
+                        {version.isActive
+                          ? "이 버전의 세부 정보만 수정합니다. 저장하면 활성 분류 설정에 반영됩니다."
+                          : "이 트리 버전의 세부 정보만 수정합니다. 다른 버전에는 적용되지 않습니다."}
+                      </p>
                     </div>
-                    {editable && (
+                    <div className="editor-detail-actions">
+                      {editable && (
+                        <button
+                          className="button"
+                          disabled={pending}
+                          onClick={() => addTag(true)}
+                        >
+                          <Icon name="plus" size={15} />
+                          하위 태그
+                        </button>
+                      )}
                       <button
-                        className="button"
-                        disabled={pending}
-                        onClick={() => addTag(true)}
+                        className="button button-primary"
+                        disabled={pending || !tagDetailsDirty}
+                        onClick={() => void saveTagDetails()}
                       >
-                        <Icon name="plus" size={15} />
-                        하위 태그
+                        <Icon name="save" size={15} />
+                        세부 정보 저장
                       </button>
-                    )}
+                    </div>
                   </div>
-                  <fieldset
-                    disabled={!editable || pending}
-                    className="tag-fields"
-                  >
+                  {!savedTag && (
+                    <p className="new-tag-save-note">
+                      새 태그의 내용은 ‘초안 저장’으로 함께 저장하세요.
+                    </p>
+                  )}
+                  <fieldset disabled={pending} className="tag-fields">
                     <div className="field-pair">
                       <label>
                         <span>태그 이름</span>
@@ -679,6 +775,7 @@ export function MetricSettings() {
                       <span>상위 태그</span>
                       <select
                         aria-label="상위 태그"
+                        disabled={!editable || pending}
                         value={tag.parentId || ""}
                         onChange={(e) =>
                           patchTag({
@@ -698,6 +795,12 @@ export function MetricSettings() {
                             </option>
                           ))}
                       </select>
+                      {!editable && (
+                        <small>
+                          발행된 트리 구조입니다. 부모나 순서를 바꾸려면
+                          복제하세요.
+                        </small>
+                      )}
                     </label>
                     <div className="jev-prompt-field">
                       <label>
@@ -926,8 +1029,8 @@ export function MetricSettings() {
           <div className="editor-bottom">
             <span>
               <Icon name="info" size={15} />
-              분류기는 활성 버전의 설정만 읽습니다. 초안 변경은 수집에 영향을
-              주지 않습니다.
+              태그 세부 정보는 현재 버전에서 수정할 수 있습니다. 트리 구조와
+              정책 상태 변경은 초안에서 저장·발행하세요.
             </span>
             {editable && (
               <button

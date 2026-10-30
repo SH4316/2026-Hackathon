@@ -132,7 +132,7 @@ try {
   await page.locator('.editor-error [role="alert"]').waitFor();
   await page.getByRole('button', { name: '서버 내용 다시 불러오기', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('input[aria-label="버전 이름"]')?.value === '다른 편집자의 저장');
-  checks.push('UI creates parent/child tags, examples/guidance and custom policies; save/publish/activate, immutable published input, stable-ID clone and revision-conflict recovery');
+  checks.push('UI creates parent/child tags, examples/guidance and custom policies; save/publish/activate, locked published version name, stable-ID clone and revision-conflict recovery');
 
   await page.goto(baseUrl + '/people'); await ready('사람 관리');
   await page.getByRole('button', { name: '사람 등록', exact: true }).click();

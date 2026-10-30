@@ -52,7 +52,7 @@ def main():
     api.expect("DELETE","/config-versions/"+v1["id"],409)
     api.expect("PUT","/config-versions/"+v1["id"],409,
                dict(revision=v1["revision"],name=v1["name"],tags=tags,policyStates=policies))
-    checks.append("custom tag tree/policy catalog, revision conflicts, publish immutability and singleton activation")
+    checks.append("custom tag tree/policy catalog, revision conflicts, published structure immutability and singleton activation")
     prompt="데모 😀 김하늘 demo.person@example.invalid 100%_literal"
     start=prompt.index("김하늘"); email=prompt.index("demo.person")
     instant=(datetime.now(timezone.utc)-timedelta(hours=2)).replace(microsecond=123456)
@@ -106,6 +106,55 @@ def main():
     assert api.expect("GET","/saved-searches/"+snapshot["id"]+"/events",200,query={"size":1})["totalElements"]==2
     checks.append("distinct span/tree counts, literal prompt search vs personQuery, registered zero-event people retained, zero detections, exclusive end, hour buckets and whole-result snapshot")
     v2=api.expect("POST","/config-versions",201,{"name":"데모 검증 v2 "+suffix,"baseVersionId":v1["id"]})
+    # A logical ID is shared across cloned trees, but details belong only to the selected version.
+    v1=api.expect("GET","/config-versions/"+v1["id"],200)
+    before_details=v1
+    editable_fields=("name","description","examples","guidance","jevPrompt","pythonRegex","color")
+    def detail_input(version, tag_id):
+        selected=next(t for t in version["tags"] if t["id"]==tag_id)
+        return dict(revision=version["revision"], **{
+            field: selected.get(field, [] if field=="examples" else "") for field in editable_fields
+        })
+    detail_body=detail_input(v1,"name")
+    detail_body.update(name="수정한 가상 이름",description="게시 후 설명",examples=["합성 이름 😀"],
+                       guidance="게시 후 판단 맥락",jevPrompt="  게시 후 기준 😀\n  ",
+                       pythonRegex=r"(?i)\b(?P<label>private)\b",color="#315A89")
+    v1=api.expect("PUT","/config-versions/"+v1["id"]+"/tags/name",200,detail_body)
+    assert v1["revision"]==before_details["revision"]+1
+    for field in ["id","name","status","isActive","createdAt","publishedAt","policyStates"]:
+        assert v1[field]==before_details[field],field
+    assert [(t["id"],t["parentId"],t["order"]) for t in v1["tags"]]==[(t["id"],t["parentId"],t["order"]) for t in before_details["tags"]]
+    assert [t for t in v1["tags"] if t["id"]!="name"]==[t for t in before_details["tags"] if t["id"]!="name"]
+    for field in editable_fields:
+        assert next(t for t in v1["tags"] if t["id"]=="name")[field]==detail_body[field]
+    assert api.expect("GET","/classifier-config",200)==v1
+    assert api.expect("GET","/config-versions/"+v2["id"],200)==v2
+    api.expect("PUT","/config-versions/"+v1["id"]+"/tags/name",409,detail_body)
+    api.expect("PUT","/config-versions/"+v1["id"]+"/tags/name",400,{**detail_body,"revision":v1["revision"],"parentId":None})
+    api.expect("PUT","/config-versions/"+v1["id"]+"/tags/missing",404,{**detail_body,"revision":v1["revision"]})
+    detail_metrics=api.expect("GET","/metrics",200,query=filters)
+    assert detail_metrics["summary"]==metrics["summary"]
+    assert [(t["id"],t["count"],t["eventCount"]) for t in detail_metrics["tags"]]==[(t["id"],t["count"],t["eventCount"]) for t in metrics["tags"]]
+    assert next(t for t in detail_metrics["tags"] if t["id"]=="name")["name"]=="수정한 가상 이름"
+    assert next(t for t in detail_metrics["tags"] if t["id"]=="name")["color"]=="#315A89"
+    snapshot_before=api.expect("GET","/saved-searches/"+snapshot["id"]+"/metrics",200)
+    assert snapshot_before["summary"]==metrics["summary"]
+    assert next(t for t in snapshot_before["tags"] if t["id"]=="name")["name"]=="수정한 가상 이름"
+    for old_event in [api.expect("GET","/events/"+str(event["id"]),200),
+                      next(e for e in api.expect("GET","/events",200,query=filters)["items"] if e["id"]==event["id"]),
+                      next(e for e in api.expect("GET","/saved-searches/"+snapshot["id"]+"/events",200)["items"] if e["id"]==event["id"])]:
+        captured=[t for d in old_event["detections"] for t in d["tags"] if t["id"]=="name"]
+        assert captured and all(t["name"]=="가상 이름" and t["color"]=="#57A7A0" for t in captured)
+    new_labels=api.expect("POST","/events",201,{**base,"eventId":"after-detail-edit","occurredAt":datetime.now(timezone.utc).isoformat()})
+    captured=[t for d in new_labels["detections"] for t in d["tags"] if t["id"]=="name"]
+    assert captured and all(t["name"]=="수정한 가상 이름" and t["color"]=="#315A89" for t in captured)
+    old_draft_revision=v2["revision"]
+    draft_body=detail_input(v2,"name")
+    draft_body["description"]="복제본만의 설명"
+    v2=api.expect("PUT","/config-versions/"+v2["id"]+"/tags/name",200,draft_body)
+    api.expect("PUT","/config-versions/"+v2["id"],409,dict(revision=old_draft_revision,name=v2["name"],tags=tags,policyStates=policies))
+    assert api.expect("GET","/config-versions/"+v1["id"],200)==v1
+    checks.append("published and draft tag details update only the selected version with revision checks; tree/policies and clone unchanged; active classifier refreshes; stale/structural/unknown-tag errors; chart captions update while counts, saved membership and captured old event labels/colors stay fixed")
     changed=[{**t,"name":"새 버전 이름","parentId":"other"} if t["id"]=="name" else t for t in tags if t["id"]!="email"]
     v2=update(v2,changed,[])
     v2=api.expect("POST","/config-versions/"+v2["id"]+"/publish",200,{"revision":v2["revision"]})

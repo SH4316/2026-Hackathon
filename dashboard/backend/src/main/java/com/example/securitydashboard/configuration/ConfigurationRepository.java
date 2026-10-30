@@ -78,6 +78,22 @@ class ConfigurationRepository {
     jdbc.update("UPDATE config_versions SET name=?,revision=revision+1 WHERE id=?", name, id);
   }
 
+  void updateTagDetails(String versionId, Tag tag) {
+    jdbc.update(
+        "UPDATE config_version_tags SET name=?,description=?,examples=?,guidance=?,jev_prompt=?,"
+            + "python_regex=?,color=? WHERE version_id=? AND id=?",
+        tag.name(),
+        tag.description(),
+        encode(tag.examples()),
+        tag.guidance(),
+        tag.jevPrompt(),
+        tag.pythonRegex(),
+        tag.color(),
+        versionId,
+        tag.id());
+    jdbc.update("UPDATE config_versions SET revision=revision+1 WHERE id=?", versionId);
+  }
+
   void publishVersion(String id, Instant publishedAt) {
     jdbc.update(
         "UPDATE config_versions SET status='PUBLISHED',published_at=?,revision=revision+1 WHERE"

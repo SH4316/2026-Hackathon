@@ -338,9 +338,9 @@ class DashboardRepository {
     var p = Map.of("ids", eventIds);
     Map<Long, List<DetectionTag>> tagMap = new HashMap<>();
     jdbc.query(
-        "SELECT dt.detection_id,t.id,t.name,t.color FROM detection_tags dt JOIN detections d ON"
-            + " d.id=dt.detection_id JOIN config_version_tags t ON t.version_id=dt.version_id AND"
-            + " t.id=dt.tag_id WHERE d.event_id IN (:ids) ORDER BY dt.detection_id,t.id",
+        "SELECT dt.detection_id,dt.tag_id,dt.captured_name,dt.captured_color FROM detection_tags dt"
+            + " JOIN detections d ON d.id=dt.detection_id WHERE d.event_id IN (:ids) ORDER BY"
+            + " dt.detection_id,dt.tag_id",
         p,
         (RowCallbackHandler)
             rs ->
@@ -348,7 +348,9 @@ class DashboardRepository {
                     .computeIfAbsent(rs.getLong("detection_id"), key -> new ArrayList<>())
                     .add(
                         new DetectionTag(
-                            rs.getString("id"), rs.getString("name"), rs.getString("color"))));
+                            rs.getString("tag_id"),
+                            rs.getString("captured_name"),
+                            rs.getString("captured_color"))));
     return tagMap;
   }
 

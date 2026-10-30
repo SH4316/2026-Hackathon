@@ -339,7 +339,12 @@ class FlywayMigrationIntegrationTest {
         new byte[] {0, 1, 2, -1});
     var before = snapshotVersionedData(jdbc);
 
-    var latest = Flyway.configure().dataSource(source).locations("classpath:db/migration").load();
+    var latest =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .target("5")
+            .load();
     assertThat(latest.migrate().migrationsExecuted).isEqualTo(1);
     assertVersionedDataPreserved(jdbc, before, "python_regex");
     assertThat(
@@ -358,6 +363,115 @@ class FlywayMigrationIntegrationTest {
             "SELECT jev_prompt,python_regex FROM config_version_tags WHERE version_id='draft' AND"
                 + " id='legacy-client'");
     assertThat(legacyTag).containsEntry("jev_prompt", "").containsEntry("python_regex", "");
+  }
+
+  @Test
+  void v6CapturesEachEventsVersionDetailsAndPreservesEventsMetadataAndSavedSearches() {
+    String url = System.getenv("TEST_MIGRATION_DB_URL");
+    if (!url.matches("jdbc:mysql://[^/]+/[A-Za-z0-9_]+_test(?:\\?.*)?"))
+      throw new IllegalStateException("Disposable migration database must end in _test");
+    var source =
+        new DriverManagerDataSource(
+            url, System.getenv("TEST_DB_USERNAME"), System.getenv("TEST_DB_PASSWORD"));
+    var jdbc = new JdbcTemplate(source);
+    var v5 =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .cleanDisabled(false)
+            .target("5")
+            .load();
+    v5.clean();
+    v5.migrate();
+    jdbc.update("INSERT INTO people(id,name) VALUES('preserved','기존 사용자 😀')");
+    jdbc.update(
+        "INSERT INTO config_versions(id,name,status,revision,created_at,published_at)"
+            + " VALUES('v1','기존 설정','PUBLISHED',7,'2026-10-20 01:02:03.123456','2026-10-20"
+            + " 02:03:04.123456'),('v2','새 설정','PUBLISHED',3,'2026-10-21 01:02:03.123456',"
+            + " '2026-10-21 02:03:04.123456')");
+    jdbc.update(
+        "INSERT INTO"
+            + " config_version_tags(version_id,id,name,description,examples,guidance,jev_prompt,python_regex,color,parent_id,sort_order)"
+            + " VALUES('v1','email','이전 이메일 😀','기존 설명',JSON_ARRAY('예시'),'가이드','  판단\\n',"
+            + " '(?P<email>.+)','#123456',NULL,5),"
+            + " ('v2','email','변경된 이메일','다른 설명',JSON_ARRAY(),'다른 가이드','새 판단','[',"
+            + " '#ABCDEF',NULL,2)");
+    jdbc.update(
+        "INSERT INTO config_tag_closure(version_id,ancestor_id,descendant_id)"
+            + " VALUES('v1','email','email'),('v2','email','email')");
+    jdbc.update(
+        "INSERT INTO config_version_policies(version_id,id,name,description,color,sort_order)"
+            + " VALUES('v1','review','검토','기존 정책','#654321',7)");
+    jdbc.update("UPDATE active_config SET version_id='v2' WHERE singleton_id=1");
+    jdbc.update(
+        "INSERT INTO"
+            + " security_events(id,source_id,event_id,person_id,version_id,prompt,occurred_at,received_at,service,model,policy_state_id)"
+            + " VALUES(991,'demo-sql-v2','demo-existing','preserved','v1','😀"
+            + " user@example.com','2026-10-20 01:02:03.123456','2026-10-20"
+            + " 01:02:04.654321','existing-service','기존 모델','review'),"
+            + " (993,'detector','existing','preserved','v2','user@example.com',"
+            + " '2026-10-21 01:02:03.123456','2026-10-21 01:02:04.654321','detector',NULL,NULL)");
+    jdbc.update(
+        "INSERT INTO detections(id,event_id,start_offset,end_offset,text)"
+            + " VALUES(992,991,2,18,'user@example.com'),(994,993,0,16,'user@example.com')");
+    jdbc.update(
+        "INSERT INTO detection_tags(detection_id,version_id,tag_id)"
+            + " VALUES(992,'v1','email'),(994,'v2','email')");
+    jdbc.update(
+        "INSERT INTO saved_searches(id,name,version_id,created_at,filters,event_count,finding_count)"
+            + " VALUES('snapshot','저장 검색','v1','2026-10-22 04:05:06.123456',"
+            + " JSON_OBJECT('tagId','email'),2,2)");
+    jdbc.update(
+        "INSERT INTO saved_search_events(saved_search_id,event_id)"
+            + " VALUES('snapshot',991),('snapshot',993)");
+    String envelope = "{\"metadata\":\"  원문 😀\\n  \"}";
+    jdbc.update(
+        "INSERT INTO detector_events(event_id,envelope,content_hash) VALUES(993,?,?)",
+        envelope,
+        "f".repeat(64));
+    jdbc.update(
+        "INSERT INTO detector_event_images(id,event_id,name,media_type,data) VALUES(995,993,?,?,?)",
+        "원본 😀.png",
+        "image/png",
+        new byte[] {0, 1, 2, -1});
+    var before = snapshotVersionedData(jdbc);
+
+    var v6 =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .target("6")
+            .load();
+    assertThat(v6.migrate().migrationsExecuted).isEqualTo(1);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT captured_name,captured_color FROM detection_tags WHERE detection_id=992"))
+        .containsEntry("captured_name", "이전 이메일 😀")
+        .containsEntry("captured_color", "#123456");
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT captured_name,captured_color FROM detection_tags WHERE detection_id=994"))
+        .containsEntry("captured_name", "변경된 이메일")
+        .containsEntry("captured_color", "#ABCDEF");
+    var after = snapshotVersionedData(jdbc);
+    for (var tag : after.get("detection_tags")) {
+      tag.remove("captured_name");
+      tag.remove("captured_color");
+    }
+    assertThat(after).usingRecursiveComparison().isEqualTo(before);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE()"
+                    + " AND TABLE_NAME='detection_tags' AND COLUMN_NAME IN"
+                    + " ('captured_name','captured_color')",
+                String.class))
+        .containsExactly("NO", "NO");
+    assertThat(v6.migrate().migrationsExecuted).isZero();
+    jdbc.update("UPDATE config_version_tags SET name='편집됨',color='#000000'");
+    assertThat(
+            jdbc.queryForList(
+                "SELECT captured_name FROM detection_tags ORDER BY detection_id", String.class))
+        .containsExactly("이전 이메일 😀", "변경된 이메일");
   }
 
   @Test
@@ -385,6 +499,9 @@ class FlywayMigrationIntegrationTest {
             "config_version_policies",
             "security_events",
             "detections",
+            "detection_tags",
+            "saved_searches",
+            "saved_search_events",
             "detector_events",
             "detector_event_images"))
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class))

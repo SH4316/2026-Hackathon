@@ -6,6 +6,7 @@ import com.example.securitydashboard.configuration.model.ConfigVersion;
 import com.example.securitydashboard.configuration.model.CreateVersion;
 import com.example.securitydashboard.configuration.model.PolicyDefinition;
 import com.example.securitydashboard.configuration.model.Tag;
+import com.example.securitydashboard.configuration.model.UpdateTagDetails;
 import com.example.securitydashboard.configuration.model.UpdateVersion;
 import com.example.securitydashboard.configuration.model.VersionSummary;
 import java.time.Clock;
@@ -99,6 +100,37 @@ public class ConfigurationService {
   }
 
   @Transactional
+  ConfigVersion updateTagDetails(String id, String tagId, UpdateTagDetails input) {
+    InputValidation.validateId(id, "versionId");
+    InputValidation.validateId(tagId, "tagId");
+    // Use the same lock order as activation and ingestion so captured labels are atomic with edits.
+    lockActiveId();
+    var version = repository.lockVersion(id).orElseThrow(ConfigurationService::versionNotFound);
+    requireRevision(version, input.revision());
+    var existing =
+        tags(id).stream()
+            .filter(tag -> tag.id().equals(tagId))
+            .findFirst()
+            .orElseThrow(
+                () -> new ApiException(HttpStatus.NOT_FOUND, "TAG_NOT_FOUND", "태그를 찾을 수 없습니다."));
+    var updated =
+        normalizeTagDetails(
+            new Tag(
+                existing.id(),
+                input.name(),
+                input.description(),
+                input.examples(),
+                input.guidance(),
+                input.jevPrompt(),
+                input.pythonRegex(),
+                input.color(),
+                existing.parentId(),
+                existing.order()));
+    repository.updateTagDetails(id, updated);
+    return get(id);
+  }
+
+  @Transactional
   ConfigVersion publish(String id, long revision) {
     lockDraft(id, revision);
     normalizeTags(tags(id));
@@ -129,7 +161,11 @@ public class ConfigurationService {
     if (!version.status().equals("DRAFT"))
       throw new ApiException(
           HttpStatus.CONFLICT, "VERSION_IMMUTABLE", "게시한 버전은 수정하거나 삭제할 수 없습니다. 새 초안을 만들어 주세요.");
-    if (revision != null && version.revision() != revision)
+    if (revision != null) requireRevision(version, revision);
+  }
+
+  private static void requireRevision(VersionState version, long revision) {
+    if (version.revision() != revision)
       throw new ApiException(
           HttpStatus.CONFLICT, "REVISION_CONFLICT", "다른 변경이 저장되었습니다. 최신 버전을 불러와 주세요.");
   }
@@ -154,24 +190,7 @@ public class ConfigurationService {
       if (t == null) throw ApiException.invalid("tags", "비어 있는 태그는 저장할 수 없습니다.");
       InputValidation.validateId(t.id(), "tags.id");
       if (t.parentId() != null) InputValidation.validateId(t.parentId(), "tags.parentId");
-      List<String> examples = t.examples() == null ? List.of() : t.examples();
-      if (examples.size() > 20) throw ApiException.invalid("examples", "예시는 최대 20개입니다.");
-      for (String example : examples) {
-        if (example == null) throw ApiException.invalid("examples", "예시는 문자열이어야 합니다.");
-        InputValidation.text(example, 1000, "examples");
-      }
-      var tag =
-          new Tag(
-              t.id(),
-              InputValidation.name(t.name(), "tags.name"),
-              InputValidation.text(t.description(), 4000, "description"),
-              List.copyOf(examples),
-              InputValidation.text(t.guidance(), 4000, "guidance"),
-              InputValidation.text(t.jevPrompt(), 12000, "tags.jevPrompt"),
-              InputValidation.text(t.pythonRegex(), 4000, "tags.pythonRegex"),
-              color(t.color()),
-              t.parentId(),
-              t.order() == null ? 0 : t.order());
+      var tag = normalizeTagDetails(t);
       if (values.putIfAbsent(t.id(), tag) != null)
         throw ApiException.invalid("tags.id", "한 버전에 동일한 태그 ID를 두 번 사용할 수 없습니다.");
     }
@@ -188,6 +207,26 @@ public class ConfigurationService {
       }
     }
     return List.copyOf(values.values());
+  }
+
+  static Tag normalizeTagDetails(Tag input) {
+    List<String> examples = input.examples() == null ? List.of() : input.examples();
+    if (examples.size() > 20) throw ApiException.invalid("examples", "예시는 최대 20개입니다.");
+    for (String example : examples) {
+      if (example == null) throw ApiException.invalid("examples", "예시는 문자열이어야 합니다.");
+      InputValidation.text(example, 1000, "examples");
+    }
+    return new Tag(
+        input.id(),
+        InputValidation.name(input.name(), "tags.name"),
+        InputValidation.text(input.description(), 4000, "description"),
+        List.copyOf(examples),
+        InputValidation.text(input.guidance(), 4000, "guidance"),
+        InputValidation.text(input.jevPrompt(), 12000, "tags.jevPrompt"),
+        InputValidation.text(input.pythonRegex(), 4000, "tags.pythonRegex"),
+        color(input.color()),
+        input.parentId(),
+        input.order() == null ? 0 : input.order());
   }
 
   static List<PolicyDefinition> normalizePolicies(List<PolicyDefinition> input) {

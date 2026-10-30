@@ -4,6 +4,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.examples.Example;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.ComposedSchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.DateTimeSchema;
@@ -282,10 +283,54 @@ class OpenApiConfiguration {
                               "#C68524",
                               "order",
                               0)))));
+      api.getPaths()
+          .get("/api/v1/config-versions/{id}/tags/{tagId}")
+          .getPut()
+          .getRequestBody()
+          .getContent()
+          .get("application/json")
+          .addExamples(
+              "선택한 버전의 태그 상세 수정",
+              new Example()
+                  .value(
+                      Map.of(
+                          "revision", 2,
+                          "name", "개인정보",
+                          "description", "개인 식별 정보",
+                          "examples", List.of("김예시"),
+                          "guidance", "맥락과 범위를 함께 확인하세요.",
+                          "jevPrompt", "개인을 식별할 수 있는 정보인지 판단하세요.\n맥락을 함께 확인하세요.",
+                          "pythonRegex", "(?i)(?P<email>[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,})",
+                          "color", "#315EA8")));
     };
   }
 
   private static void configurationSchemas(OpenAPI api) {
+    var details = api.getComponents().getSchemas().get("UpdateTagDetails");
+    details
+        .description(
+            "선택한 버전의 기존 태그 상세 전체를 저장합니다. 초안과 게시 버전에서 사용할 수 있으며 트리 구조는 바꾸지 않습니다."
+                + " 같은 논리 ID의 다른 버전에는 적용하지 않습니다. 알 수 없는 필드는 400입니다.")
+        .additionalProperties(false)
+        .addProperty(
+            "name",
+            new StringSchema().minLength(1).maxLength(80).description("필수 이름. 앞뒤 공백을 제거합니다."))
+        .addProperty("description", nullableString().maxLength(4000)._default(""))
+        .addProperty(
+            "examples",
+            new ArraySchema()
+                .maxItems(20)
+                .items(new StringSchema().maxLength(1000))
+                .description(
+                    "예시 문자열 최대 20개. 각 예시는 최대 1000 Unicode code point입니다. 생략하거나 null이면 빈 목록입니다."))
+        .addProperty("guidance", nullableString().maxLength(4000)._default(""))
+        .addProperty(
+            "color",
+            nullableString()
+                .pattern("^#[a-fA-F0-9]{6}$")
+                ._default("#64748B")
+                .description("#RRGGBB 색상. 대문자로 저장하며 생략·null·빈 값이면 #64748B입니다."));
+    details.addRequiredItem("name");
     api.getComponents()
         .getSchemas()
         .get("Tag")
@@ -310,6 +355,9 @@ class OpenApiConfiguration {
                     "태그별 Python 정규식. 최대 4000 Unicode code point이며 공백·줄바꿈·백슬래시·인라인 플래그를 그대로 보존합니다."
                         + " 입력에서 생략하거나 null이면 빈 문자열로 저장하고 응답은 항상 문자열입니다. 부모 패턴을 상속하지 않습니다. 대시보드에서는"
                         + " 문법 검사나 실행을 하지 않으며 Python 문법의 유효성은 탐지기가 판단합니다."));
+    var tag = api.getComponents().getSchemas().get("Tag");
+    details.addProperty("jevPrompt", (Schema<?>) tag.getProperties().get("jevPrompt"));
+    details.addProperty("pythonRegex", (Schema<?>) tag.getProperties().get("pythonRegex"));
   }
 
   private static void detectorSchemas(OpenAPI api) {

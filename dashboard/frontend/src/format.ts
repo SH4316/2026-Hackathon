@@ -108,12 +108,12 @@ export function createId(prefix: string): string {
 
 export type FlatTag = Tag & { depth: number };
 
-function compareTags(a: Tag, b: Tag): number {
-  return (
-    a.order - b.order ||
-    a.name.localeCompare(b.name, "ko") ||
-    a.id.localeCompare(b.id)
-  );
+/** Stable tree order matches the API's ASCII ID tie-breaker, independent of editable labels. */
+export function compareTagOrder(
+  a: Pick<Tag, "id" | "order">,
+  b: Pick<Tag, "id" | "order">,
+): number {
+  return a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
 /** Preorder view of the catalog; transient orphan/cyclic edits cannot hide nodes. */
@@ -129,7 +129,7 @@ export function flattenTree(tags: Tag[]): FlatTag[] {
     siblings.push(tag);
     children.set(parent, siblings);
   }
-  for (const siblings of children.values()) siblings.sort(compareTags);
+  for (const siblings of children.values()) siblings.sort(compareTagOrder);
   const result: FlatTag[] = [];
   const visited = new Set<string>();
   const visit = (root: Tag) => {
@@ -146,7 +146,7 @@ export function flattenTree(tags: Tag[]): FlatTag[] {
     }
   };
   for (const root of children.get(null) ?? []) visit(root);
-  for (const remaining of [...byId.values()].sort(compareTags))
+  for (const remaining of [...byId.values()].sort(compareTagOrder))
     visit(remaining);
   return result;
 }

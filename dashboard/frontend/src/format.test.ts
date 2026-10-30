@@ -95,6 +95,39 @@ function detection(
 }
 
 describe("dynamic tag trees", () => {
+  it("keeps equal-order siblings in ASCII ID order when mutable names change", () => {
+    const tags = [
+      { ...tag("a"), name: "가" },
+      { ...tag("_"), name: "나" },
+      { ...tag("A"), name: "다" },
+      { ...tag("z", "A"), name: "가" },
+      { ...tag("_child", "A"), name: "나" },
+      { ...tag("Z", "A"), name: "다" },
+      { ...tag("later", "A", 1), name: "가" },
+    ];
+    const structure = (items: Tag[]) =>
+      flattenTree(items).map(({ id, parentId, order, depth }) => ({
+        id, parentId, order, depth,
+      }));
+    const before = structure(tags);
+    expect(before).toEqual([
+      { id: "A", parentId: null, order: 0, depth: 0 },
+      { id: "Z", parentId: "A", order: 0, depth: 1 },
+      { id: "_child", parentId: "A", order: 0, depth: 1 },
+      { id: "z", parentId: "A", order: 0, depth: 1 },
+      { id: "later", parentId: "A", order: 1, depth: 1 },
+      { id: "_", parentId: null, order: 0, depth: 0 },
+      { id: "a", parentId: null, order: 0, depth: 0 },
+    ]);
+
+    const renamed = tags.map((item) => ({
+      ...item,
+      name: item.name === "가" ? "힣" : item.name === "다" ? "A" : "가",
+    }));
+    expect(structure(renamed)).toEqual(before);
+    expect(flattenTree(renamed).find(({ id }) => id === "A")?.name).toBe("A");
+  });
+
   it("flattens sibling order and depth without changing catalog objects", () => {
     const tags = [
       tag("child", "root"),

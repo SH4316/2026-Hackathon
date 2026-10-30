@@ -2657,10 +2657,32 @@ dd {
 }
 .editor-detail-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 24px;
+}
+.editor-detail-header > div:first-child {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.editor-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag-detail-scope,
+.new-tag-save-note {
+  color: #5e6c82;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.tag-detail-scope {
+  margin-top: 8px;
+}
+.new-tag-save-note {
+  margin-bottom: 19px;
 }
 .editor-detail-header h2 {
   font-size: 18px;

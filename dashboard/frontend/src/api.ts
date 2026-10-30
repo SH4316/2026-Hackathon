@@ -8,6 +8,7 @@ import type {
   Person,
   SavedSearch,
   SaveSearchInput,
+  SaveTagDetailsInput,
   SaveVersionInput,
   SecurityEvent,
   VersionSummary,
@@ -108,6 +109,16 @@ export const api = {
   },
   saveVersion(id: string, input: SaveVersionInput): Promise<ConfigVersion> {
     return request(`/config-versions/${resourceId(id)}`, json("PUT", input));
+  },
+  saveTagDetails(
+    versionId: string,
+    tagId: string,
+    input: SaveTagDetailsInput,
+  ): Promise<ConfigVersion> {
+    return request(
+      `/config-versions/${resourceId(versionId)}/tags/${resourceId(tagId)}`,
+      json("PUT", input),
+    );
   },
   publishVersion(id: string, revision: number): Promise<ConfigVersion> {
     return request(

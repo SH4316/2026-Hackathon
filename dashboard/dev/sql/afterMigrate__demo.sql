@@ -156,13 +156,15 @@ SELECT e.id,CHAR_LENGTH('데모 전용 가상 자료 · '),CHAR_LENGTH('데모 �
 FROM _demo_events s JOIN security_events e ON e.source_id='demo-sql-v2' AND e.event_id=s.event_key
 WHERE s.has_detection AND e.prompt=s.prompt_value
  AND NOT EXISTS(SELECT 1 FROM detections existing WHERE existing.event_id=e.id AND existing.start_offset=CHAR_LENGTH('데모 전용 가상 자료 · '));
-INSERT IGNORE INTO detection_tags(detection_id,version_id,tag_id)
-SELECT d.id,e.version_id,s.tag_id FROM _demo_events s JOIN security_events e ON e.source_id='demo-sql-v2' AND e.event_id=s.event_key
+INSERT IGNORE INTO detection_tags(detection_id,version_id,tag_id,captured_name,captured_color)
+SELECT d.id,e.version_id,t.id,t.name,t.color FROM _demo_events s JOIN security_events e ON e.source_id='demo-sql-v2' AND e.event_id=s.event_key
  JOIN detections d ON d.event_id=e.id AND d.start_offset=CHAR_LENGTH('데모 전용 가상 자료 · ')
+ JOIN config_version_tags t ON t.version_id=e.version_id AND t.id=s.tag_id
 WHERE s.has_detection AND NOT EXISTS(SELECT 1 FROM detection_tags existing WHERE existing.detection_id=d.id AND existing.tag_id=s.tag_id);
-INSERT IGNORE INTO detection_tags(detection_id,version_id,tag_id)
-SELECT d.id,e.version_id,s.parent_id FROM _demo_events s JOIN security_events e ON e.source_id='demo-sql-v2' AND e.event_id=s.event_key
+INSERT IGNORE INTO detection_tags(detection_id,version_id,tag_id,captured_name,captured_color)
+SELECT d.id,e.version_id,t.id,t.name,t.color FROM _demo_events s JOIN security_events e ON e.source_id='demo-sql-v2' AND e.event_id=s.event_key
  JOIN detections d ON d.event_id=e.id AND d.start_offset=CHAR_LENGTH('데모 전용 가상 자료 · ')
+ JOIN config_version_tags t ON t.version_id=e.version_id AND t.id=s.parent_id
 WHERE s.has_detection AND NOT EXISTS(SELECT 1 FROM detection_tags existing WHERE existing.detection_id=d.id AND existing.tag_id=s.parent_id);
 -- Two equal pieces of text at different ranges remain two detections. Each range has two tags.
 INSERT IGNORE INTO detections(event_id,start_offset,end_offset,text)
@@ -173,8 +175,8 @@ INSERT IGNORE INTO detections(event_id,start_offset,end_offset,text)
 SELECT e.id,LOCATE('김하늘의 확인',e.prompt)-1,LOCATE('김하늘의 확인',e.prompt)+CHAR_LENGTH('김하늘')-1,'김하늘'
 FROM _demo_events s JOIN security_events e ON e.source_id='demo-sql-v2' AND e.event_id=s.event_key WHERE s.has_detection AND s.repeated_name
  AND NOT EXISTS(SELECT 1 FROM detections existing WHERE existing.event_id=e.id AND existing.start_offset=LOCATE('김하늘의 확인',e.prompt)-1);
-INSERT IGNORE INTO detection_tags(detection_id,version_id,tag_id)
-SELECT d.id,e.version_id,t.id FROM _demo_events s JOIN security_events e ON e.source_id='demo-sql-v2' AND e.event_id=s.event_key
+INSERT IGNORE INTO detection_tags(detection_id,version_id,tag_id,captured_name,captured_color)
+SELECT d.id,e.version_id,t.id,t.name,t.color FROM _demo_events s JOIN security_events e ON e.source_id='demo-sql-v2' AND e.event_id=s.event_key
  JOIN detections d ON d.event_id=e.id AND d.text='김하늘'
  JOIN config_version_tags t ON t.version_id=e.version_id AND t.id IN ('pii','pii-1')
 WHERE s.has_detection AND s.repeated_name

@@ -88,6 +88,35 @@ describe("V2 query contract", () => {
 });
 
 describe("configuration version lifecycle", () => {
+  it("saves only mutable tag details in the selected version with its current revision", async () => {
+    const saved = { id: "published/a", status: "PUBLISHED", revision: 6 };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(saved)));
+    vi.stubGlobal("fetch", fetchMock);
+    const input = {
+      revision: 5,
+      name: "수정한 이름",
+      description: "설명",
+      examples: ["첫 예시", "둘째 😀 예시"],
+      guidance: "판단 맥락",
+      jevPrompt: "  판단 기준 😀\n다음 줄\n  ",
+      pythonRegex: String.raw`(?im)^\b(?P<label>private)\b[ \t]*$`,
+      color: "#123456",
+    };
+
+    expect(await api.saveTagDetails("published/a", "tag/b", input)).toEqual(saved);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0]).toEqual([
+      "/api/v1/config-versions/published%2Fa/tags/tag%2Fb",
+      {
+        method: "PUT",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    ]);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty("parentId");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty("order");
+  });
+
   it("sends revision-checked draft edits and publish while preserving logical IDs", async () => {
     const fetchMock = vi
       .fn()

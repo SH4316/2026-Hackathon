@@ -69,6 +69,11 @@ export interface SaveVersionInput {
   policyStates: PolicyDefinition[];
 }
 
+/** Mutable details for one tag in one version; tree structure stays unchanged. */
+export type SaveTagDetailsInput = Omit<Tag, "id" | "parentId" | "order"> & {
+  revision: number;
+};
+
 export interface Person {
   id: string;
   name: string;
