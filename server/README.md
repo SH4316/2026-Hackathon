@@ -94,7 +94,7 @@ python -m prompt_guard inspect                                  # 대화형 입�
 
 ## 전송 목적지 등급
 
-`policies/destinations.yaml` 은 [AI 모델별 데이터 정책 정리](../docs/ai-model-data-policy.md)를 근거로
+`policies/destinations.yaml` 은 [AI 모델별 데이터 정책 정리](../docs/ai-model-data-policy.md)(정정판 JSON: `docs/ai-model-data-policy.json`)를 근거로
 목적지별 등급을 정합니다. 등급은 기본 정책을 **강화만** 합니다.
 
 | 등급 | 근거 | 효과 |
