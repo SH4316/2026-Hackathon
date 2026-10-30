@@ -3,10 +3,20 @@
   "name": "Prompt Guard",
   "version": "0.1.0",
   "description": "외부 생성형 AI에 보내기 전에 조직 검사 서버로 프롬프트의 민감정보를 확인하고 정제합니다.",
-  "permissions": ["storage"],
-  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
-  "background": { "service_worker": "src/background.js" },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -26,11 +36,50 @@
         "http://localhost/*",
         "http://127.0.0.1/*"
       ],
-      "exclude_matches": ["http://127.0.0.1:8000/*", "http://localhost:8000/*"],
-      "js": ["src/labels.js", "src/sites.js", "src/ui.js", "src/content.js"],
+      "exclude_matches": [
+        "http://127.0.0.1:8000/*",
+        "http://localhost:8000/*"
+      ],
+      "js": [
+        "src/labels.js",
+        "src/sites.js",
+        "src/ui.js",
+        "src/restore.js",
+        "src/files.js",
+        "src/local.js",
+        "src/content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
-  "action": { "default_popup": "popup.html", "default_title": "Prompt Guard" },
-  "options_page": "options.html"
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Prompt Guard"
+  },
+  "options_page": "options.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "vendor/prompt-guard-rules/src/*.js",
+        "vendor/prompt-guard-rules/data/*.js"
+      ],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://chat.deepseek.com/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://chat.mistral.ai/*",
+        "https://www.perplexity.ai/*",
+        "https://grok.com/*",
+        "https://chat.qwen.ai/*",
+        "https://www.meta.ai/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ]
+    }
+  ]
 }

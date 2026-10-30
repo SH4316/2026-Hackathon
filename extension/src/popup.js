@@ -19,3 +19,8 @@ chrome.runtime.sendMessage({ type: "health" }).then((res) => {
     detailEl.textContent = "검사할 수 없으면 전송을 보류합니다. 설정에서 서버 주소를 확인하세요.";
   }
 });
+
+chrome.storage.local.get({ stats: {} }).then(({ stats }) => {
+  document.getElementById("stats").textContent =
+    `이 브라우저에서 막은 전송·첨부 ${stats.blocked || 0}회 · 안전하게 다듬은 횟수 ${stats.sanitized || 0}회 · 그래도 전송 ${stats.forced || 0}회`;
+});

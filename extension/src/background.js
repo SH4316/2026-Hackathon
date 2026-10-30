@@ -7,6 +7,8 @@ const DEFAULTS = {
   apiKey: "",
   enabled: true,
   timeoutMs: 15000,
+  // 내용을 검사할 수 없는 파일(이미지·음성 등) 첨부를 막을지
+  blockUnscannableFiles: false,
 };
 
 async function getSettings() {
@@ -47,6 +49,16 @@ function checkRequest(msg) {
   };
 }
 
+// 이 브라우저에만 쌓는 횟수 통계. 원문은 포함하지 않으며 어디로도 전송하지 않는다.
+const STAT_NAMES = ["blocked", "sanitized", "forced"];
+async function bumpStat(name) {
+  if (!STAT_NAMES.includes(name)) return { ok: false, error: "unknown_stat" };
+  const { stats = {} } = await chrome.storage.local.get("stats");
+  stats[name] = (stats[name] || 0) + 1;
+  await chrome.storage.local.set({ stats });
+  return { ok: true };
+}
+
 async function handle(msg) {
   switch (msg?.type) {
     case "inspect":
@@ -57,6 +69,8 @@ async function handle(msg) {
       return callServer("GET", "/readyz");
     case "settings":
       return { ok: true, data: await getSettings() };
+    case "stat":
+      return bumpStat(msg.name);
     default:
       return { ok: false, error: "unknown_message" };
   }
