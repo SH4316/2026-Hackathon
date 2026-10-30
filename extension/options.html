@@ -52,6 +52,50 @@
       <span id="msg" class="muted" role="status"></span>
     </div>
   </form>
+
+  <section class="rules" aria-labelledby="rules-title">
+    <h2 id="rules-title">내 정규식 규칙</h2>
+    <p class="muted small">조직 규칙 외에 이 브라우저에서만 추가로 찾을 형식(사번·과제번호 등)을 정합니다. 서버 판정에 더해 판정을 강화만 하며, 조직 규칙을 끄거나 약하게 만들 수는 없습니다. 규칙은 이 브라우저에만 저장되고 서버로 보내지 않습니다.</p>
+    <ul id="ruleList" class="rule-list"></ul>
+    <p id="ruleEmpty" class="muted small">아직 추가한 규칙이 없습니다.</p>
+
+    <form id="ruleForm">
+      <label>이름
+        <input id="ruleLabel" type="text" maxlength="60" required placeholder="사번">
+      </label>
+      <label>정규식
+        <input id="rulePattern" type="text" maxlength="300" required spellcheck="false" placeholder="(?&lt;![A-Z0-9])EMP-\d{6}(?!\d)">
+      </label>
+      <p class="muted small">Python 정규식 문법(\d \w 는 한글 등 Unicode 포함). 이름 그룹·인라인 플래그·역참조·중첩 수량자((a+)+)는 쓸 수 없습니다.</p>
+      <div class="rule-grid">
+        <label>조치
+          <select id="ruleAction">
+            <option value="mask">치환 필요</option>
+            <option value="warn">확인 필요</option>
+            <option value="block">전송 불가</option>
+          </select>
+        </label>
+        <label>토큰 이름
+          <input id="ruleToken" type="text" maxlength="30" required spellcheck="false" placeholder="EMP_ID">
+        </label>
+      </div>
+      <p class="muted small">치환하면 <code id="tokenPreview">[MY_EMP_ID_1]</code> 처럼 바뀝니다.</p>
+      <label class="row toggle">
+        <span>대소문자 구분</span>
+        <input id="ruleCase" type="checkbox">
+      </label>
+      <label>시험 문장(저장하지 않음)
+        <textarea id="ruleSample" rows="3" spellcheck="false" placeholder="사번 EMP-123456 으로 조회해 줘"></textarea>
+      </label>
+      <p id="ruleTestOut" class="rule-test muted small" aria-live="polite"></p>
+      <div class="actions">
+        <button type="submit">규칙 추가</button>
+        <button id="ruleTest" type="button">시험</button>
+        <span id="ruleMsg" class="muted" role="status"></span>
+      </div>
+    </form>
+  </section>
   <script src="src/options.js"></script>
+  <script type="module" src="src/options-rules.js"></script>
 </body>
 </html>
