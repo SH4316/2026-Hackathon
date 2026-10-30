@@ -83,7 +83,7 @@ PG.NOTICE_LABELS = {
   model_endpoint_unset: "Jev 모델 엔드포인트가 설정되지 않아 기능이 비활성화되어 있습니다.",
   model_check_failed: "문맥 검사(로컬 모델)를 완료하지 못했습니다.",
   model_check_required_but_disabled: "정책상 필요한 문맥 검사(로컬 모델)가 꺼져 있습니다.",
-  org_config_unavailable: "조직 대시보드 규칙을 받을 수 없어 검사를 끝내지 못했습니다.",
+  org_config_unavailable: "조직 대시보드 규칙을 받을 수 없습니다. 메트릭 설정의 게시·활성화와 검사 서버의 대시보드 연결 설정을 확인하세요.",
   report_failed: "대시보드 기록을 확인하지 못해 전송을 보류했습니다. 다시 시도해 주세요.",
   org_jev_failed: "조직 Jev 판정(로컬 모델)을 완료하지 못했습니다.",
   org_jev_model_disabled: "조직 Jev 판정에 필요한 로컬 모델이 꺼져 있습니다.",
@@ -99,6 +99,7 @@ PG.ERROR_LABELS = {
   network: "검사 서버에 연결할 수 없습니다.",
   timeout: "검사 서버 응답 시간이 초과되었습니다.",
   http_401: "검사 서버 인증에 실패했습니다. 확장프로그램 설정의 API 키를 확인하세요.",
+  http_503: "검사 서버 또는 모델이 준비되지 않았습니다. 서버 상태를 확인하고 다시 시도하세요.",
   http_413: "입력이 너무 길어 검사할 수 없습니다.",
   http_422: "검사 요청 형식이 올바르지 않습니다.",
 };

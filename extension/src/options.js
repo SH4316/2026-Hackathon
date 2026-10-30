@@ -1,4 +1,5 @@
 import { initAIControls } from "./ai-controls.js";
+import "./labels.js";
 void initAIControls();
 const $ = (id) => document.getElementById(id);
 const msg = $("msg");
@@ -95,5 +96,5 @@ $("test").addEventListener("click", async () => {
   const res = await chrome.runtime.sendMessage({ type: "health" });
   msg.textContent = res?.ok
     ? `연결됨 · 정책 ${res.data.policy_version}`
-    : `실패: ${res?.error} (저장 후 다시 시도하세요)`;
+    : globalThis.PG.errorLabel(res?.error || "network");
 });

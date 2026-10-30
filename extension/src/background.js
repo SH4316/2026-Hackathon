@@ -1,6 +1,7 @@
 import { runInspection } from "./inspection.js";
 import { BUNDLE_KEY, BUNDLE_ALARM, createBundleCache } from "./rules-cache.js";
 import { fileReportRequest } from "./file-report.js";
+import { checkServer, requestServer, REQUEST_TIMEOUT_MS, INSPECTION_TIMEOUT_MS } from "./server-client.js";
 
 // 서비스 워커: 서버 검사와 독립적인 기기 내 AI 검사를 조합한다.
 // content script 는 페이지 CORS 의 영향을 받으므로 서버 요청은 모두 여기서 보낸다.
@@ -14,7 +15,8 @@ const DEFAULTS = {
   enabled: true,
   serverEnabled: true,
   localAiEnabled: false,
-  timeoutMs: 15000,
+  timeoutMs: REQUEST_TIMEOUT_MS,
+  inspectionTimeoutMs: INSPECTION_TIMEOUT_MS,
   // 내용을 검사할 수 없는 파일(이미지·음성 등) 첨부를 막을지
   blockUnscannableFiles: false,
   // 대시보드 등록 코드로 연결한 정보 { clientId, label, personId, managed }
@@ -33,25 +35,7 @@ async function getSettings() {
 
 async function callServer(method, path, body, settings) {
   const s = settings || await getSettings();
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), s.timeoutMs);
-  try {
-    const headers = { "Content-Type": "application/json" };
-    if (s.apiKey) headers["X-API-Key"] = s.apiKey;
-    const res = await fetch(s.serverUrl.replace(/\/+$/, "") + path, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-      signal: ctrl.signal,
-    });
-    if (!res.ok) return { ok: false, error: `http_${res.status}` };
-    try { return { ok: true, data: res.status === 204 ? null : await res.json() }; }
-    catch { return { ok: false, error: "invalid_inspection" }; }
-  } catch (err) {
-    return { ok: false, error: err.name === "AbortError" ? "timeout" : "network" };
-  } finally {
-    clearTimeout(timer);
-  }
+  return requestServer(method, path, body, s, { keepAlive: () => chrome.runtime.getPlatformInfo() });
 }
 
 function checkRequest(msg) {
@@ -199,8 +183,7 @@ async function handle(msg, sender) {
     case "sanitize":
       return inspect(msg, sender);
     case "health": {
-      const s = await getSettings();
-      return s.serverEnabled ? callServer("GET", "/readyz", undefined, s) : { ok: false, error: "server_disabled" };
+      return checkServer(await getSettings(), callServer);
     }
     case "ai:prepare":
       return prepareAI();

@@ -71,6 +71,7 @@ content / files → background (서버·로컬 결과 조합)
 
 ```bash
 npm test                   # 토크나이저/판정 기준 Python 참조 비교, 결과 조합·실패 처리, 토큰 복원
+npm run e2e:server          # 연결 인증·조직 설정 누락·35초 지연 판정 후 전송·시간 초과 보류(합성 API)
 npx playwright install chromium
 npm run e2e:ai             # 실제 ONNX + 실제 확장프로그램, 첫 실행은 모델 다운로드
 # 테스트 전용 프로필을 재사용하면 모델 다운로드를 줄일 수 있습니다.
@@ -104,6 +105,14 @@ AI만 감지한 프롬프트·파일 경고, 스위치 변경 후 이전 승인 
 - 경고 화면은 Shadow DOM 으로 사이트 CSS 와 분리했고, 사용자 텍스트는 `textContent` 로만 그립니다.
 - 원문은 확장프로그램 저장소·콘솔에 남기지 않습니다. 서버 주소·API 키·검사 설정·개인 규칙·서버 규칙 묶음·텍스트 없는 AI 준비 상태와 횟수를 `chrome.storage.local`에 저장합니다. **조직 대시보드에는 기본적으로 원문이 저장됩니다**(`report_text=full`; `masked`·`off` 선택 가능).
 - 관리 상태의 전송 직전 검사는 `send_action=normal|confirmed|forced`로 선택을 기록합니다. 서버가 대시보드 기록을 기다린 뒤 돌려주는 `report_status`가 `failed`이거나 없으면 회색으로 보류합니다. `recorded`는 기록 완료, `skipped`는 조직 설정상 기록 제외입니다. 기록은 전송 전 선택이며 외부 AI 수신 성공을 증명하지 않습니다.
+
+### Compose 연결 후 판정이 끝나지 않을 때
+
+연결 테스트는 인증이 필요한 `/v1/rules/bundle`과 모델 준비 상태(`/readyz`)를 함께 확인합니다. API 키가 없거나 틀리면 **인증 실패**, 조직 서버에 활성 규칙이 없으면 **준비 안 됨**과 함께 원인을 표시합니다. `.env`의 `PG_API_KEYS` 중 한 키 또는 등록 코드로 발급받은 개인 토큰을 사용하고, 대시보드의 메트릭 설정이 게시·활성화됐는지 확인하세요. 대시보드 연결 URL을 발급했다면 서버의 `PG_DASHBOARD_CONNECTION`도 설정해야 합니다.
+
+CPU 모델 판정은 연결 확인보다 오래 걸릴 수 있습니다. `/v1/inspect`·`/v1/sanitize`는 기본 **270초**, 연결 확인·등록 등 일반 요청은 **15초**까지 기다립니다. 검사 요청이 진행되는 동안에만 서비스 워커를 유지하며 완료·실패·시간 초과 시 종료합니다([Chrome의 장시간 작업 안내](https://developer.chrome.com/docs/extensions/develop/migrate/to-service-workers#keep_a_service_worker_alive_until_a_long-running_operation_is_finished)). 정제는 원문 검사와 정제문 재검사를 모두 수행하므로 입력·규칙 수·장비 성능에 따라 이 한도를 넘을 수 있습니다. 검사 실패는 전송 승인이 되지 않습니다.
+
+서버와 Decider 이미지는 접근 로그를 끄므로 `docker compose logs --tail=80 server decider`에 POST 기록이 없는 것만으로 요청이 도착하지 않았다고 판단할 수 없습니다. `Unsupported upgrade request`는 HTTP 업그레이드 관련 경고이며 검사 API 자체는 WebSocket을 사용하지 않습니다. Nginx·터널을 거친다면 동일 요청을 서버의 공개 포트로 직접 보내 비교하세요.
 
 ## SafePrompt 위젯 (입력창 신호등)
 

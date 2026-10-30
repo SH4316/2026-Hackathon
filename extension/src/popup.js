@@ -1,4 +1,5 @@
 import { initAIControls } from "./ai-controls.js";
+import "./labels.js";
 void initAIControls();
 const statusEl = document.getElementById("status");
 const detailEl = document.getElementById("detail");
@@ -10,7 +11,7 @@ enabledEl.addEventListener("change", () => chrome.storage.local.set({ enabled: e
 document.getElementById("options").addEventListener("click", () => chrome.runtime.openOptionsPage());
 
 async function health() {
-const res = await chrome.runtime.sendMessage({ type: "health" });
+  const res = await chrome.runtime.sendMessage({ type: "health" });
   if (res?.ok) {
     statusEl.dataset.state = "ok";
     statusEl.textContent = "연결됨";
@@ -23,8 +24,9 @@ const res = await chrome.runtime.sendMessage({ type: "health" });
     detailEl.textContent = "기기 내 AI를 켜면 서버 없이 검사할 수 있습니다.";
   } else {
     statusEl.dataset.state = "error";
-    statusEl.textContent = res?.error === "http_503" ? "준비 안 됨" : "연결 안 됨";
-    detailEl.textContent = "기기 내 AI가 켜져 있으면 기기에서 검사합니다. 서버 주소는 설정에서 확인하세요.";
+    statusEl.textContent = res?.error === "http_401" ? "인증 실패"
+      : ["http_503", "org_config_unavailable"].includes(res?.error) ? "준비 안 됨" : "연결 안 됨";
+    detailEl.textContent = globalThis.PG.errorLabel(res?.error || "network");
   }
 }
 void health();
