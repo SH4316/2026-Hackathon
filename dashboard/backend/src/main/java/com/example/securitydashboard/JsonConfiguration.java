@@ -13,17 +13,29 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 class JsonConfiguration {
-    @Bean
-    Jackson2ObjectMapperBuilderCustomizer strictInput() {
-        return builder -> builder.featuresToDisable(MapperFeature.ALLOW_COERCION_OF_SCALARS).postConfigurer(mapper -> {
-            mapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
-            mapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
-            mapper.getFactory().setStreamReadConstraints(StreamReadConstraints.builder()
-                .maxNestingDepth(16).maxStringLength(4096).maxNameLength(128).maxNumberLength(20).build());
-            mapper.coercionConfigFor(LogicalType.Textual)
-                .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
-                .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
-                .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail);
-        });
-    }
+  @Bean
+  Jackson2ObjectMapperBuilderCustomizer strictInput() {
+    return builder ->
+        builder
+            .featuresToDisable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
+            .postConfigurer(
+                mapper -> {
+                  mapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+                  mapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+                  mapper
+                      .getFactory()
+                      .setStreamReadConstraints(
+                          StreamReadConstraints.builder()
+                              .maxNestingDepth(16)
+                              .maxStringLength(400000)
+                              .maxNameLength(128)
+                              .maxNumberLength(20)
+                              .build());
+                  mapper
+                      .coercionConfigFor(LogicalType.Textual)
+                      .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
+                      .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
+                      .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail);
+                });
+  }
 }

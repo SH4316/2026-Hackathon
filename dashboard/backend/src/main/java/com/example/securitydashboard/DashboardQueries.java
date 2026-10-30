@@ -1,226 +1,457 @@
 package com.example.securitydashboard;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.LocalDate;
+import java.sql.*;
+import java.time.*;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.*;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(readOnly = true)
 class DashboardQueries {
-    private final NamedParameterJdbcTemplate jdbc;
+  private final NamedParameterJdbcTemplate jdbc;
+  private final ConfigurationService configs;
 
-    DashboardQueries(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
+  DashboardQueries(NamedParameterJdbcTemplate jdbc, ConfigurationService configs) {
+    this.jdbc = jdbc;
+    this.configs = configs;
+  }
 
-    ApiModels.Page<ApiModels.Event> events(EventFilter filter, PageRequest page) {
-        Query query = query(filter);
-        long count = count("SELECT COUNT(*) FROM security_events e WHERE " + query.where(), query.parameters());
-        var parameters = query.parameters().addValue("limit", page.size()).addValue("offset", page.offset());
-        var rows = jdbc.query("""
-            SELECT e.*, p.name AS person_name FROM security_events e
-            JOIN people p ON p.id=e.person_id WHERE %s
-            ORDER BY e.occurred_at DESC, e.id DESC LIMIT :limit OFFSET :offset
-            """.formatted(query.where()), parameters, this::eventRow);
-        return ApiModels.Page.of(withFindings(rows), page.page(), page.size(), count);
+  ApiModels.Page<ApiModels.Event> events(EventFilter filter, PageRequest page) {
+    return events(filter, page, null);
+  }
+
+  ApiModels.Page<ApiModels.Event> events(EventFilter filter, PageRequest page, String snapshotId) {
+    Query q = query(filter, snapshotId);
+    long total = count(q.cte() + " SELECT COUNT(*) FROM matched_events", q.parameters());
+    q.parameters().addValue("limit", page.size()).addValue("offset", page.offset());
+    var rows =
+        jdbc.query(
+            q.cte()
+                + eventSelect("matched_events")
+                + " ORDER BY e.occurred_at DESC,e.id DESC LIMIT :limit OFFSET :offset",
+            q.parameters(),
+            this::eventRow);
+    return ApiModels.Page.of(withDetections(rows), page.page(), page.size(), total);
+  }
+
+  ApiModels.Event event(long id) {
+    var rows =
+        jdbc.query(
+            eventSelect("security_events") + " WHERE e.id=:id", Map.of("id", id), this::eventRow);
+    if (rows.isEmpty())
+      throw new ApiException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND", "이벤트를 찾을 수 없습니다.");
+    return withDetections(rows).getFirst();
+  }
+
+  ApiModels.Event byExternalId(String source, String event) {
+    var rows =
+        jdbc.query(
+            eventSelect("security_events") + " WHERE e.source_id=:source AND e.event_id=:event",
+            Map.of("source", source, "event", event),
+            this::eventRow);
+    return rows.isEmpty() ? null : withDetections(rows).getFirst();
+  }
+
+  private String eventSelect(String table) {
+    return " SELECT e.*,p.name AS person_name,cp.name AS policy_state_name FROM "
+        + table
+        + " e JOIN people p ON p.id=e.person_id LEFT JOIN config_version_policies cp ON"
+        + " cp.version_id=e.version_id AND cp.id=e.policy_state_id ";
+  }
+
+  ApiModels.Page<ApiModels.Person> people(
+      EventFilter filter, PageRequest page, String personQuery) {
+    Query q = query(filter, null);
+    String where = "1=1";
+    if (filter.personId() != null) where += " AND p.id=:personId";
+    if (personQuery != null) {
+      ConfigurationService.text(personQuery, 80, "personQuery");
+      where +=
+          " AND (CONVERT(p.id USING utf8mb4) COLLATE utf8mb4_bin LIKE :personQuery ESCAPE '!' OR"
+              + " p.name LIKE :personQuery ESCAPE '!')";
+      q.parameters().addValue("personQuery", "%" + escapeLike(personQuery) + "%");
     }
+    String stats =
+        ", person_stats AS (SELECT e.person_id,COUNT(*) AS"
+            + " event_count,COALESCE(SUM(dc.finding_count),0) AS finding_count,MAX(e.occurred_at)"
+            + " AS last_event_at FROM matched_events e LEFT JOIN (SELECT event_id,COUNT(*)"
+            + " finding_count FROM matched_detections GROUP BY event_id) dc ON dc.event_id=e.id"
+            + " GROUP BY e.person_id) ";
+    String from = " FROM people p LEFT JOIN person_stats s ON s.person_id=p.id WHERE " + where;
+    long total = count(q.cte() + stats + " SELECT COUNT(*)" + from, q.parameters());
+    q.parameters().addValue("limit", page.size()).addValue("offset", page.offset());
+    var rows =
+        jdbc.query(
+            q.cte()
+                + stats
+                + " SELECT p.id,p.name,COALESCE(s.event_count,0)"
+                + " event_count,COALESCE(s.finding_count,0) finding_count,s.last_event_at"
+                + from
+                + " ORDER BY p.name,p.id LIMIT :limit OFFSET :offset",
+            q.parameters(),
+            this::personRow);
+    return ApiModels.Page.of(rows, page.page(), page.size(), total);
+  }
 
-    ApiModels.Event event(long id) {
-        var rows = jdbc.query("""
-            SELECT e.*, p.name AS person_name FROM security_events e
-            JOIN people p ON p.id=e.person_id WHERE e.id=:id
-            """, Map.of("id", id), this::eventRow);
-        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND", "이벤트를 찾을 수 없습니다.");
-        return withFindings(rows).getFirst();
+  ApiModels.Person person(String id, EventFilter filter) {
+    Query q = query(filter, null);
+    q.parameters().addValue("requestedId", id);
+    var rows =
+        jdbc.query(
+            q.cte()
+                + " SELECT p.id,p.name,COUNT(e.id) event_count,COALESCE(SUM(dc.finding_count),0)"
+                + " finding_count,MAX(e.occurred_at) last_event_at FROM people p LEFT JOIN"
+                + " matched_events e ON e.person_id=p.id LEFT JOIN (SELECT event_id,COUNT(*)"
+                + " finding_count FROM matched_detections GROUP BY event_id) dc ON dc.event_id=e.id"
+                + " WHERE p.id=:requestedId GROUP BY p.id,p.name",
+            q.parameters(),
+            this::personRow);
+    if (rows.isEmpty())
+      throw new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "사용자를 찾을 수 없습니다.");
+    return rows.getFirst();
+  }
+
+  ApiModels.Metrics metrics(EventFilter filter) {
+    return metrics(filter, null);
+  }
+
+  ApiModels.Metrics metrics(EventFilter filter, String snapshotId) {
+    Query q = query(filter, snapshotId);
+    var summary =
+        jdbc.queryForObject(
+            q.cte()
+                + " SELECT COUNT(*) event_count,COALESCE(SUM(dc.finding_count),0)"
+                + " finding_count,COUNT(DISTINCT e.person_id) person_count,COALESCE(SUM(CASE WHEN"
+                + " dc.finding_count>0 THEN 1 ELSE 0 END),0) detected_event_count FROM"
+                + " matched_events e LEFT JOIN (SELECT event_id,COUNT(*) finding_count FROM"
+                + " matched_detections GROUP BY event_id) dc ON dc.event_id=e.id",
+            q.parameters(),
+            (rs, n) ->
+                new ApiModels.Summary(
+                    rs.getLong("event_count"),
+                    rs.getLong("finding_count"),
+                    rs.getLong("person_count"),
+                    rs.getLong("detected_event_count")));
+    List<ApiModels.TagMetric> tags =
+        q.version() == null
+            ? List.of()
+            : jdbc.query(
+                q.cte()
+                    + " SELECT t.id,t.parent_id,t.name,t.color,t.sort_order,COUNT(DISTINCT d.id)"
+                    + " finding_count,COUNT(DISTINCT d.event_id) event_count FROM"
+                    + " config_version_tags t LEFT JOIN config_tag_closure c ON"
+                    + " c.version_id=t.version_id AND c.ancestor_id=t.id LEFT JOIN detection_tags"
+                    + " dt ON dt.tag_id=c.descendant_id LEFT JOIN matched_detections d ON"
+                    + " d.id=dt.detection_id WHERE t.version_id=:viewVersion GROUP BY"
+                    + " t.id,t.parent_id,t.name,t.color,t.sort_order ORDER BY t.sort_order,t.id",
+                q.parameters(),
+                (rs, n) ->
+                    new ApiModels.TagMetric(
+                        rs.getString("id"),
+                        rs.getString("parent_id"),
+                        rs.getString("name"),
+                        rs.getString("color"),
+                        rs.getInt("sort_order"),
+                        rs.getLong("finding_count"),
+                        rs.getLong("event_count")));
+    var unmapped =
+        jdbc.queryForObject(
+            q.cte()
+                + " SELECT COUNT(*) finding_count,COUNT(DISTINCT d.event_id) event_count FROM"
+                + " matched_detections d WHERE "
+                + unmappedPredicate(),
+            q.parameters(),
+            (rs, n) ->
+                new ApiModels.Unmapped(rs.getLong("finding_count"), rs.getLong("event_count")));
+    var services =
+        jdbc.query(
+            q.cte()
+                + " SELECT e.service,COUNT(*) event_count,COALESCE(SUM(dc.finding_count),0)"
+                + " finding_count FROM matched_events e LEFT JOIN (SELECT event_id,COUNT(*)"
+                + " finding_count FROM matched_detections GROUP BY event_id) dc ON dc.event_id=e.id"
+                + " GROUP BY e.service ORDER BY event_count DESC,e.service",
+            q.parameters(),
+            (rs, n) ->
+                new ApiModels.ServiceMetric(
+                    rs.getString("service"),
+                    rs.getLong("event_count"),
+                    rs.getLong("finding_count")));
+    return new ApiModels.Metrics(
+        q.version() == null ? null : q.version().id(),
+        summary,
+        series(q),
+        tags,
+        unmapped,
+        policies(q),
+        services);
+  }
+
+  private List<ApiModels.PolicyMetric> policies(Query q) {
+    var counts =
+        jdbc.query(
+            q.cte()
+                + " SELECT e.policy_state_id id,MAX(cp.name) name,MAX(cp.color) color,COUNT(*)"
+                + " event_count FROM matched_events e JOIN config_version_policies cp ON"
+                + " cp.version_id=e.version_id AND cp.id=e.policy_state_id GROUP BY"
+                + " e.policy_state_id",
+            q.parameters(),
+            (rs, n) ->
+                new ApiModels.PolicyMetric(
+                    rs.getString("id"),
+                    rs.getString("name"),
+                    rs.getString("color"),
+                    rs.getLong("event_count"),
+                    false));
+    Map<String, ApiModels.PolicyMetric> remaining = new LinkedHashMap<>();
+    counts.forEach(p -> remaining.put(p.id(), p));
+    List<ApiModels.PolicyMetric> result = new ArrayList<>();
+    if (q.version() != null)
+      for (var p : q.version().policyStates()) {
+        var found = remaining.remove(p.id());
+        result.add(
+            new ApiModels.PolicyMetric(
+                p.id(), p.name(), p.color(), found == null ? 0 : found.eventCount(), true));
+      }
+    result.addAll(remaining.values());
+    return result;
+  }
+
+  private List<ApiModels.Series> series(Query q) {
+    List<String> buckets = new ArrayList<>();
+    int index = 0;
+    Instant cursor =
+        q.filter()
+            .from()
+            .atZone(EventFilter.SEOUL)
+            .truncatedTo(q.filter().interval().equals("hour") ? ChronoUnit.HOURS : ChronoUnit.DAYS)
+            .toInstant();
+    // atStartOfDay uses historical timezone rules as well as modern UTC+09.
+    if (q.filter().interval().equals("day"))
+      cursor =
+          q.filter()
+              .from()
+              .atZone(EventFilter.SEOUL)
+              .toLocalDate()
+              .atStartOfDay(EventFilter.SEOUL)
+              .toInstant();
+    while (cursor.isBefore(q.filter().to())) {
+      ZonedDateTime local = cursor.atZone(EventFilter.SEOUL);
+      Instant next =
+          q.filter().interval().equals("hour")
+              ? local.plusHours(1).toInstant()
+              : local.toLocalDate().plusDays(1).atStartOfDay(EventFilter.SEOUL).toInstant();
+      String label =
+          q.filter().interval().equals("hour") ? cursor.toString() : local.toLocalDate().toString();
+      buckets.add(
+          "SELECT :bucket"
+              + index
+              + " bucket,:bucketFrom"
+              + index
+              + " bucket_from,:bucketTo"
+              + index
+              + " bucket_to");
+      q.parameters()
+          .addValue("bucket" + index, label)
+          .addValue("bucketFrom" + index, Timestamp.from(cursor))
+          .addValue("bucketTo" + index, Timestamp.from(next));
+      cursor = next;
+      index++;
     }
+    return jdbc.query(
+        q.cte()
+            + ", buckets AS ("
+            + String.join(" UNION ALL ", buckets)
+            + ") SELECT b.bucket,COUNT(e.id) event_count,COALESCE(SUM(dc.finding_count),0)"
+            + " finding_count FROM buckets b LEFT JOIN matched_events e ON"
+            + " e.occurred_at>=b.bucket_from AND e.occurred_at<b.bucket_to LEFT JOIN (SELECT"
+            + " event_id,COUNT(*) finding_count FROM matched_detections GROUP BY event_id) dc ON"
+            + " dc.event_id=e.id GROUP BY b.bucket ORDER BY b.bucket",
+        q.parameters(),
+        (rs, n) ->
+            new ApiModels.Series(
+                rs.getString("bucket"), rs.getLong("event_count"), rs.getLong("finding_count")));
+  }
 
-    ApiModels.Page<ApiModels.Person> people(EventFilter filter, PageRequest page, String search) {
-        Query query = query(filter);
-        String personWhere = "1=1";
-        if (filter.personId() != null) personWhere += " AND p.id=:personId";
-        if (search != null) {
-            personWhere += " AND (p.id LIKE :search ESCAPE '!' OR p.name LIKE :search ESCAPE '!')";
-            query.parameters().addValue("search", "%" + escapeLike(search) + "%");
-        }
-        long count = count("SELECT COUNT(*) FROM people p WHERE " + personWhere, query.parameters());
-        var parameters = query.parameters().addValue("limit", page.size()).addValue("offset", page.offset());
-        var rows = jdbc.query("""
-            SELECT p.id, p.name, COALESCE(s.event_count,0) AS event_count,
-                   COALESCE(s.finding_count,0) AS finding_count, s.last_event_at
-            FROM people p LEFT JOIN (%s) s ON s.person_id=p.id
-            WHERE %s ORDER BY p.name, p.id LIMIT :limit OFFSET :offset
-            """.formatted(personStatsSql(query), personWhere), parameters, this::personRow);
-        return ApiModels.Page.of(rows, page.page(), page.size(), count);
+  Query query(EventFilter filter, String snapshotId) {
+    var version = configs.view(filter.versionId());
+    var p =
+        new MapSqlParameterSource("from", timestampBoundary(filter.from()))
+            .addValue("to", timestampBoundary(filter.to()))
+            .addValue("viewVersion", version == null ? null : version.id());
+    String where = "e.occurred_at>=:from AND e.occurred_at<:to";
+    if (filter.service() != null) {
+      where += " AND e.service=:service";
+      p.addValue("service", filter.service());
     }
-
-    ApiModels.Person person(String id, EventFilter filter) {
-        Query query = query(filter);
-        query.parameters().addValue("requestedId", id);
-        var rows = jdbc.query("""
-            SELECT p.id, p.name, COALESCE(s.event_count,0) AS event_count,
-                   COALESCE(s.finding_count,0) AS finding_count, s.last_event_at
-            FROM people p LEFT JOIN (%s) s ON s.person_id=p.id WHERE p.id=:requestedId
-            """.formatted(personStatsSql(query)), query.parameters(), this::personRow);
-        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "사용자를 찾을 수 없습니다.");
-        return rows.getFirst();
+    if (filter.personId() != null) {
+      where += " AND e.person_id=:personId";
+      p.addValue("personId", filter.personId());
     }
-
-    ApiModels.Metrics metrics(EventFilter filter) {
-        Query query = query(filter);
-        String base = " FROM security_events e " + findingJoin(filter) + " WHERE " + query.where();
-        var summary = jdbc.queryForObject("""
-            SELECT COUNT(*) AS event_count, COALESCE(SUM(fc.finding_count),0) AS finding_count,
-                   COUNT(DISTINCT e.person_id) AS person_count,
-                   COALESCE(SUM(CASE WHEN e.policy_state='UNKNOWN' THEN 1 ELSE 0 END),0) AS unknown_policy_count
-            """ + base, query.parameters(), (rs, row) -> new ApiModels.Summary(rs.getLong("event_count"),
-                rs.getLong("finding_count"), rs.getLong("person_count"), rs.getLong("unknown_policy_count")));
-
-        List<ApiModels.Daily> daily = daily(query);
-
-        Map<Category, ApiModels.CategoryMetric> byCategory = new EnumMap<>(Category.class);
-        String selectedCategory = filter.category() == null ? "" : " AND f.category=:category";
-        jdbc.query("""
-            SELECT f.category, SUM(f.quantity) AS finding_count, COUNT(DISTINCT e.id) AS event_count
-            FROM security_events e JOIN findings f ON f.event_id=e.id WHERE %s %s GROUP BY f.category
-            """.formatted(query.where(), selectedCategory), query.parameters(), (rs, row) ->
-                new ApiModels.CategoryMetric(Category.valueOf(rs.getString("category")), rs.getLong("finding_count"), rs.getLong("event_count")))
-            .forEach(value -> byCategory.put(value.category(), value));
-        List<ApiModels.CategoryMetric> categories = java.util.Arrays.stream(Category.values())
-            .map(category -> byCategory.getOrDefault(category, new ApiModels.CategoryMetric(category, 0, 0))).toList();
-
-        Map<PolicyState, Long> policyCounts = new EnumMap<>(PolicyState.class);
-        jdbc.query("SELECT e.policy_state, COUNT(*) AS event_count FROM security_events e WHERE " + query.where()
-                + " AND e.policy_state IS NOT NULL GROUP BY e.policy_state", query.parameters(), (rs, row) ->
-                    new ApiModels.PolicyMetric(PolicyState.valueOf(rs.getString("policy_state")), rs.getLong("event_count")))
-            .forEach(value -> policyCounts.put(value.policyState(), value.eventCount()));
-        List<ApiModels.PolicyMetric> policies = java.util.Arrays.stream(PolicyState.values())
-            .map(policy -> new ApiModels.PolicyMetric(policy, policyCounts.getOrDefault(policy, 0L))).toList();
-
-        var services = jdbc.query("SELECT e.service, COUNT(*) AS event_count, COALESCE(SUM(fc.finding_count),0) AS finding_count"
-            + base + " GROUP BY e.service ORDER BY event_count DESC, e.service", query.parameters(), (rs, row) ->
-                new ApiModels.ServiceMetric(rs.getString("service"), rs.getLong("event_count"), rs.getLong("finding_count")));
-        return new ApiModels.Metrics(summary, daily, categories, policies, services);
+    if (filter.policyStateId() != null) {
+      where += " AND e.policy_state_id=:policyStateId";
+      p.addValue("policyStateId", filter.policyStateId());
     }
-
-    private List<ApiModels.Daily> daily(Query query) {
-        // Calendar boundaries come from the JVM timezone database, including historical Seoul
-        // offsets and DST. Counts still aggregate in MySQL, with no timezone-table prerequisite.
-        List<String> buckets = new ArrayList<>();
-        LocalDate lastDay = query.filter().to().minusNanos(1).atZone(EventFilter.SEOUL).toLocalDate();
-        int index = 0;
-        for (LocalDate date = query.filter().from().atZone(EventFilter.SEOUL).toLocalDate(); !date.isAfter(lastDay); date = date.plusDays(1)) {
-            buckets.add("SELECT :date" + index + " AS bucket, :dayFrom" + index + " AS day_from, :dayTo" + index + " AS day_to");
-            query.parameters().addValue("date" + index, date.toString())
-                .addValue("dayFrom" + index, timestampBoundary(date.atStartOfDay(EventFilter.SEOUL).toInstant()))
-                .addValue("dayTo" + index, timestampBoundary(date.plusDays(1).atStartOfDay(EventFilter.SEOUL).toInstant()));
-            index++;
-        }
-        return jdbc.query("""
-            SELECT days.bucket, COUNT(e.id) AS event_count, COALESCE(SUM(fc.finding_count),0) AS finding_count
-            FROM (%s) days LEFT JOIN security_events e
-              ON e.occurred_at >= days.day_from AND e.occurred_at < days.day_to AND %s
-            %s GROUP BY days.bucket ORDER BY days.bucket
-            """.formatted(String.join(" UNION ALL ", buckets), query.where(), findingJoin(query.filter())),
-            query.parameters(), (rs, row) -> new ApiModels.Daily(LocalDate.parse(rs.getString("bucket")),
-                rs.getLong("event_count"), rs.getLong("finding_count")));
+    if (filter.q() != null) {
+      where += " AND e.prompt LIKE :promptQuery ESCAPE '!'";
+      p.addValue("promptQuery", "%" + escapeLike(filter.q()) + "%");
     }
-
-    private String personStatsSql(Query query) {
-        return "SELECT e.person_id, COUNT(*) AS event_count, COALESCE(SUM(fc.finding_count),0) AS finding_count, "
-            + "MAX(e.occurred_at) AS last_event_at FROM security_events e " + findingJoin(query.filter())
-            + " WHERE " + query.where() + " GROUP BY e.person_id";
+    if (filter.hasDetections() != null)
+      where +=
+          " AND "
+              + (filter.hasDetections() ? "" : "NOT ")
+              + "EXISTS (SELECT 1 FROM detections hd WHERE hd.event_id=e.id)";
+    String span = "1=1";
+    if (filter.tagId() != null) {
+      if (version == null || version.tags().stream().noneMatch(t -> t.id().equals(filter.tagId())))
+        throw new ApiException(
+            HttpStatus.UNPROCESSABLE_ENTITY, "TAG_NOT_IN_VERSION", "조회 버전에 등록된 태그를 선택해 주세요.");
+      p.addValue("tagId", filter.tagId());
+      span =
+          "EXISTS (SELECT 1 FROM detection_tags dt JOIN config_tag_closure c ON"
+              + " c.descendant_id=dt.tag_id AND c.version_id=:viewVersion WHERE"
+              + " dt.detection_id=d.id AND c.ancestor_id=:tagId)";
     }
-
-    private String findingJoin(EventFilter filter) {
-        return " LEFT JOIN (SELECT event_id, SUM(quantity) AS finding_count FROM findings"
-            + (filter.category() == null ? "" : " WHERE category=:category")
-            + " GROUP BY event_id) fc ON fc.event_id=e.id ";
+    if (filter.unmapped()) span = unmappedPredicate();
+    if (filter.tagId() != null || filter.unmapped())
+      where += " AND EXISTS (SELECT 1 FROM detections d WHERE d.event_id=e.id AND " + span + ")";
+    if (snapshotId != null) {
+      where +=
+          " AND EXISTS (SELECT 1 FROM saved_search_events se WHERE se.saved_search_id=:snapshotId"
+              + " AND se.event_id=e.id)";
+      p.addValue("snapshotId", snapshotId);
     }
+    String cte =
+        "WITH matched_events AS (SELECT e.* FROM security_events e WHERE "
+            + where
+            + "), matched_detections AS (SELECT d.* FROM detections d JOIN matched_events e ON"
+            + " e.id=d.event_id WHERE "
+            + span
+            + ")";
+    return new Query(filter, version, where, span, cte, p);
+  }
 
-    private Query query(EventFilter filter) {
-        var parameters = new MapSqlParameterSource("from", timestampBoundary(filter.from()))
-            .addValue("to", timestampBoundary(filter.to()));
-        String where = "e.occurred_at >= :from AND e.occurred_at < :to";
-        if (filter.service() != null) {
-            where += " AND e.service=:service";
-            parameters.addValue("service", filter.service());
-        }
-        if (filter.personId() != null) {
-            where += " AND e.person_id=:personId";
-            parameters.addValue("personId", filter.personId());
-        }
-        if (filter.policyState() != null) {
-            where += " AND e.policy_state=:policyState";
-            parameters.addValue("policyState", filter.policyState().name());
-        }
-        if (filter.category() != null) {
-            where += " AND EXISTS (SELECT 1 FROM findings matched WHERE matched.event_id=e.id AND matched.category=:category)";
-            parameters.addValue("category", filter.category().name());
-        }
-        return new Query(filter, where, parameters);
-    }
+  private static String unmappedPredicate() {
+    return "NOT EXISTS (SELECT 1 FROM detection_tags ut JOIN config_version_tags vt ON"
+        + " vt.id=ut.tag_id AND vt.version_id=:viewVersion WHERE ut.detection_id=d.id)";
+  }
 
-    private ApiModels.Event eventRow(ResultSet rs, int row) throws SQLException {
-        String policy = rs.getString("policy_state");
-        return new ApiModels.Event(rs.getLong("id"), rs.getString("source_id"), rs.getString("event_id"),
-            rs.getString("person_id"), rs.getString("person_name"), instant(rs, "occurred_at"), instant(rs, "received_at"),
-            rs.getString("service"), rs.getString("model"), policy == null ? null : PolicyState.valueOf(policy), List.of(), 0);
-    }
+  private ApiModels.Event eventRow(ResultSet rs, int n) throws SQLException {
+    return new ApiModels.Event(
+        rs.getLong("id"),
+        rs.getString("source_id"),
+        rs.getString("event_id"),
+        rs.getString("version_id"),
+        rs.getString("person_id"),
+        rs.getString("person_name"),
+        rs.getString("prompt"),
+        instant(rs, "occurred_at"),
+        instant(rs, "received_at"),
+        rs.getString("service"),
+        rs.getString("model"),
+        rs.getString("policy_state_id"),
+        rs.getString("policy_state_name"),
+        List.of(),
+        0);
+  }
 
-    private List<ApiModels.Event> withFindings(List<ApiModels.Event> events) {
-        if (events.isEmpty()) return List.of();
-        Map<Long, List<ApiModels.Finding>> findings = new LinkedHashMap<>();
-        jdbc.query("SELECT event_id, category, quantity FROM findings WHERE event_id IN (:ids) ORDER BY event_id, category",
-            Map.of("ids", events.stream().map(ApiModels.Event::id).toList()), rs -> {
-                findings.computeIfAbsent(rs.getLong("event_id"), id -> new ArrayList<>())
-                    .add(new ApiModels.Finding(Category.valueOf(rs.getString("category")), rs.getInt("quantity")));
-            });
-        return events.stream().map(event -> {
-            var values = findings.getOrDefault(event.id(), List.of()).stream()
-                .sorted(java.util.Comparator.comparing(ApiModels.Finding::category)).toList();
-            return new ApiModels.Event(event.id(), event.sourceId(), event.eventId(), event.personId(), event.personName(),
-                event.occurredAt(), event.receivedAt(), event.service(), event.model(), event.policyState(), values,
-                values.stream().mapToLong(ApiModels.Finding::quantity).sum());
-        }).toList();
-    }
+  private List<ApiModels.Event> withDetections(List<ApiModels.Event> events) {
+    if (events.isEmpty()) return List.of();
+    record DetectionRow(long id, long eventId, int start, int end, String text) {}
+    var p = Map.of("ids", events.stream().map(ApiModels.Event::id).toList());
+    var rows =
+        jdbc.query(
+            "SELECT d.* FROM detections d WHERE d.event_id IN (:ids) ORDER BY"
+                + " d.event_id,d.start_offset,d.end_offset",
+            p,
+            (rs, n) ->
+                new DetectionRow(
+                    rs.getLong("id"),
+                    rs.getLong("event_id"),
+                    rs.getInt("start_offset"),
+                    rs.getInt("end_offset"),
+                    rs.getString("text")));
+    Map<Long, List<ApiModels.DetectionTag>> tagMap = new HashMap<>();
+    jdbc.query(
+        "SELECT dt.detection_id,t.id,t.name,t.color FROM detection_tags dt JOIN detections d ON"
+            + " d.id=dt.detection_id JOIN config_version_tags t ON t.version_id=dt.version_id AND"
+            + " t.id=dt.tag_id WHERE d.event_id IN (:ids) ORDER BY dt.detection_id,t.id",
+        p,
+        (org.springframework.jdbc.core.RowCallbackHandler)
+            rs ->
+                tagMap
+                    .computeIfAbsent(rs.getLong("detection_id"), key -> new ArrayList<>())
+                    .add(
+                        new ApiModels.DetectionTag(
+                            rs.getString("id"), rs.getString("name"), rs.getString("color"))));
+    Map<Long, List<ApiModels.Detection>> detections = new HashMap<>();
+    for (var d : rows)
+      detections
+          .computeIfAbsent(d.eventId(), key -> new ArrayList<>())
+          .add(
+              new ApiModels.Detection(
+                  d.id(), d.start(), d.end(), d.text(), tagMap.getOrDefault(d.id(), List.of())));
+    return events.stream()
+        .map(
+            e -> {
+              var ds = detections.getOrDefault(e.id(), List.of());
+              return new ApiModels.Event(
+                  e.id(),
+                  e.sourceId(),
+                  e.eventId(),
+                  e.versionId(),
+                  e.personId(),
+                  e.personName(),
+                  e.prompt(),
+                  e.occurredAt(),
+                  e.receivedAt(),
+                  e.service(),
+                  e.model(),
+                  e.policyStateId(),
+                  e.policyStateName(),
+                  ds,
+                  ds.size());
+            })
+        .toList();
+  }
 
-    private ApiModels.Person personRow(ResultSet rs, int row) throws SQLException {
-        return new ApiModels.Person(rs.getString("id"), rs.getString("name"), rs.getLong("event_count"),
-            rs.getLong("finding_count"), instant(rs, "last_event_at"));
-    }
+  private ApiModels.Person personRow(ResultSet rs, int n) throws SQLException {
+    return new ApiModels.Person(
+        rs.getString("id"),
+        rs.getString("name"),
+        rs.getLong("event_count"),
+        rs.getLong("finding_count"),
+        instant(rs, "last_event_at"));
+  }
 
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        // JDBC and the MySQL connection both operate in UTC (also explicit for non-UTC host JVMs).
-        Timestamp timestamp = rs.getTimestamp(column, java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")));
-        return timestamp == null ? null : timestamp.toInstant();
-    }
+  static Instant instant(ResultSet rs, String column) throws SQLException {
+    Timestamp t = rs.getTimestamp(column, Calendar.getInstance(TimeZone.getTimeZone("UTC")));
+    return t == null ? null : t.toInstant();
+  }
 
-    private static Timestamp timestampBoundary(Instant instant) {
-        Instant micros = instant.truncatedTo(ChronoUnit.MICROS);
-        // Stored events have microsecond precision. Ceiling both query bounds preserves [from,to).
-        if (!micros.equals(instant)) micros = micros.plus(1, ChronoUnit.MICROS);
-        return Timestamp.from(micros);
-    }
+  static Timestamp timestampBoundary(Instant instant) {
+    Instant micros = instant.truncatedTo(ChronoUnit.MICROS);
+    if (!micros.equals(instant)) micros = micros.plus(1, ChronoUnit.MICROS);
+    return Timestamp.from(micros);
+  }
 
-    private long count(String sql, MapSqlParameterSource parameters) {
-        Long value = jdbc.queryForObject(sql, parameters, Long.class);
-        return value == null ? 0 : value;
-    }
+  private long count(String sql, MapSqlParameterSource params) {
+    Long count = jdbc.queryForObject(sql, params, Long.class);
+    return count == null ? 0 : count;
+  }
 
-    private static String escapeLike(String value) {
-        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
-    }
+  private static String escapeLike(String value) {
+    return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+  }
 
-    private record Query(EventFilter filter, String where, MapSqlParameterSource parameters) {}
+  record Query(
+      EventFilter filter,
+      ApiModels.ConfigVersion version,
+      String where,
+      String span,
+      String cte,
+      MapSqlParameterSource parameters) {}
 }

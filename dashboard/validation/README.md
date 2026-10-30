@@ -1,37 +1,36 @@
-# 실행 검증 기록
+# V2 실행 검증 기록
 
-검증일: 2026-10-30 UTC. 이 기록은 이 작업 환경에서 실제 실행한 검증 결과만 기술합니다.
+검증일: 2026-10-30 UTC. 실제 실행한 결과만 기록하며, V1 검증은 [legacy-v1](legacy-v1/README.md)에 보관합니다. V1의 수량 기반 집계 결과를 V2의 근거로 사용하지 않습니다.
 
-## 환경
+## 환경과 범위
 
-- Java: OpenJDK 21.0.12.1 (`/usr/lib/jvm/java-21-openjdk-amd64`)
-- Node.js: 24.22.1
-- MySQL: 공식 MySQL Community Server 8.4.7, 서버 시간대 `+00:00`
-- DB 서버: `127.0.0.1:33306`, 전용 테스트 스키마 `ai_security_dashboard_test`, 시연 스키마 `ai_security_dashboard`
-- Compose: Docker Compose 2.39.4로 `compose.yaml config --quiet` 통과
+Java OpenJDK 21.0.12.1, Node.js 24.22.1, 공식 MySQL Community Server 8.4.7을 사용했습니다. 실제 MySQL은 임시 경로 `/tmp/dashboard-runtime`의 기존 데이터 디렉터리를 이용해 로컬 `127.0.0.1:33306`에서 실행했습니다. 필요한 라이브러리도 같은 임시 경로에 있으며 시스템 패키지를 변경하지 않았습니다.
 
-이 실행 환경에는 Docker Engine와 CLI가 없고, 비특권 사용자(UID 1000), 커널 capability 없음, `NoNewPrivs=1`입니다. 사용자 네임스페이스 생성도 `Operation not permitted`로 실패했습니다. 따라서 이 환경에서 Compose 컨테이너 실행과 Docker 볼륨 재시작은 검증하지 못했습니다. Compose 구문은 공식 Compose CLI로 검증했습니다.
+일반 HTTP 검증은 `sending_http_v2_test`, JUnit은 `sending_test`, 업그레이드는 `sending_upgrade_v2_test`, SQL 반복 검증은 `sending_empty_v2_test`, 개발 화면은 `sending_demo_v2`로 분리했습니다. SQL 반복 검증 DB 이름의 `empty`는 최초 스키마 검증 용도이며 최종 상태는 시드가 적용된 테스트 DB입니다. 기존 V1 시연 DB는 변경하지 않았습니다.
 
-DB 검증은 공식 `mysql-8.4.7-linux-glibc2.28-x86_64-minimal.tar.xz`를 `/tmp/dashboard-runtime/`에 내려받아 기존 시스템을 변경하지 않고 실행했습니다. 필요한 libaio/libnuma/ncurses 라이브러리도 같은 임시 디렉터리에 추출했습니다. H2나 MariaDB로 대체하지 않았습니다. 서버는 로컬 주소에만 바인딩했고, JUnit용 DB와 시연 DB를 분리했습니다.
+Docker Engine를 사용할 수 없어 Compose 이미지 빌드·컨테이너 기동·볼륨 재시작은 실행하지 않았습니다. Compose 2.39.4로 최종 구성 해석과 불변 조건만 검증했습니다. 로컬 MySQL/JAR 검증을 Docker 런타임 검증으로 표현하지 않습니다. 관리형 환경 상태 도구와 `/etc/codex/network-policy.json`은 이 세션에 없었습니다. Browser/Node REPL 도구도 발견되지 않아 Browser 스킬을 읽은 뒤 기존 임시 Playwright 설치를 사용했습니다.
 
-## 결과
+## 완료된 검증
 
-- [backend-tests.json](backend-tests.json): Java 21 백엔드 13개 테스트 통과, 실패·오류·건너뜀 0개. 이 중 9개는 실제 MySQL 통합 테스트입니다. UTC와 `Asia/Seoul` JVM 시간대에서 검증했으며 역사적 서울 일광절약시간 구간과 마이크로초 경계도 포함합니다.
-- 프런트엔드 담당 검증: Node.js 24.22.1에서 Vitest 22개와 TypeScript·Vite 프로덕션 빌드 통과. API 오류/쿼리, 날짜·한국 시간 표시, 필터를 유지하는 개인 링크, 비동기 갱신·취소 동작을 확인했습니다.
-- [api-smoke.json](api-smoke.json): 별도 HTTP 테스트 DB에서 실제 API 검증 통과. 12개 동시 중복 요청 중 최초 한 개만 `201`, 나머지는 `200`과 동일 ID를 반환했습니다. 재전송 정규화·충돌, 집계/필터, 날짜 경계, 페이지, 0건 사용자, 잘못된 입력을 확인했습니다.
-- [persistence.json](persistence.json): MySQL을 정상 종료한 뒤 같은 데이터 디렉터리로 재시작했습니다. API의 사용자 페이지·이벤트 페이지·전체 집계가 전후 동일했고 기존 앱의 DB 연결 풀도 복구되었습니다. 4명·48건·감지 수량 213개·명시적 미확인 12건이 유지되었습니다.
-- [package-smoke.json](package-smoke.json): Java 21로 최종 JAR를 실행하여 6개 SPA 경로와 해시 JS/CSS 파일을 검증했습니다. 없는 정적 파일·API·임의 경로는 실제 404를 반환하고 API는 JSON을 반환합니다. 프런트엔드 파일이 JAR 내부에도 포함됨을 확인했습니다.
-- [browser-smoke.json](browser-smoke.json): 최종 JAR의 분리된 HTTP 테스트 DB에서 Chromium 기능 검증 통과. 수동 새로고침·자동 갱신 없음, 항목→이력→상세→개인 이동, 페이지 이동, 날짜 오류, 필터·빈 상태, 등록·중복 오류·검색, 7개 설정 입력과 저장 비활성/요청 없음, 네트워크 재시도·상세 404, 390px 모바일 내비게이션을 확인했습니다. 처리되지 않은 JavaScript 오류는 0개입니다.
-- [demo-package-smoke.json](demo-package-smoke.json): 시연용 `8080` 프로세스도 최종 JAR로 교체한 뒤 같은 SPA/정적 파일/API 검증을 통과했습니다. 기존 시연 데이터 전체 스냅샷이 교체 전과 동일합니다.
-- [accessibility.json](accessibility.json): 최종 JAR의 6개 화면에서 axe 위반 규칙·노드 0개, 실행 오류 0개. 각 화면을 320·390·768·1280·1440px에서 측정한 30개 반응형 검사에서 문서 전체의 가로 넘침 0건입니다. 표 내부의 의도된 가로 스크롤과 구별하여 검사했습니다.
-  - 자동 명암비 판정이 `incomplete`인 노드는 전체 현황 15개, 탐지 이력 1개, 개인 상세 15개입니다. 이 결과는 자동 검사가 판단하지 못한 부분을 포함하며 전체 WCAG 수동 검증 완료를 의미하지 않습니다. 최종 화면 검토 담당자에게 해당 범위를 전달했습니다.
-- 샘플 스크립트 첫 실행은 이벤트 48건 생성, 두 번째 실행은 신규 0건·기존 48건을 확인했습니다.
-- Compose 2.39.4 설정 검증과 Python 스크립트 컴파일·브라우저 스크립트 문법 검사도 통과했습니다.
+- [backend-tests.json](backend-tests.json): 백엔드 21개 테스트, 실패·오류·건너뜀 모두 0. 단위 7개, 실제 MySQL API 13개, 실제 Flyway 업그레이드 1개입니다. 동시 초안 수정과 활성화, 동일·상이한 재전송 경쟁도 포함합니다.
+- [api-smoke.json](api-smoke.json), [빈 DB 첫 실행](fresh-start-api-smoke.json): 별도 HTTP 서버의 실제 MySQL 검증. 빈 일반 DB와 활성 버전 없음, 사용자 정의 설정·게시·활성화, 코드 포인트 이모지 구간과 동일 범위 태그 합집합, 마이크로초, 기본값 재전송, 12개 동시 요청의 `201` 한 건·`200` 11건, 필터와 SQL 집계, 버전 재해석·미매핑·당시 라벨, 전체 결과 스냅샷 고정, 오류 응답을 확인했습니다.
+- [sql-runtime.json](sql-runtime.json): 실제 Flyway로 V1을 적용하고 사람 1명·이벤트 1개·감지 1개를 넣은 뒤 V2로 올려 모두 초기화됨을 확인했습니다. V2에 새 사람을 추가하고 다시 시작했을 때 보존되며 마이그레이션 이력도 두 개로 유지됩니다. V1 SQL 파일은 기존 커밋과 동일합니다.
+- 같은 SQL 기록에서 개발 콜백 두 번 적용 후 2개 게시 버전·96개 버전별 태그 노드·6개 정책·6명·209개 이벤트·246개 감지·492개 태그 연결이 동일함을 확인했습니다. 수정한 버전·태그 이름과 선택한 활성 `demo-v2`가 유지되고, 모든 구간의 코드 포인트 부분 문자열이 원문과 일치했습니다. 실제 애플리케이션에서도 파일 시스템 콜백을 발견해 정상 실행했습니다.
+- [compose-config.json](compose-config.json), [compose-dev.md](compose-dev.md): 일반·개발 볼륨 분리, 읽기 전용 SQL 마운트, 개발 전용 Flyway 위치, 단일 앱 포트 치환, 호스트 `DB_URL` 차단, 추가 시드 컨테이너 없음을 확인했습니다.
 
-검증한 최종 JAR: `backend/build/libs/ai-security-dashboard.jar` (60,138,994바이트), SHA-256 `be6091686f558b2b6a20e1a33218d610fe8a05dddb11b2724decf296be170d09`.
+- [package-smoke.json](package-smoke.json): 패키지의 9개 SPA 경로, 실제 JS·CSS 파일, 없는 API·정적 파일·임의 경로의 404, Swagger UI 두 경로와 OpenAPI 상대 서버 `/`를 확인했습니다. 개발 시드 SQL이 JAR에 들어가지 않았습니다. [개발 DB의 패키지 실행](demo-package-smoke.json)도 같은 검사를 통과했습니다.
+- [browser-smoke.json](browser-smoke.json): 실제 패키지의 Chromium 흐름을 확인했습니다. 그래프 중심 현황과 수동 갱신, 시간별 조회·트리 이동, 이모지 포함 원문과 위치 강조, 감지 0건·프롬프트 검색, 저장 후 추가 이벤트에도 고정된 결과와 다시 조회, 부모·자식·예시·지침·정책 편집 및 저장·발행·활성화·복제·수정 충돌 회복, 사람 등록·검색, 활성 트리에 따른 읽기 전용 감시 연동, 네트워크 재시도·없는 상세·모바일 이동을 통과했습니다. 처리되지 않은 JavaScript 오류는 0개입니다.
 
-현재 이 작업 환경의 시연 URL은 <http://127.0.0.1:8080>입니다. Java 21 단일 JAR와 실제 MySQL을 사용하며 테스트용 등록 데이터는 이 시연 DB에 섞이지 않았습니다. 작업 환경을 종료하면 임시 서버도 종료됩니다.
+- [frontend-tests.json](frontend-tests.json): 최종 프런트엔드 44개 테스트·6개 파일과 타입 검사·프로덕션 빌드를 통과했습니다. 데이터·쿼리·비동기 갱신과 버전 전환·예시 줄바꿈·복제 이름 등 UI 회귀 검증을 포함합니다.
+- [v2-accessibility.json](v2-accessibility.json): 9개 상태에서 1440·390px의 axe 검사 18회, 5개 너비(320·390·768·1280·1440px)의 문서 크기 측정 45회를 수행했습니다. 자동 위반·문서 가로 넘침·실행 오류는 모두 0개입니다. 감시 항목 영역은 키보드 Tab으로 접근하고 PageDown으로 스크롤되며 비활성 입력 47개가 유지됨을 별도로 확인했습니다. `incomplete` 판정은 보고서에 그대로 보존했으며 수동 보조 기술 검증과 WCAG 전체 적합성 판정을 포함하지 않습니다.
+
+최종 JAR: `backend/build/libs/ai-security-dashboard.jar`, 34,265,324바이트. SHA-256 `5cd84561e22d9664340273de6ff4dbc1f55459ef7bb208a4747c8d75f4498004`. 최종 JAR의 새 일반 DB에서 API와 전체 브라우저 흐름을 다시 통과했습니다. Python 스크립트 컴파일과 브라우저 스크립트 문법 검사도 통과했습니다.
 
 ## 재실행
 
-일반 개발 환경에서는 [README](../README.md)의 Compose와 별도 테스트 DB 생성 절차를 사용합니다. `TEST_DB_URL`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`를 지정해 백엔드 테스트를 실행하고, 테스트 DB에 연결된 앱에 대해 `scripts/smoke_api.py`를 실행합니다. 앱과 MySQL을 멈췄다가 동일 데이터 디렉터리 또는 볼륨으로 다시 시작한 뒤 기존 사용자·이벤트 ID를 조회하면 재시작 후 영속성을 확인할 수 있습니다.
+[README](../README.md)의 테스트 DB 생성 및 실행 명령을 사용합니다. 테스트 데이터는 게시 후 수정·삭제되지 않는 이벤트와 설정을 포함하므로 시연 DB와 분리해야 합니다. `scripts/smoke_api.py`는 API, `scripts/smoke_package.py`는 SPA·Swagger·JAR 경계, `scripts/smoke_browser.mjs`는 UI 흐름, `scripts/smoke_compose.py`는 Compose 구성을 검사합니다. 자동 접근성 검사는 `scripts/smoke_accessibility.mjs`를 사용하며 수동 WCAG 전체 검증을 의미하지 않습니다.
+
+
+현재 시연 주소는 <http://127.0.0.1:8080>입니다. [최종 시연 실행 검증](demo-runtime.json)에서 같은 개발 DB의 게시 버전 2개·활성 `demo-v1`·사람 6명·이벤트 209개·감지 246개·감지된 이벤트 172개가 유지됨을 확인했습니다. 일반 스키마가 최신 상태여서 마이그레이션은 다시 실행되지 않았고, 개발 SQL 콜백은 중복·임시 테이블 경고 없이 실행됐습니다. 두 번째 트리로 조회해도 전체 이벤트 수가 유지됩니다. 최종 `8080`에서 SPA·Swagger·API 경계 검사도 다시 통과했습니다.
+
+Vite 미리보기를 위한 `8082`는 유지했고 테스트 전용 HTTP 서버 `8083`은 종료했습니다. 시연은 로컬 Java 21과 실제 MySQL을 사용하며 Docker 컨테이너 실행 결과가 아닙니다. 작업 환경이 종료되면 임시 서버도 종료됩니다.

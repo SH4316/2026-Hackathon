@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { DependencyList } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DependencyList } from "react";
 
 interface ResourceState<T> {
   data: T | null;
@@ -18,7 +18,10 @@ interface InternalResource<T> extends ResourceState<T> {
 }
 
 /** Loads on context changes or explicit refresh, with no polling or focus refetch. */
-export function useResource<T>(loader: (signal: AbortSignal) => Promise<T>, deps: DependencyList): Resource<T> {
+export function useResource<T>(
+  loader: (signal: AbortSignal) => Promise<T>,
+  deps: DependencyList,
+): Resource<T> {
   const context = useMemo(() => ({}), deps);
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
@@ -49,14 +52,22 @@ export function useResource<T>(loader: (signal: AbortSignal) => Promise<T>, deps
       .then(() => load(controller.signal))
       .then((data) => {
         if (active && !controller.signal.aborted) {
-          setState({ context, revision, data, loading: false, error: null, updatedAt: new Date() });
+          setState({
+            context,
+            revision,
+            data,
+            loading: false,
+            error: null,
+            updatedAt: new Date(),
+          });
         }
       })
       .catch((error: unknown) => {
         if (active && !controller.signal.aborted) {
-          const message = error instanceof Error && error.name !== 'TypeError'
-            ? error.message
-            : '서버에 연결하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.';
+          const message =
+            error instanceof Error && error.name !== "TypeError"
+              ? error.message
+              : "서버에 연결하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.";
           setState((previous) => ({
             ...previous,
             context,

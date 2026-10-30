@@ -1,20 +1,26 @@
 {
   "status": "PASS",
-  "checkedAt": "2026-10-30T15:19:27.243476+00:00",
-  "baseUrl": "http://127.0.0.1:8081",
+  "checkedAt": "2026-10-30T17:32:13.464126+00:00",
+  "baseUrl": "http://127.0.0.1:8083",
   "spaRoutes": [
     "/",
     "/events",
     "/events/1",
     "/people",
     "/people/demo-person",
-    "/settings/monitoring"
+    "/settings/metrics",
+    "/settings/monitoring",
+    "/saved-searches",
+    "/saved-searches/demo-snapshot"
   ],
   "assets": [
-    "/assets/index-CaK7VVmB.js",
-    "/assets/index-CFzXB7Ez.css"
+    "/assets/index-B7N3KnUK.js",
+    "/assets/index-CuicbBHA.css"
   ],
   "missingResourcesReturn404": true,
   "apiReturnsJson": true,
-  "jarSha256": "be6091686f558b2b6a20e1a33218d610fe8a05dddb11b2724decf296be170d09"
+  "swaggerUiServed": true,
+  "openApiRelativeServer": true,
+  "devSqlExcludedFromJar": true,
+  "jarSha256": "5cd84561e22d9664340273de6ff4dbc1f55459ef7bb208a4747c8d75f4498004"
 }

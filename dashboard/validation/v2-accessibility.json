@@ -1,0 +1,1131 @@
+{
+  "status": "PASS",
+  "generatedAt": "2026-10-30T17:30:14.406Z",
+  "baseUrl": "http://127.0.0.1:5174",
+  "browser": "156.0.8078.4",
+  "axeVersion": "4.14.0",
+  "standards": [
+    "wcag2a",
+    "wcag2aa",
+    "wcag21a",
+    "wcag21aa"
+  ],
+  "axeWidths": [
+    1440,
+    390
+  ],
+  "responsiveWidths": [
+    320,
+    390,
+    768,
+    1280,
+    1440
+  ],
+  "viewportHeight": 1000,
+  "savedSearchCountAtStart": 0,
+  "fixtures": "Labeled demo prompt/person and published demo configuration. Temporary cloned draft removed after checks. Saved-search empty UI uses an explicit [] response fixture for its list GET, isolating concurrent runtime mutations; no saved searches removed.",
+  "privacy": "No prompt bodies, node HTML, response bodies or exception payloads recorded.",
+  "summary": {
+    "states": 9,
+    "axeScans": 18,
+    "violationRules": 0,
+    "violationNodes": 0,
+    "responsiveMeasurements": 45,
+    "horizontalOverflowFailures": 0,
+    "errorStateMeasurements": 0,
+    "runtimeErrorCount": 0,
+    "temporaryDraftDeleted": true,
+    "keyboardChecks": 2,
+    "keyboardCheckFailures": 0
+  },
+  "axe": [
+    {
+      "state": "overview",
+      "route": "/",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 1
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 38
+        }
+      ],
+      "passes": 26
+    },
+    {
+      "state": "events",
+      "route": "/events",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 24
+    },
+    {
+      "state": "prompt",
+      "route": "/events/60",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 18
+    },
+    {
+      "state": "people",
+      "route": "/people",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 1
+        }
+      ],
+      "passes": 24
+    },
+    {
+      "state": "person",
+      "route": "/people/demo-person-06",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 14
+        }
+      ],
+      "passes": 28
+    },
+    {
+      "state": "editor-published",
+      "route": "/settings/metrics?versionId=demo-v1",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 24
+    },
+    {
+      "state": "editor-editable",
+      "route": "/settings/metrics?versionId=v_8a864c842c79461cb4855ab20f17de9f",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 24
+    },
+    {
+      "state": "saved-empty",
+      "route": "/saved-searches",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 16
+    },
+    {
+      "state": "monitoring",
+      "route": "/settings/monitoring",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 22,
+      "recheckedAt": "2026-10-30T17:30:13.426Z"
+    },
+    {
+      "state": "overview",
+      "route": "/",
+      "width": 390,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 1
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 35
+        }
+      ],
+      "passes": 26
+    },
+    {
+      "state": "events",
+      "route": "/events",
+      "width": 390,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 88
+        }
+      ],
+      "passes": 25
+    },
+    {
+      "state": "prompt",
+      "route": "/events/60",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 18
+    },
+    {
+      "state": "people",
+      "route": "/people",
+      "width": 390,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 1
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 12
+        }
+      ],
+      "passes": 25
+    },
+    {
+      "state": "person",
+      "route": "/people/demo-person-06",
+      "width": 390,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 35
+        }
+      ],
+      "passes": 29
+    },
+    {
+      "state": "editor-published",
+      "route": "/settings/metrics?versionId=demo-v1",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 24
+    },
+    {
+      "state": "editor-editable",
+      "route": "/settings/metrics?versionId=v_8a864c842c79461cb4855ab20f17de9f",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 24
+    },
+    {
+      "state": "saved-empty",
+      "route": "/saved-searches",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 16
+    },
+    {
+      "state": "monitoring",
+      "route": "/settings/monitoring",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 22,
+      "recheckedAt": "2026-10-30T17:30:14.387Z"
+    }
+  ],
+  "responsive": [
+    {
+      "state": "overview",
+      "route": "/",
+      "width": 320,
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "metric-tree-scroll",
+          "clientWidth": 282,
+          "scrollWidth": 282,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "events",
+      "route": "/events",
+      "width": 320,
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 282,
+          "scrollWidth": 785,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "prompt",
+      "route": "/events/60",
+      "width": 320,
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "people",
+      "route": "/people",
+      "width": 320,
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 282,
+          "scrollWidth": 525,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "person",
+      "route": "/people/demo-person-06",
+      "width": 320,
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 282,
+          "scrollWidth": 785,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-published",
+      "route": "/settings/metrics?versionId=demo-v1",
+      "width": 320,
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 282,
+          "scrollWidth": 282,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-editable",
+      "route": "/settings/metrics?versionId=v_8a864c842c79461cb4855ab20f17de9f",
+      "width": 320,
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 282,
+          "scrollWidth": 282,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "saved-empty",
+      "route": "/saved-searches",
+      "width": 320,
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "monitoring",
+      "route": "/settings/monitoring",
+      "width": 320,
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "settings-fields",
+          "clientWidth": 280,
+          "scrollWidth": 280,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "overview",
+      "route": "/",
+      "width": 390,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "metric-tree-scroll",
+          "clientWidth": 352,
+          "scrollWidth": 352,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "events",
+      "route": "/events",
+      "width": 390,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 352,
+          "scrollWidth": 785,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "prompt",
+      "route": "/events/60",
+      "width": 390,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "people",
+      "route": "/people",
+      "width": 390,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 352,
+          "scrollWidth": 525,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "person",
+      "route": "/people/demo-person-06",
+      "width": 390,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 352,
+          "scrollWidth": 785,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-published",
+      "route": "/settings/metrics?versionId=demo-v1",
+      "width": 390,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 352,
+          "scrollWidth": 352,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-editable",
+      "route": "/settings/metrics?versionId=v_8a864c842c79461cb4855ab20f17de9f",
+      "width": 390,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 352,
+          "scrollWidth": 352,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "saved-empty",
+      "route": "/saved-searches",
+      "width": 390,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "monitoring",
+      "route": "/settings/monitoring",
+      "width": 390,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "monitoring-catalog",
+          "clientWidth": 352,
+          "scrollWidth": 352,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": [],
+      "recheckedAt": "2026-10-30T17:30:14.387Z"
+    },
+    {
+      "state": "overview",
+      "route": "/",
+      "width": 768,
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "metric-tree-scroll",
+          "clientWidth": 538,
+          "scrollWidth": 538,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "events",
+      "route": "/events",
+      "width": 768,
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 538,
+          "scrollWidth": 800,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "prompt",
+      "route": "/events/60",
+      "width": 768,
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "people",
+      "route": "/people",
+      "width": 768,
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 538,
+          "scrollWidth": 538,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "person",
+      "route": "/people/demo-person-06",
+      "width": 768,
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 538,
+          "scrollWidth": 800,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-published",
+      "route": "/settings/metrics?versionId=demo-v1",
+      "width": 768,
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 234,
+          "scrollWidth": 234,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-editable",
+      "route": "/settings/metrics?versionId=v_8a864c842c79461cb4855ab20f17de9f",
+      "width": 768,
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 234,
+          "scrollWidth": 234,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "saved-empty",
+      "route": "/saved-searches",
+      "width": 768,
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "monitoring",
+      "route": "/settings/monitoring",
+      "width": 768,
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "settings-fields",
+          "clientWidth": 536,
+          "scrollWidth": 536,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "overview",
+      "route": "/",
+      "width": 1280,
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "metric-tree-scroll",
+          "clientWidth": 563,
+          "scrollWidth": 563,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "events",
+      "route": "/events",
+      "width": 1280,
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 1018,
+          "scrollWidth": 1018,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "prompt",
+      "route": "/events/60",
+      "width": 1280,
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "people",
+      "route": "/people",
+      "width": 1280,
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 1018,
+          "scrollWidth": 1018,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "person",
+      "route": "/people/demo-person-06",
+      "width": 1280,
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 1018,
+          "scrollWidth": 1018,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-published",
+      "route": "/settings/metrics?versionId=demo-v1",
+      "width": 1280,
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 269,
+          "scrollWidth": 269,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-editable",
+      "route": "/settings/metrics?versionId=v_8a864c842c79461cb4855ab20f17de9f",
+      "width": 1280,
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 269,
+          "scrollWidth": 269,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "saved-empty",
+      "route": "/saved-searches",
+      "width": 1280,
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "monitoring",
+      "route": "/settings/monitoring",
+      "width": 1280,
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "settings-fields",
+          "clientWidth": 1016,
+          "scrollWidth": 1016,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "overview",
+      "route": "/",
+      "width": 1440,
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "metric-tree-scroll",
+          "clientWidth": 658,
+          "scrollWidth": 658,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "events",
+      "route": "/events",
+      "width": 1440,
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 1134,
+          "scrollWidth": 1134,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "prompt",
+      "route": "/events/60",
+      "width": 1440,
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "people",
+      "route": "/people",
+      "width": 1440,
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 1134,
+          "scrollWidth": 1134,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "person",
+      "route": "/people/demo-person-06",
+      "width": 1440,
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "table-scroll",
+          "clientWidth": 1134,
+          "scrollWidth": 1134,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-published",
+      "route": "/settings/metrics?versionId=demo-v1",
+      "width": 1440,
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 309,
+          "scrollWidth": 309,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "editor-editable",
+      "route": "/settings/metrics?versionId=v_8a864c842c79461cb4855ab20f17de9f",
+      "width": 1440,
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "editor-tree-body",
+          "clientWidth": 309,
+          "scrollWidth": 309,
+          "overflowX": "auto",
+          "tabIndex": -1
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "state": "saved-empty",
+      "route": "/saved-searches",
+      "width": 1440,
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "state": "monitoring",
+      "route": "/settings/monitoring",
+      "width": 1440,
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflow": false,
+      "errorStateCount": 0,
+      "scrollRegions": [
+        {
+          "className": "monitoring-catalog",
+          "clientWidth": 1134,
+          "scrollWidth": 1134,
+          "overflowX": "auto",
+          "tabIndex": 0
+        }
+      ],
+      "diagnostics": [],
+      "recheckedAt": "2026-10-30T17:30:13.426Z"
+    }
+  ],
+  "runtimeErrors": [],
+  "limitations": "Automated axe WCAG A/AA rules and document overflow checks only; incomplete rules and manual assistive technology testing remain outside this result. Table contents may scroll within labeled regions.",
+  "followUp": {
+    "checkedAt": "2026-10-30T17:30:14.405Z",
+    "scope": "Only monitoring at 1440/390 after adding a labeled, keyboard-focusable scroll wrapper outside the disabled fieldset. Previous results for other states remain unchanged.",
+    "resolvedFindings": [
+      {
+        "state": "monitoring",
+        "width": 1440,
+        "previousRules": [
+          "scrollable-region-focusable"
+        ],
+        "currentViolationRules": [],
+        "keyboardCheckPassed": true
+      },
+      {
+        "state": "monitoring",
+        "width": 390,
+        "previousRules": [
+          "scrollable-region-focusable"
+        ],
+        "currentViolationRules": [],
+        "keyboardCheckPassed": true
+      }
+    ],
+    "keyboardChecks": [
+      {
+        "width": 1440,
+        "tabCount": 11,
+        "keyboardReachable": true,
+        "pageDownScrolled": true,
+        "scrollTopBefore": 0,
+        "focused": true,
+        "scrollTop": 376,
+        "clientHeight": 430,
+        "scrollHeight": 3730,
+        "tabIndex": 0,
+        "role": "region",
+        "accessibleLabel": "활성 버전의 수집 태그 목록",
+        "fieldsetDisabled": true,
+        "controlCount": 47,
+        "disabledControlCount": 47,
+        "enabledControlCount": 0,
+        "documentWidth": 1440,
+        "viewportWidth": 1440,
+        "passed": true
+      },
+      {
+        "width": 390,
+        "tabCount": 10,
+        "keyboardReachable": true,
+        "pageDownScrolled": true,
+        "scrollTopBefore": 0,
+        "focused": true,
+        "scrollTop": 376,
+        "clientHeight": 430,
+        "scrollHeight": 3524,
+        "tabIndex": 0,
+        "role": "region",
+        "accessibleLabel": "활성 버전의 수집 태그 목록",
+        "fieldsetDisabled": true,
+        "controlCount": 47,
+        "disabledControlCount": 47,
+        "enabledControlCount": 0,
+        "documentWidth": 390,
+        "viewportWidth": 390,
+        "passed": true
+      }
+    ],
+    "runtimeErrors": []
+  }
+}

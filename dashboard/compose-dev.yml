@@ -6,11 +6,17 @@ services:
       service: backend
     ports: !override
       - "${APP_BIND_IP:-0.0.0.0}:${APP_PORT:-8080}:8080"
+    environment:
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration,filesystem:/app/dev-sql
+    volumes:
+      - ./dev/sql:/app/dev-sql:ro
 
   mysql:
     extends:
       file: compose.yaml
       service: mysql
+    volumes: !override
+      - dev-mysql-data:/var/lib/mysql
 
 volumes:
-  mysql-data:
+  dev-mysql-data:

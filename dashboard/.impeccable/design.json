@@ -1,23 +1,346 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-30T15:20:59.081934+00:00",
+  "generatedAt": "2026-10-30T17:36:55.493817+00:00",
   "title": "Design System: AI 보안 관제",
   "extensions": {
-    "shadows": [
-      {
-        "name": "chart-tooltip",
-        "value": "0 5px 16px #172b4d0d",
-        "purpose": "차트 툴팁에만 사용"
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "탐색·동작 파랑",
+        "canonical": "#365fc5",
+        "tonalRamp": [
+          "oklch(0.15 0.1660 264.69)",
+          "oklch(0.26 0.1660 264.69)",
+          "oklch(0.38 0.1660 264.69)",
+          "oklch(0.49 0.1660 264.69)",
+          "oklch(0.61 0.1660 264.69)",
+          "oklch(0.72 0.1660 264.69)",
+          "oklch(0.84 0.1660 264.69)",
+          "oklch(0.95 0.1660 264.69)"
+        ]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "기본 버튼 호버",
+        "canonical": "#274ca9",
+        "tonalRamp": [
+          "oklch(0.15 0.1556 264.50)",
+          "oklch(0.26 0.1556 264.50)",
+          "oklch(0.38 0.1556 264.50)",
+          "oklch(0.49 0.1556 264.50)",
+          "oklch(0.61 0.1556 264.50)",
+          "oklch(0.72 0.1556 264.50)",
+          "oklch(0.84 0.1556 264.50)",
+          "oklch(0.95 0.1556 264.50)"
+        ]
+      },
+      "primary-surface": {
+        "role": "primary",
+        "displayName": "옅은 파랑 표면",
+        "canonical": "#edf2ff",
+        "tonalRamp": [
+          "oklch(0.15 0.0182 269.09)",
+          "oklch(0.26 0.0182 269.09)",
+          "oklch(0.38 0.0182 269.09)",
+          "oklch(0.49 0.0182 269.09)",
+          "oklch(0.61 0.0182 269.09)",
+          "oklch(0.72 0.0182 269.09)",
+          "oklch(0.84 0.0182 269.09)",
+          "oklch(0.95 0.0182 269.09)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "작업 배경",
+        "canonical": "#f6f8fb",
+        "tonalRamp": [
+          "oklch(0.15 0.0045 258.32)",
+          "oklch(0.26 0.0045 258.32)",
+          "oklch(0.38 0.0045 258.32)",
+          "oklch(0.49 0.0045 258.32)",
+          "oklch(0.61 0.0045 258.32)",
+          "oklch(0.72 0.0045 258.32)",
+          "oklch(0.84 0.0045 258.32)",
+          "oklch(0.95 0.0045 258.32)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "패널 표면",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(0.15 0.0000 89.88)",
+          "oklch(0.26 0.0000 89.88)",
+          "oklch(0.38 0.0000 89.88)",
+          "oklch(0.49 0.0000 89.88)",
+          "oklch(0.61 0.0000 89.88)",
+          "oklch(0.72 0.0000 89.88)",
+          "oklch(0.84 0.0000 89.88)",
+          "oklch(0.95 0.0000 89.88)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "본문 글자",
+        "canonical": "#243148",
+        "tonalRamp": [
+          "oklch(0.15 0.0452 261.44)",
+          "oklch(0.26 0.0452 261.44)",
+          "oklch(0.38 0.0452 261.44)",
+          "oklch(0.49 0.0452 261.44)",
+          "oklch(0.61 0.0452 261.44)",
+          "oklch(0.72 0.0452 261.44)",
+          "oklch(0.84 0.0452 261.44)",
+          "oklch(0.95 0.0452 261.44)"
+        ]
+      },
+      "secondary-ink": {
+        "role": "neutral",
+        "displayName": "보조 글자",
+        "canonical": "#5e6c82",
+        "tonalRamp": [
+          "oklch(0.15 0.0387 259.37)",
+          "oklch(0.26 0.0387 259.37)",
+          "oklch(0.38 0.0387 259.37)",
+          "oklch(0.49 0.0387 259.37)",
+          "oklch(0.61 0.0387 259.37)",
+          "oklch(0.72 0.0387 259.37)",
+          "oklch(0.84 0.0387 259.37)",
+          "oklch(0.95 0.0387 259.37)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "패널 경계",
+        "canonical": "#e4e9f0",
+        "tonalRamp": [
+          "oklch(0.15 0.0109 256.70)",
+          "oklch(0.26 0.0109 256.70)",
+          "oklch(0.38 0.0109 256.70)",
+          "oklch(0.49 0.0109 256.70)",
+          "oklch(0.61 0.0109 256.70)",
+          "oklch(0.72 0.0109 256.70)",
+          "oklch(0.84 0.0109 256.70)",
+          "oklch(0.95 0.0109 256.70)"
+        ]
+      },
+      "active-ink": {
+        "role": "secondary",
+        "displayName": "활성 버전 글자",
+        "canonical": "#2f6f58",
+        "tonalRamp": [
+          "oklch(0.15 0.0761 166.96)",
+          "oklch(0.26 0.0761 166.96)",
+          "oklch(0.38 0.0761 166.96)",
+          "oklch(0.49 0.0761 166.96)",
+          "oklch(0.61 0.0761 166.96)",
+          "oklch(0.72 0.0761 166.96)",
+          "oklch(0.84 0.0761 166.96)",
+          "oklch(0.95 0.0761 166.96)"
+        ]
+      },
+      "active-surface": {
+        "role": "secondary",
+        "displayName": "활성 버전 표면",
+        "canonical": "#eaf5ef",
+        "tonalRamp": [
+          "oklch(0.15 0.0141 162.47)",
+          "oklch(0.26 0.0141 162.47)",
+          "oklch(0.38 0.0141 162.47)",
+          "oklch(0.49 0.0141 162.47)",
+          "oklch(0.61 0.0141 162.47)",
+          "oklch(0.72 0.0141 162.47)",
+          "oklch(0.84 0.0141 162.47)",
+          "oklch(0.95 0.0141 162.47)"
+        ]
+      },
+      "draft-ink": {
+        "role": "tertiary",
+        "displayName": "초안 버전 글자",
+        "canonical": "#876021",
+        "tonalRamp": [
+          "oklch(0.15 0.0929 75.59)",
+          "oklch(0.26 0.0929 75.59)",
+          "oklch(0.38 0.0929 75.59)",
+          "oklch(0.49 0.0929 75.59)",
+          "oklch(0.61 0.0929 75.59)",
+          "oklch(0.72 0.0929 75.59)",
+          "oklch(0.84 0.0929 75.59)",
+          "oklch(0.95 0.0929 75.59)"
+        ]
+      },
+      "draft-surface": {
+        "role": "tertiary",
+        "displayName": "초안 버전 표면",
+        "canonical": "#faf3e7",
+        "tonalRamp": [
+          "oklch(0.15 0.0176 81.33)",
+          "oklch(0.26 0.0176 81.33)",
+          "oklch(0.38 0.0176 81.33)",
+          "oklch(0.49 0.0176 81.33)",
+          "oklch(0.61 0.0176 81.33)",
+          "oklch(0.72 0.0176 81.33)",
+          "oklch(0.84 0.0176 81.33)",
+          "oklch(0.95 0.0176 81.33)"
+        ]
+      },
+      "published-ink": {
+        "role": "primary",
+        "displayName": "발행 버전 글자",
+        "canonical": "#46649a",
+        "tonalRamp": [
+          "oklch(0.15 0.0935 261.51)",
+          "oklch(0.26 0.0935 261.51)",
+          "oklch(0.38 0.0935 261.51)",
+          "oklch(0.49 0.0935 261.51)",
+          "oklch(0.61 0.0935 261.51)",
+          "oklch(0.72 0.0935 261.51)",
+          "oklch(0.84 0.0935 261.51)",
+          "oklch(0.95 0.0935 261.51)"
+        ]
+      },
+      "published-surface": {
+        "role": "primary",
+        "displayName": "발행 버전 표면",
+        "canonical": "#edf2fb",
+        "tonalRamp": [
+          "oklch(0.15 0.0132 262.38)",
+          "oklch(0.26 0.0132 262.38)",
+          "oklch(0.38 0.0132 262.38)",
+          "oklch(0.49 0.0132 262.38)",
+          "oklch(0.61 0.0132 262.38)",
+          "oklch(0.72 0.0132 262.38)",
+          "oklch(0.84 0.0132 262.38)",
+          "oklch(0.95 0.0132 262.38)"
+        ]
+      },
+      "nav-surface": {
+        "role": "primary",
+        "displayName": "현재 메뉴 표면",
+        "canonical": "#edf2fc",
+        "tonalRamp": [
+          "oklch(0.15 0.0144 264.50)",
+          "oklch(0.26 0.0144 264.50)",
+          "oklch(0.38 0.0144 264.50)",
+          "oklch(0.49 0.0144 264.50)",
+          "oklch(0.61 0.0144 264.50)",
+          "oklch(0.72 0.0144 264.50)",
+          "oklch(0.84 0.0144 264.50)",
+          "oklch(0.95 0.0144 264.50)"
+        ]
+      },
+      "tag-ink": {
+        "role": "neutral",
+        "displayName": "태그 글자",
+        "canonical": "#495b76",
+        "tonalRamp": [
+          "oklch(0.15 0.0494 258.33)",
+          "oklch(0.26 0.0494 258.33)",
+          "oklch(0.38 0.0494 258.33)",
+          "oklch(0.49 0.0494 258.33)",
+          "oklch(0.61 0.0494 258.33)",
+          "oklch(0.72 0.0494 258.33)",
+          "oklch(0.84 0.0494 258.33)",
+          "oklch(0.95 0.0494 258.33)"
+        ]
+      },
+      "tag-surface": {
+        "role": "neutral",
+        "displayName": "태그 표면",
+        "canonical": "#f3f5fa",
+        "tonalRamp": [
+          "oklch(0.15 0.0070 268.55)",
+          "oklch(0.26 0.0070 268.55)",
+          "oklch(0.38 0.0070 268.55)",
+          "oklch(0.49 0.0070 268.55)",
+          "oklch(0.61 0.0070 268.55)",
+          "oklch(0.72 0.0070 268.55)",
+          "oklch(0.84 0.0070 268.55)",
+          "oklch(0.95 0.0070 268.55)"
+        ]
+      },
+      "prompt-highlight": {
+        "role": "primary",
+        "displayName": "Prompt 감지 강조",
+        "canonical": "#e0eafa",
+        "tonalRamp": [
+          "oklch(0.15 0.0242 259.82)",
+          "oklch(0.26 0.0242 259.82)",
+          "oklch(0.38 0.0242 259.82)",
+          "oklch(0.49 0.0242 259.82)",
+          "oklch(0.61 0.0242 259.82)",
+          "oklch(0.72 0.0242 259.82)",
+          "oklch(0.84 0.0242 259.82)",
+          "oklch(0.95 0.0242 259.82)"
+        ]
+      },
+      "prompt-ink": {
+        "role": "primary",
+        "displayName": "Prompt 강조 글자",
+        "canonical": "#233f77",
+        "tonalRamp": [
+          "oklch(0.15 0.1016 262.57)",
+          "oklch(0.26 0.1016 262.57)",
+          "oklch(0.38 0.1016 262.57)",
+          "oklch(0.49 0.1016 262.57)",
+          "oklch(0.61 0.1016 262.57)",
+          "oklch(0.72 0.1016 262.57)",
+          "oklch(0.84 0.1016 262.57)",
+          "oklch(0.95 0.1016 262.57)"
+        ]
       }
-    ],
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "화면 제목",
+        "purpose": "페이지의 작업 이름을 짧게 표시한다."
+      },
+      "title": {
+        "displayName": "패널 제목",
+        "purpose": "집계나 편집 영역의 이름을 표시한다."
+      },
+      "body": {
+        "displayName": "본문",
+        "purpose": "표와 관리자 작업의 기본 텍스트다."
+      },
+      "label": {
+        "displayName": "입력 레이블",
+        "purpose": "조건과 편집 필드의 의미를 표시한다."
+      }
+    },
+    "shadows": [],
     "motion": [
       {
-        "name": "control-transition",
-        "value": "150ms",
-        "purpose": "입력과 버튼 상태 전환"
+        "name": "button-transition",
+        "value": "background-color 150ms, border-color 150ms",
+        "purpose": "기본·보조 버튼의 색 상태 전환. reduced-motion에서는 제거한다."
+      },
+      {
+        "name": "input-transition",
+        "value": "border-color 150ms",
+        "purpose": "입력 필드의 경계 상태 전환. reduced-motion에서는 제거한다."
+      },
+      {
+        "name": "navigation-transition",
+        "value": "background-color 150ms, color 150ms",
+        "purpose": "메뉴의 배경과 글자 상태 전환. reduced-motion에서는 제거한다."
+      },
+      {
+        "name": "loading-pulse",
+        "value": "skeleton-pulse 1.5s ease-in-out infinite alternate",
+        "purpose": "로딩 스켈레톤. reduced-motion에서는 제거한다."
+      },
+      {
+        "name": "refresh-rotation",
+        "value": "rotate 0.9s linear infinite",
+        "purpose": "진행 중인 수동 새로고침 표시. reduced-motion에서는 제거한다."
       }
     ],
     "breakpoints": [
+      {
+        "name": "wide-desktop",
+        "value": "1700px"
+      },
       {
         "name": "compact-desktop",
         "value": "1280px"
@@ -37,45 +360,73 @@
       "name": "Primary button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "조회와 사람 등록의 기본 동작",
+      "description": "조회, 초안 저장, 발행·활성화 등 현재 작업의 기본 동작. 대기 중에는 disabled로 표시한다.",
       "html": "<button class=\"ds-primary\">조회</button>",
-      "css": ".ds-primary {font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--blue,#365fc5);color:#fff;border:1px solid var(--blue,#365fc5);border-radius:6px;padding:9px 13px;min-height:35px;font-size:12px;font-weight:550;line-height:1.5;white-space:nowrap;cursor:pointer;transition:background-color .15s,border-color .15s}.ds-primary:hover {background:var(--blue-hover,#274ca9);border-color:var(--blue-hover,#274ca9)}.ds-primary:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}.ds-primary:disabled{background:#c7d3ec;border-color:#c7d3ec;color:#465e8c;cursor:not-allowed}"
+      "css": ".ds-primary {font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--blue,#365fc5);color:#fff;border:1px solid var(--blue,#365fc5);border-radius:6px;padding:9px 13px;min-height:35px;font-size:12px;font-weight:550;line-height:1.5;white-space:nowrap;cursor:pointer;transition:background-color .15s,border-color .15s}.ds-primary:hover {background:var(--blue-hover,#274ca9);border-color:var(--blue-hover,#274ca9)}.ds-primary:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}.ds-primary:disabled{background:#c7d3ec;border-color:#c7d3ec;color:#465e8c;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}"
     },
     {
       "name": "Secondary button",
       "kind": "button",
-      "description": "명시적인 새로고침과 보조 동작",
+      "description": "수동 새로고침, 복제와 보조 동작.",
       "html": "<button class=\"ds-secondary\">새로고침</button>",
-      "css": ".ds-secondary{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:#465570;border:1px solid #dce3ed;border-radius:6px;padding:9px 13px;min-height:35px;font-size:12px;font-weight:550;line-height:1.5;white-space:nowrap;cursor:pointer;transition:background-color .15s,border-color .15s}.ds-secondary:hover{background:#f4f7fc;border-color:#b8c7df}.ds-secondary:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}.ds-secondary:disabled{background:#f0f3f7;border-color:#e1e7ef;color:#616c7b;cursor:not-allowed}"
+      "css": ".ds-secondary{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:#465570;border:1px solid #dce3ed;border-radius:6px;padding:9px 13px;min-height:35px;font-size:12px;font-weight:550;line-height:1.5;white-space:nowrap;cursor:pointer;transition:background-color .15s,border-color .15s}.ds-secondary:hover{background:#f4f7fc;border-color:#b8c7df}.ds-secondary:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}.ds-secondary:disabled{background:#f0f3f7;border-color:#e1e7ef;color:#616c7b;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none}}",
+      "refersTo": "button-secondary"
     },
     {
       "name": "Filter input",
       "kind": "input",
-      "description": "조회 조건 입력",
+      "description": "조회 조건을 입력하며 조회 버튼 또는 Enter 제출 시 적용한다.",
       "html": "<label class=\"ds-field\">사람 ID<input placeholder=\"전체 사람\"></label>",
-      "css": ".ds-field{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;flex-direction:column;gap:6px;color:#53627a;font-size:12px;font-weight:500;line-height:1.6;min-width:0}.ds-field input{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;width:100%;min-width:0;height:35px;padding:7px 9px;background:#fff;color:#3d4b64;border:1px solid #dfe5ee;border-radius:5px;font-size:12px;font-weight:400;line-height:1.6;transition:border-color .15s;caret-color:var(--blue,#365fc5)}.ds-field input::placeholder{color:#616d7e;opacity:1}.ds-field input:hover{border-color:#b8c5d9}.ds-field input:focus{outline:2px solid #d3dffb;outline-offset:0;border-color:#7090d4}"
+      "css": ".ds-field{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;flex-direction:column;gap:6px;color:#53627a;font-size:12px;font-weight:500;line-height:1.6;min-width:0}.ds-field input{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;width:100%;min-width:0;height:35px;padding:7px 9px;background:#fff;color:#3d4b64;border:1px solid #dfe5ee;border-radius:5px;font-size:12px;font-weight:400;line-height:1.6;transition:border-color .15s;caret-color:var(--blue,#365fc5)}.ds-field input::placeholder{color:#616d7e;opacity:1}.ds-field input:hover{border-color:#b8c5d9}.ds-field input:focus{outline:2px solid #d3dffb;outline-offset:0;border-color:#7090d4}@media(prefers-reduced-motion:reduce){.ds-field input{transition:none}}",
+      "refersTo": "input"
     },
     {
       "name": "Active navigation",
       "kind": "nav",
-      "description": "현재 작업 위치",
-      "html": "<a class=\"ds-nav\" href=\"#\" aria-current=\"page\">전체 현황</a>",
-      "css": ".ds-nav{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:12px;min-height:45px;padding:11px 14px;background:#edf2fc;color:#365fc5;border-radius:7px;font-size:13px;font-weight:650;line-height:1.6;text-decoration:none;transition:background-color .15s,color .15s}.ds-nav:hover{background:#edf2fc;color:#365fc5}.ds-nav:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}"
-    },
-    {
-      "name": "Unknown policy",
-      "kind": "chip",
-      "description": "미확인 상태는 위험 확정과 구분",
-      "html": "<span class=\"ds-badge\">설정 미확인</span>",
-      "css": ".ds-badge{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;gap:5px;padding:3px 7px;background:#eff2f7;color:#5e6b81;border-radius:4px;font-size:11px;font-weight:500;line-height:1.7;white-space:nowrap}.ds-badge:before{content:\"\";width:5px;height:5px;background:currentColor;border-radius:50%}"
+      "description": "현재 위치를 배경·글자색과 aria-current로 표시한다. 전체 메뉴는 모바일에서 3열·2행이다.",
+      "html": "<a class=\"ds-nav\" href=\"#\" aria-current=\"page\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\"/></svg><span>전체 현황</span></a>",
+      "css": ".ds-nav{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:12px;min-height:45px;padding:11px 14px;background:#edf2fc;color:#365fc5;border-radius:7px;font-size:13px;font-weight:650;line-height:1.6;text-decoration:none;transition:background-color .15s,color .15s}.ds-nav:hover{background:#edf2fc;color:#365fc5}.ds-nav:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}@media(prefers-reduced-motion:reduce){.ds-nav{transition:none}}.ds-nav svg{flex-shrink:0}@media(max-width:760px){.ds-nav{justify-content:center;gap:6px;padding:10px 3px;border-radius:5px;font-size:11px}.ds-nav svg{width:16px}}",
+      "refersTo": "navigation-active"
     },
     {
       "name": "Information panel",
       "kind": "card",
       "refersTo": "panel",
-      "description": "단일 의미를 갖는 집계 구획",
-      "html": "<section class=\"ds-panel\"><header class=\"ds-panel-header\"><div><h2>항목별 감지</h2><p>개인정보 · 인증정보 · 내부기밀</p></div></header></section>",
+      "description": "한 집계 또는 작업 영역을 가는 테두리와 흰 표면으로 구분한다.",
+      "html": "<section class=\"ds-panel\"><header class=\"ds-panel-header\"><div><h2>트리별 감지</h2><p>선택한 버전의 감지 영역을 확인합니다.</p></div></header></section>",
       "css": ".ds-panel{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;background:#fff;border:1px solid var(--border,#e4e9f0);border-radius:var(--radius,12px);color:var(--text,#243148);min-width:0;line-height:1.6}.ds-panel-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:21px 24px 0}.ds-panel h2{margin:0;font-size:15px;font-weight:650;letter-spacing:-.025em;line-height:1.5}.ds-panel p{margin:4px 0 0;font-size:11px;color:#616d7c}"
+    },
+    {
+      "name": "User-defined tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "사용자 정의 태그 이름과 색 점을 함께 표시한다. 예시 점은 TagChip의 기본 색이다.",
+      "html": "<span class=\"ds-tag\"><span class=\"ds-tag-dot\" aria-hidden=\"true\"></span>데모 태그</span>",
+      "css": ".ds-tag{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;gap:5px;background:#f3f5fa;border:1px solid #e6ebf3;border-radius:4px;color:#495b76;font-size:10px;font-weight:400;line-height:1.5;padding:3px 6px;max-width:160px;white-space:normal;overflow-wrap:anywhere}.ds-tag-dot{width:5px;height:5px;border-radius:2px;flex-shrink:0;background:var(--ds-tag-color,#5776c6)}"
+    },
+    {
+      "name": "Configuration version badges",
+      "kind": "chip",
+      "refersTo": "version-active",
+      "description": "활성 여부와 초안·발행 상태를 텍스트로 구분한다. 정책의 의미나 위험도를 나타내지 않는다.",
+      "html": "<span class=\"ds-version ds-version-active\">활성</span> <span class=\"ds-version ds-version-draft\">초안</span> <span class=\"ds-version ds-version-published\">발행됨</span>",
+      "css": ".ds-version{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:3px 7px;border-radius:4px;line-height:1.7;white-space:nowrap}.ds-version-active{background:#eaf5ef;color:#2f6f58}.ds-version-draft{background:#faf3e7;color:#876021}.ds-version-published{background:#edf2fb;color:#46649a}"
+    },
+    {
+      "name": "Prompt detection highlight",
+      "kind": "custom",
+      "refersTo": "prompt-mark",
+      "description": "원문을 텍스트로 표시하고 Unicode 코드 포인트 기반 감지 범위를 강조한다. 선택하지 않은 범위는 중립색으로 낮춘다.",
+      "html": "<div class=\"ds-prompt\">데모 Prompt의 <mark>감지 영역</mark>과 <mark class=\"ds-mark-muted\">다른 감지 영역</mark>을 확인합니다.</div>",
+      "css": ".ds-prompt{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;padding:20px;background:#f8fafc;border:1px solid #e8edf4;border-radius:8px;color:#34455e;font-size:14px;line-height:2.3;white-space:pre-wrap;overflow-wrap:anywhere;max-height:620px;overflow-y:auto;scrollbar-width:thin}.ds-prompt mark{background:#e0eafa;color:#233f77;border-bottom:2px solid #8ea9dc;padding:1px 0;border-radius:2px}.ds-prompt mark.ds-mark-muted{background:#f0f3f8;border-color:#d9e1ec;color:var(--muted,#5e6c82)}"
+    },
+    {
+      "name": "Metric tree row",
+      "kind": "custom",
+      "refersTo": "tree-row",
+      "description": "접기 버튼과 독립 선택 링크, 사용자 색의 막대, 감지 영역 개수와 Prompt 건수를 한 행에 표시한다. 상위 수량은 하위 수량의 합이 아닌 중복 없는 집합이다.",
+      "html": "<div class=\"ds-tree-row\"><button class=\"ds-tree-chevron\" aria-label=\"데모 태그 펼치기\" aria-expanded=\"false\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 5 7 7-7 7\"/></svg></button><a class=\"ds-tree-label\" href=\"#\"><span class=\"ds-tree-dot\" aria-hidden=\"true\"></span>데모 태그</a><span class=\"ds-tree-bar\" aria-hidden=\"true\"><span></span></span><a class=\"ds-tree-count\" href=\"#\">12<small>개</small></a><span class=\"ds-tree-events\">8건</span></div>",
+      "css": ".ds-tree-row{font-family:\"Noto Sans KR Variable\",\"Noto Sans KR\",-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:7px;min-height:38px;padding:0 20px 0 18px;color:var(--text,#243148);border-bottom:1px solid #f0f3f7;line-height:1.6}.ds-tree-row:hover{background:#f9fbff}.ds-tree-chevron{display:flex;align-items:center;justify-content:center;padding:3px;width:20px;height:23px;border:0;border-radius:4px;color:var(--muted,#5e6c82);background:transparent;flex-shrink:0;cursor:pointer}.ds-tree-chevron[aria-expanded=\"true\"] svg{transform:rotate(90deg)}.ds-tree-chevron:disabled{visibility:hidden}.ds-tree-label{display:flex;align-items:center;gap:8px;min-width:90px;flex:1;font-size:12px;overflow-wrap:anywhere}.ds-tree-label,.ds-tree-count{color:inherit;text-decoration:none}.ds-tree-dot{width:7px;height:7px;border-radius:2px;flex-shrink:0;background:var(--ds-tag-color,#5776c6)}.ds-tree-bar{width:21%;height:4px;background:#f0f3f7;border-radius:2px;overflow:hidden}.ds-tree-bar>span{display:block;width:60%;height:100%;border-radius:2px;background:var(--ds-tag-color,#5776c6)}.ds-tree-count{min-width:48px;text-align:right;font-size:13px;font-weight:650;font-variant-numeric:tabular-nums}.ds-tree-count small{margin-left:4px;font-size:10px;font-weight:400;color:#5e6c82}.ds-tree-events{min-width:36px;color:var(--muted,#5e6c82);font-size:10px;text-align:right}.ds-tree-chevron:focus-visible,.ds-tree-label:focus-visible,.ds-tree-count:focus-visible{outline:2px solid var(--blue,#365fc5);outline-offset:4px}"
     }
   ],
   "narrative": {
@@ -89,9 +440,9 @@
       "Do 샘플 데이터의 이름에 데모임을 표시한다."
     ],
     "donts": [
-      "Don't 대화 원문이나 민감정보 값을 화면에 추가하지 않는다.",
-      "Don't 설정 미확인과 정책 정보 없음, 학습 허용과 정책 위반을 같은 의미로 표시하지 않는다.",
-      "Don't 설정 페이지에 실제 저장이나 활성화 동작을 추가하지 않는다."
+      "Don't Prompt 원문을 HTML로 실행하거나 감지 위치를 변경하는 정규화를 적용하지 않는다.",
+      "Don't 사용자 정의 정책 이름이나 색상에서 위험도를 추측하지 않는다.",
+      "Don't 발행된 버전을 직접 수정하거나 새 설정 저장과 활성화를 같은 동작으로 처리하지 않는다."
     ]
   }
 }

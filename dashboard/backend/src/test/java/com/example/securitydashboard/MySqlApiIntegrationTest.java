@@ -4,264 +4,645 @@ import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.Executors;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.*;
+import java.util.*;
+import java.util.concurrent.*;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.*;
+import org.springframework.test.web.servlet.*;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @EnabledIfEnvironmentVariable(named = "TEST_DB_URL", matches = ".+")
 class MySqlApiIntegrationTest {
-    @Autowired MockMvc mvc;
-    @Autowired ObjectMapper json;
-    @Autowired JdbcTemplate jdbc;
+  @Autowired MockMvc mvc;
+  @Autowired ObjectMapper json;
+  @Autowired JdbcTemplate jdbc;
 
-    @DynamicPropertySource
-    static void database(DynamicPropertyRegistry registry) {
-        String url = System.getenv("TEST_DB_URL");
-        if (url == null || !url.matches("jdbc:mysql://[^/]+/[A-Za-z0-9_]+_test(?:\\?.*)?")) {
-            throw new IllegalStateException("TEST_DB_URL must point to a separate MySQL schema ending in _test");
-        }
-        registry.add("spring.datasource.url", () -> url);
-        registry.add("spring.datasource.username", () -> System.getenv().getOrDefault("TEST_DB_USERNAME", "dashboard"));
-        registry.add("spring.datasource.password", () -> System.getenv().getOrDefault("TEST_DB_PASSWORD", "dashboard-local"));
+  @DynamicPropertySource
+  static void database(DynamicPropertyRegistry registry) {
+    String url = System.getenv("TEST_DB_URL");
+    if (url == null || !url.matches("jdbc:mysql://[^/]+/[A-Za-z0-9_]+_test(?:\\?.*)?"))
+      throw new IllegalStateException(
+          "TEST_DB_URL must point to a separate MySQL schema ending in _test");
+    registry.add("spring.datasource.url", () -> url);
+    registry.add(
+        "spring.datasource.username",
+        () -> System.getenv().getOrDefault("TEST_DB_USERNAME", "dashboard"));
+    registry.add(
+        "spring.datasource.password",
+        () -> System.getenv().getOrDefault("TEST_DB_PASSWORD", "dashboard-local"));
+  }
+
+  @BeforeEach
+  void reset() {
+    assertThat(jdbc.queryForObject("SELECT VERSION()", String.class)).startsWith("8.");
+    jdbc.update("DELETE FROM saved_searches");
+    jdbc.update("UPDATE active_config SET version_id=NULL");
+    jdbc.update("DELETE FROM detection_tags");
+    jdbc.update("DELETE FROM detections");
+    jdbc.update("DELETE FROM security_events");
+    jdbc.update("DELETE FROM people");
+    jdbc.update("DELETE FROM config_versions");
+  }
+
+  @Test
+  void startsEmptyAndDocumentsAllApisAndPreservesMissingRoutes() throws Exception {
+    mvc.perform(get("/api/v1/config-versions")).andExpect(content().json("[]"));
+    mvc.perform(get("/api/v1/classifier-config"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NO_ACTIVE_VERSION"));
+    mvc.perform(get("/api/v1/metrics"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.versionId").isEmpty())
+        .andExpect(jsonPath("$.summary.eventCount").value(0))
+        .andExpect(jsonPath("$.tags").isEmpty());
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.servers[0].url").value("/"))
+        .andExpect(jsonPath("$.paths['/api/v1/config-versions']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/saved-searches/{id}/metrics']").exists());
+    mvc.perform(get("/swagger-ui.html")).andExpect(status().is3xxRedirection());
+    mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
+    for (String path : List.of("/api/v1/missing", "/assets/missing.js", "/random"))
+      mvc.perform(get(path)).andExpect(status().isNotFound());
+    for (String path : List.of("/events/123", "/settings/metrics", "/saved-searches/example"))
+      mvc.perform(get(path)).andExpect(forwardedUrl("/index.html"));
+  }
+
+  @Test
+  void registeredPeopleRemainVisibleWithDatesAndPromptFilters() throws Exception {
+    String v = version(true);
+    person("active", "활동 담당자");
+    person("empty", "신규 담당자");
+    create(
+        event(
+            "person-filter",
+            v,
+            "active",
+            "matching prompt",
+            List.of(span(0, 1, "m", "a")),
+            "2026-10-20T01:00:00Z"));
+    var people = getJson(range(get("/api/v1/people")).param("q", "matching"));
+    assertThat(people.path("totalElements").asInt()).isEqualTo(2);
+    var empty = find(people.path("items"), "empty");
+    assertThat(empty.path("eventCount").asLong()).isZero();
+    assertThat(empty.path("findingCount").asLong()).isZero();
+    assertThat(empty.path("lastEventAt").isNull()).isTrue();
+    assertThat(find(people.path("items"), "active").path("eventCount").asLong()).isEqualTo(1);
+    var noMatches = getJson(range(get("/api/v1/people")).param("q", "absent"));
+    assertThat(noMatches.path("totalElements").asInt()).isEqualTo(2);
+    for (var person : noMatches.path("items")) {
+      assertThat(person.path("eventCount").asLong()).isZero();
+      assertThat(person.path("lastEventAt").isNull()).isTrue();
     }
+    assertThat(
+            getJson(range(get("/api/v1/people")).param("q", "absent").param("personId", "empty"))
+                .path("totalElements")
+                .asInt())
+        .isEqualTo(1);
+    assertThat(
+            getJson(range(get("/api/v1/people")).param("q", "absent").param("personQuery", "신규"))
+                .path("totalElements")
+                .asInt())
+        .isEqualTo(1);
+  }
 
-    @BeforeEach
-    void resetDedicatedDatabase() {
-        assertThat(jdbc.queryForObject("SELECT VERSION()", String.class)).doesNotContainIgnoringCase("mariadb");
-        jdbc.update("DELETE FROM findings");
-        jdbc.update("DELETE FROM security_events");
-        jdbc.update("DELETE FROM people");
-    }
+  @Test
+  void draftsAreRevisionCheckedPublishedImmutableClonedAndSingletonActive() throws Exception {
+    var draft = createDraft("처음", null);
+    String id = draft.path("id").asText();
+    var edit =
+        call(
+            put("/api/v1/config-versions/" + id),
+            Map.of("revision", 0, "name", "수정", "tags", tags(true), "policyStates", policies()),
+            200);
+    call(
+        put("/api/v1/config-versions/" + id),
+        Map.of("revision", 0, "name", "오래됨", "tags", List.of(), "policyStates", List.of()),
+        409);
+    call(post("/api/v1/config-versions/" + id + "/publish"), Map.of("revision", 0), 409);
+    var published =
+        call(
+            post("/api/v1/config-versions/" + id + "/publish"),
+            Map.of("revision", edit.path("revision").asLong()),
+            200);
+    assertThat(published.path("status").asText()).isEqualTo("PUBLISHED");
+    call(
+        put("/api/v1/config-versions/" + id),
+        Map.of(
+            "revision",
+            published.path("revision").asLong(),
+            "name",
+            "변경",
+            "tags",
+            List.of(),
+            "policyStates",
+            List.of()),
+        409);
+    mvc.perform(delete("/api/v1/config-versions/" + id)).andExpect(status().isConflict());
+    var clone = createDraft("복제", id);
+    assertThat(clone.path("tags")).isEqualTo(published.path("tags"));
+    mvc.perform(delete("/api/v1/config-versions/" + clone.path("id").asText()))
+        .andExpect(status().isNoContent());
+    call(post("/api/v1/config-versions/" + id + "/activate"), null, 200);
+    String second = publishEmpty();
+    call(post("/api/v1/config-versions/" + second + "/activate"), null, 200);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT version_id FROM active_config WHERE singleton_id=1", String.class))
+        .isEqualTo(second);
+  }
 
-    @Test
-    void registrationRetainsZeroEventPeopleAndLiteralSearchAndNeverOverwritesDuplicate() throws Exception {
-        person("alpha", "  김_보안  ");
-        person("beta", "이보안");
-        mvc.perform(post("/api/v1/people").contentType(MediaType.APPLICATION_JSON)
-            .content("{\"id\":\"alpha\",\"name\":\"바뀐 이름\"}")).andExpect(status().isConflict());
-        mvc.perform(get("/api/v1/people").param("q", "_")).andExpect(status().isOk())
-            .andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.items[0].name").value("김_보안"))
-            .andExpect(jsonPath("$.items[0].eventCount").value(0)).andExpect(jsonPath("$.items[0].lastEventAt").isEmpty());
-        mvc.perform(get("/api/v1/people").param("q", "%")).andExpect(jsonPath("$.totalElements").value(0));
-        mvc.perform(get("/api/v1/people").param("service", "claude")).andExpect(jsonPath("$.totalElements").value(2));
-    }
+  @Test
+  void rejectsInvalidTreesAndUnregisteredDetectionDefinitionsAtomically() throws Exception {
+    String v = version(true);
+    person("p", "담당자");
+    var cycle =
+        List.of(
+            Map.of("id", "a", "name", "A", "parentId", "b"),
+            Map.of("id", "b", "name", "B", "parentId", "a"));
+    String draft = createDraft("bad", null).path("id").asText();
+    call(
+        put("/api/v1/config-versions/" + draft),
+        Map.of("revision", 0, "name", "bad", "tags", cycle, "policyStates", List.of()),
+        400);
+    call(
+        post("/api/v1/events"),
+        event("unknown", v, "p", "A😀BC", List.of(span(1, 2, "😀", "missing")), null),
+        422);
+    var bad = event("policy", v, "p", "safe", List.of(), null);
+    bad.put("policyStateId", "missing");
+    call(post("/api/v1/events"), bad, 422);
+    call(post("/api/v1/events"), event("person", v, "missing", "safe", List.of(), null), 422);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class)).isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM detections", Long.class)).isZero();
+  }
 
-    @Test
-    void canonicalReplayIsOrderInsensitivePrecisionStableAndConflictsAreAtomic() throws Exception {
-        person("alpha", "보안 담당");
-        String original = """
-            {"sourceId":"src","eventId":"same","personId":"alpha","occurredAt":"2026-04-01T09:00:00.123456789+09:00",
-             "service":" ChatGPT ","model":" demo ","findings":[{"category":"CREDENTIAL","quantity":3},{"category":"PERSONAL_DATA","quantity":2}]}
-            """;
-        JsonNode created = postEvent(original, 201);
-        String replay = """
-            {"sourceId":"src","eventId":"same","personId":"alpha","occurredAt":"2026-04-01T00:00:00.123456Z",
-             "service":"chatgpt","model":"demo","findings":[{"category":"PERSONAL_DATA","quantity":2},{"category":"CREDENTIAL","quantity":3}]}
-            """;
-        JsonNode existing = postEvent(replay, 200);
-        assertThat(existing).isEqualTo(created);
-        assertThat(created.path("occurredAt").asText()).isEqualTo("2026-04-01T00:00:00.123456Z");
-        assertThat(created.path("policyState").isNull()).isTrue();
-        postEvent(replay.replace("\"quantity\":3", "\"quantity\":4"), 409);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT SUM(quantity) FROM findings", Long.class)).isEqualTo(5);
-    }
+  @Test
+  void unicodeRangesMergeReplaysAfterActivationAndOmittedTimestampRemainsStable() throws Exception {
+    String v = version(true);
+    person("p", "담당자");
+    var body =
+        event(
+            "unicode",
+            v,
+            "p",
+            " A😀BC ",
+            List.of(span(2, 3, "😀", "b", "a"), span(2, 3, "😀", "a"), span(2, 4, "😀B", "b")),
+            null);
+    var created = call(post("/api/v1/events"), body, 201);
+    assertThat(created.path("findingCount").asInt()).isEqualTo(2);
+    assertThat(created.path("detections").get(0).path("tags").size()).isEqualTo(2);
+    assertThat(created.path("prompt").asText()).isEqualTo(" A😀BC ");
+    body.put("detections", List.of(span(2, 4, "😀B", "b"), span(2, 3, "😀", "a", "b")));
+    assertThat(call(post("/api/v1/events"), body, 200)).isEqualTo(created);
+    String second = publishEmpty();
+    call(post("/api/v1/config-versions/" + second + "/activate"), null, 200);
+    assertThat(call(post("/api/v1/events"), body, 200)).isEqualTo(created);
+    body.put("eventId", "stale");
+    call(post("/api/v1/events"), body, 409);
+    body.put("eventId", "unicode");
+    body.put("model", "different");
+    call(post("/api/v1/events"), body, 409);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class))
+        .isEqualTo(1);
+  }
 
-    @Test
-    void validatesStrictPayloadAndDoesNotEchoSensitiveValues() throws Exception {
-        person("alpha", "담당자");
-        String valid = event("one", "alpha", "2026-04-01T00:00:00Z", "claude", "UNKNOWN", List.of());
-        for (String malformed : List.of(
-            valid.replace("\"sourceId\":\"src\"", "\"sourceId\":123"),
-            valid.replace("\"eventId\":\"one\"", "\"eventId\":\"one\",\"prompt\":\"sensitive-example\""),
-            valid.replace("\"policyState\":\"UNKNOWN\"", "\"policyState\":123"),
-            valid.replace("\"policyState\":\"UNKNOWN\"", "\"policyState\":\"invalid\""),
-            valid.replace("2026-04-01T00:00:00Z", "2026-04-01T00:00:00"),
-            valid.replace("2026-04-01T00:00:00Z", "2099-04-01T00:00:00Z"),
-            valid.replace("\"policyState\":\"UNKNOWN\",", ""),
-            valid.replace("\"findings\":[]", "\"findings\":[{\"category\":\"CREDENTIAL\",\"quantity\":1.5}]"),
-            valid.replace("\"findings\":[]", "\"findings\":[{\"category\":\"CREDENTIAL\",\"quantity\":\"1\"}]"),
-            valid.replace("\"findings\":[]", "\"findings\":[{\"category\":\"CREDENTIAL\",\"quantity\":1,\"secret\":\"sensitive-example\"}]"),
-            valid.replace("\"findings\":[]", "\"findings\":[{\"category\":\"CREDENTIAL\",\"quantity\":1},{\"category\":\"CREDENTIAL\",\"quantity\":2}]"),
-            valid.replace("\"findings\":[]", "\"findings\":[null]"),
-            valid.replace("\"service\":\"claude\"", "\"service\":\"claude\",\"service\":\"gemini\"")
-        )) {
-            var result = mvc.perform(post("/api/v1/events").contentType(MediaType.APPLICATION_JSON).content(malformed))
-                .andExpect(status().isBadRequest()).andReturn();
-            assertThat(result.getResponse().getContentAsString()).doesNotContain("sensitive-example");
-        }
-        postEvent(valid.replace("\"personId\":\"alpha\"", "\"personId\":\"missing\""), 422);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class)).isZero();
-    }
+  @Test
+  void sqlAggregatesDistinctSubtreeAndUnmappedAcrossEveryCapturedVersion() throws Exception {
+    String v1 = version(true);
+    person("p", "김_담당");
+    person("empty", "영 기록");
+    create(
+        event(
+            "first",
+            v1,
+            "p",
+            "abc %_",
+            List.of(span(0, 1, "a", "a", "b"), span(1, 2, "b", "b")),
+            "2026-10-20T14:59:59Z"));
+    create(event("zero", v1, "p", "zero", List.of(), "2026-10-20T15:00:00Z"));
+    String v2 = createDraft("다른 트리", null).path("id").asText();
+    call(
+        put("/api/v1/config-versions/" + v2),
+        Map.of(
+            "revision",
+            0,
+            "name",
+            "새 트리",
+            "tags",
+            List.of(tag("root", "상위", null), tag("a", "새 이름", "root")),
+            "policyStates",
+            List.of()),
+        200);
+    call(post("/api/v1/config-versions/" + v2 + "/publish"), Map.of("revision", 1), 200);
+    call(post("/api/v1/config-versions/" + v2 + "/activate"), null, 200);
+    create(event("new", v2, "p", "abc", List.of(span(0, 1, "a", "a")), "2026-10-21T01:00:00Z"));
+    var metrics = getJson(range(get("/api/v1/metrics")).param("versionId", v2));
+    assertThat(metrics.at("/summary/eventCount").asInt()).isEqualTo(3);
+    assertThat(metrics.at("/summary/findingCount").asInt()).isEqualTo(3);
+    assertThat(metrics.at("/summary/detectedEventCount").asInt()).isEqualTo(2);
+    assertThat(metrics.at("/unmapped/count").asInt()).isEqualTo(1);
+    assertThat(find(metrics.path("tags"), "root").path("count").asInt()).isEqualTo(2);
+    assertThat(find(metrics.path("tags"), "a").path("name").asText()).isEqualTo("새 이름");
+    assertThat(metrics.path("series").get(0).path("bucket").asText()).isEqualTo("2026-10-20");
+    var selected =
+        getJson(range(get("/api/v1/metrics")).param("versionId", v1).param("tagId", "root"));
+    assertThat(selected.at("/summary/findingCount").asInt()).isEqualTo(3);
+    var unmapped =
+        getJson(range(get("/api/v1/metrics")).param("versionId", v2).param("unmapped", "true"));
+    assertThat(unmapped.at("/summary/findingCount").asInt()).isEqualTo(1);
+    assertThat(unmapped.at("/summary/eventCount").asInt()).isEqualTo(1);
+    var events = getJson(range(get("/api/v1/events")).param("versionId", v2));
+    assertThat(events.path("totalElements").asInt()).isEqualTo(3);
+    var oldEvent = findEvent(events.path("items"), "first");
+    assertThat(oldEvent.path("detections").get(0).path("tags").get(0).path("name").asText())
+        .isEqualTo("이전 A");
+    assertThat(getJson(range(get("/api/v1/events")).param("q", "%_")).path("totalElements").asInt())
+        .isEqualTo(1);
+    assertThat(
+            getJson(range(get("/api/v1/people")).param("q", "%_").param("personQuery", "_"))
+                .path("totalElements")
+                .asInt())
+        .isEqualTo(1);
+    assertThat(
+            getJson(range(get("/api/v1/events")).param("hasDetections", "false"))
+                .path("totalElements")
+                .asInt())
+        .isEqualTo(1);
+  }
 
-    @Test
-    void concurrentIdenticalIngestionCreatesExactlyOneCompleteEvent() throws Exception {
-        person("alpha", "담당자");
-        String payload = event("concurrent", "alpha", "2026-04-01T00:00:00Z", "gemini", null,
-            List.of(Map.of("category", "CONFIDENTIAL", "quantity", 7)));
-        var barrier = new CyclicBarrier(6);
-        try (var pool = Executors.newFixedThreadPool(6)) {
-            List<Callable<Integer>> calls = new ArrayList<>();
-            for (int i = 0; i < 6; i++) calls.add(() -> {
-                barrier.await();
-                return mvc.perform(post("/api/v1/events").contentType(MediaType.APPLICATION_JSON).content(payload))
-                    .andReturn().getResponse().getStatus();
+  @Test
+  void snapshotsFreezeAllMembershipAndInterpretationAndDeletionKeepsEvents() throws Exception {
+    String v = version(true);
+    person("p", "담당자");
+    for (int i = 0; i < 23; i++)
+      create(
+          event("snap" + i, v, "p", "abc", List.of(span(0, 1, "a", "a")), "2026-10-20T01:00:00Z"));
+    var saved =
+        call(
+            post("/api/v1/saved-searches"),
+            Map.of(
+                "name",
+                "전체 저장",
+                "filters",
+                Map.of(
+                    "from", "2026-10-20T00:00:00Z", "to", "2026-10-22T00:00:00Z", "tagId", "root")),
+            201);
+    String id = saved.path("id").asText();
+    assertThat(saved.path("eventCount").asInt()).isEqualTo(23);
+    assertThat(saved.path("versionId").asText()).isEqualTo(v);
+    create(event("after", v, "p", "abc", List.of(span(0, 1, "a", "a")), "2026-10-20T01:00:00Z"));
+    String next = publishEmpty();
+    call(post("/api/v1/config-versions/" + next + "/activate"), null, 200);
+    var page =
+        getJson(
+            get("/api/v1/saved-searches/" + id + "/events").param("page", "1").param("size", "20"));
+    assertThat(page.path("totalElements").asInt()).isEqualTo(23);
+    assertThat(page.path("items").size()).isEqualTo(3);
+    var metric = getJson(get("/api/v1/saved-searches/" + id + "/metrics"));
+    assertThat(metric.at("/summary/findingCount").asInt()).isEqualTo(23);
+    assertThat(metric.path("versionId").asText()).isEqualTo(v);
+    mvc.perform(delete("/api/v1/saved-searches/" + id)).andExpect(status().isNoContent());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class))
+        .isEqualTo(24);
+  }
+
+  @Test
+  void nullAndUnmappedPoliciesUseCapturedNamesWithoutSyntheticState() throws Exception {
+    String v = version(true);
+    person("p", "담당");
+    var e = event("with-policy", v, "p", "a", List.of(), "2026-10-20T01:00:00Z");
+    e.put("policyStateId", "custom");
+    create(e);
+    create(event("null-policy", v, "p", "a", List.of(), "2026-10-20T01:00:00Z"));
+    String empty = publishEmpty();
+    call(post("/api/v1/config-versions/" + empty + "/activate"), null, 200);
+    var m = getJson(range(get("/api/v1/metrics")));
+    assertThat(m.path("policies").size()).isEqualTo(1);
+    assertThat(m.path("policies").get(0).path("name").asText()).isEqualTo("직접 만든 정책");
+    assertThat(m.path("policies").get(0).path("mapped").asBoolean()).isFalse();
+    assertThat(m.path("policies").get(0).path("eventCount").asInt()).isEqualTo(1);
+  }
+
+  @Test
+  void concurrentIdenticalAndConflictingIngestionIsAtomic() throws Exception {
+    String v = version(true);
+    person("p", "담당");
+    var e = event("race", v, "p", "abc", List.of(span(0, 1, "a", "a", "b")), null);
+    String body = json.writeValueAsString(e);
+    var barrier = new CyclicBarrier(6);
+    try (var pool = Executors.newFixedThreadPool(6)) {
+      List<Callable<Integer>> calls = new ArrayList<>();
+      for (int i = 0; i < 6; i++)
+        calls.add(
+            () -> {
+              barrier.await();
+              return mvc.perform(
+                      post("/api/v1/events").contentType(MediaType.APPLICATION_JSON).content(body))
+                  .andReturn()
+                  .getResponse()
+                  .getStatus();
             });
-            List<Integer> statuses = new ArrayList<>();
-            for (var future : pool.invokeAll(calls)) statuses.add(future.get());
-            assertThat(statuses).filteredOn(status -> status == 201).hasSize(1);
-            assertThat(statuses).filteredOn(status -> status == 200).hasSize(5);
-        }
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM findings", Long.class)).isEqualTo(1);
+      var result = new ArrayList<Integer>();
+      for (var f : pool.invokeAll(calls)) result.add(f.get());
+      assertThat(result).containsOnly(200, 201);
+      assertThat(result.stream().filter(s -> s == 201).count()).isEqualTo(1);
     }
-
-    @Test
-    void concurrentConflictingContentReturnsOneCreatedAndOneConflict() throws Exception {
-        person("alpha", "담당자");
-        var barrier = new CyclicBarrier(2);
-        try (var pool = Executors.newFixedThreadPool(2)) {
-            List<Callable<Integer>> calls = new ArrayList<>();
-            for (int quantity : List.of(1, 2)) {
-                String payload = event("race", "alpha", "2026-04-01T00:00:00Z", "custom-ai", null,
-                    List.of(Map.of("category", "CREDENTIAL", "quantity", quantity)));
-                calls.add(() -> {
-                    barrier.await();
-                    return mvc.perform(post("/api/v1/events").contentType(MediaType.APPLICATION_JSON).content(payload))
-                        .andReturn().getResponse().getStatus();
-                });
-            }
-            List<Integer> statuses = new ArrayList<>();
-            for (var future : pool.invokeAll(calls)) statuses.add(future.get());
-            assertThat(statuses).containsExactlyInAnyOrder(201, 409);
-        }
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM findings", Long.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT quantity FROM findings", Integer.class)).isIn(1, 2);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class))
+        .isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM detections", Long.class)).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM detection_tags", Long.class)).isEqualTo(2);
+    e.put("prompt", "different");
+    call(post("/api/v1/events"), e, 400);
+    var contentBarrier = new CyclicBarrier(2);
+    try (var pool = Executors.newFixedThreadPool(2)) {
+      List<Callable<Integer>> calls = new ArrayList<>();
+      for (String text : List.of("a", "z")) {
+        String payload =
+            json.writeValueAsString(
+                event("content-race", v, "p", text + "bc", List.of(span(0, 1, text, "a")), null));
+        calls.add(
+            () -> {
+              contentBarrier.await();
+              return mvc.perform(
+                      post("/api/v1/events")
+                          .contentType(MediaType.APPLICATION_JSON)
+                          .content(payload))
+                  .andReturn()
+                  .getResponse()
+                  .getStatus();
+            });
+      }
+      var results = new ArrayList<Integer>();
+      for (var f : pool.invokeAll(calls)) results.add(f.get());
+      assertThat(results).containsExactlyInAnyOrder(201, 409);
     }
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class))
+        .isEqualTo(2);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM detections", Long.class)).isEqualTo(2);
+  }
 
-    @Test
-    void calendarBucketsHonorHistoricalSeoulDstAndFractionalRangeBounds() throws Exception {
-        person("alpha", "담당자");
-        postEvent(event("historical-dst", "alpha", "1987-06-01T14:30:00.123456Z", "chatgpt", "UNKNOWN", List.of()), 201);
-        mvc.perform(get("/api/v1/metrics").param("from", "1987-05-31T14:00:00Z").param("to", "1987-06-02T14:00:00Z"))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.daily[0].date").value("1987-06-01"))
-            .andExpect(jsonPath("$.daily[0].eventCount").value(0)).andExpect(jsonPath("$.daily[1].date").value("1987-06-02"))
-            .andExpect(jsonPath("$.daily[1].eventCount").value(1));
-        mvc.perform(get("/api/v1/events").param("from", "1987-06-01T14:30:00.123456001Z")
-            .param("to", "1987-06-01T14:30:01Z")).andExpect(jsonPath("$.totalElements").value(0));
-        mvc.perform(get("/api/v1/events").param("from", "1987-06-01T14:30:00Z")
-            .param("to", "1987-06-01T14:30:00.123456001Z")).andExpect(jsonPath("$.totalElements").value(1));
+  @Test
+  void concurrentDraftUpdatesAndActivationUseDatabaseLocks() throws Exception {
+    String draft = createDraft("경합 초안", null).path("id").asText();
+    var barrier = new CyclicBarrier(2);
+    try (var pool = Executors.newFixedThreadPool(2)) {
+      List<Callable<Integer>> calls = new ArrayList<>();
+      for (String name : List.of("첫 변경", "둘째 변경")) {
+        String body =
+            json.writeValueAsString(
+                Map.of("revision", 0, "name", name, "tags", List.of(), "policyStates", List.of()));
+        calls.add(
+            () -> {
+              barrier.await();
+              return mvc.perform(
+                      put("/api/v1/config-versions/" + draft)
+                          .contentType(MediaType.APPLICATION_JSON)
+                          .content(body))
+                  .andReturn()
+                  .getResponse()
+                  .getStatus();
+            });
+      }
+      var results = new ArrayList<Integer>();
+      for (var f : pool.invokeAll(calls)) results.add(f.get());
+      assertThat(results).containsExactlyInAnyOrder(200, 409);
     }
-
-    @Test
-    void aggregatesInSqlWithoutEventFanoutAndUsesSeoulDailyBucketsAndAllFilters() throws Exception {
-        person("alpha", "가나다"); person("beta", "라마바"); person("empty", "영 기록");
-        postEvent(event("before-midnight", "alpha", "2026-04-01T14:59:59Z", "chatgpt", "TRAINING_ALLOWED",
-            List.of(Map.of("category", "PERSONAL_DATA", "quantity", 2), Map.of("category", "CREDENTIAL", "quantity", 3))), 201);
-        postEvent(event("midnight", "beta", "2026-04-01T15:00:00Z", "chatgpt", null,
-            List.of(Map.of("category", "PERSONAL_DATA", "quantity", 4))), 201);
-        postEvent(event("unknown", "alpha", "2026-04-02T03:00:00Z", "claude", "UNKNOWN", List.of()), 201);
-        postEvent(event("disabled", "beta", "2026-04-02T04:00:00Z", "gemini", "TRAINING_DISABLED",
-            List.of(Map.of("category", "CONFIDENTIAL", "quantity", 8))), 201);
-        postEvent(event("exclusive-end", "alpha", "2026-04-03T15:00:00Z", "chatgpt", "UNKNOWN", List.of()), 201);
-
-        mvc.perform(get("/api/v1/metrics").param("from", "2026-04-01T00:00:00+09:00").param("to", "2026-04-04T00:00:00+09:00"))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.summary.eventCount").value(4))
-            .andExpect(jsonPath("$.summary.findingCount").value(17)).andExpect(jsonPath("$.summary.personCount").value(2))
-            .andExpect(jsonPath("$.summary.unknownPolicyCount").value(1))
-            .andExpect(jsonPath("$.daily[0].date").value("2026-04-01")).andExpect(jsonPath("$.daily[0].eventCount").value(1))
-            .andExpect(jsonPath("$.daily[1].eventCount").value(3)).andExpect(jsonPath("$.daily[2].eventCount").value(0))
-            .andExpect(jsonPath("$.categories[0].count").value(6)).andExpect(jsonPath("$.categories[0].eventCount").value(2))
-            .andExpect(jsonPath("$.policies[2].eventCount").value(1));
-
-        mvc.perform(get("/api/v1/metrics").param("from", "2026-04-01T00:00:00+09:00").param("to", "2026-04-04T00:00:00+09:00")
-            .param("category", "PERSONAL_DATA").param("service", "CHATGPT"))
-            .andExpect(jsonPath("$.summary.eventCount").value(2)).andExpect(jsonPath("$.summary.findingCount").value(6))
-            .andExpect(jsonPath("$.categories[1].count").value(0)).andExpect(jsonPath("$.services[0].findingCount").value(6));
-
-        mvc.perform(get("/api/v1/people").param("from", "2026-04-01T00:00:00+09:00").param("to", "2026-04-04T00:00:00+09:00")
-            .param("category", "PERSONAL_DATA").param("personId", "alpha"))
-            .andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.items[0].eventCount").value(1))
-            .andExpect(jsonPath("$.items[0].findingCount").value(2));
-
-        mvc.perform(get("/api/v1/events").param("from", "2026-04-01T00:00:00+09:00").param("to", "2026-04-04T00:00:00+09:00")
-            .param("policyState", "TRAINING_ALLOWED").param("size", "1"))
-            .andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.totalPages").value(1))
-            .andExpect(jsonPath("$.items[0].findingCount").value(5));
+    String first = publishEmpty(), second = publishEmpty();
+    var activeBarrier = new CyclicBarrier(8);
+    try (var pool = Executors.newFixedThreadPool(8)) {
+      List<Callable<Integer>> calls = new ArrayList<>();
+      for (int i = 0; i < 8; i++) {
+        String id = i % 2 == 0 ? first : second;
+        calls.add(
+            () -> {
+              activeBarrier.await();
+              return mvc.perform(post("/api/v1/config-versions/" + id + "/activate"))
+                  .andReturn()
+                  .getResponse()
+                  .getStatus();
+            });
+      }
+      for (var f : pool.invokeAll(calls)) assertThat(f.get()).isEqualTo(200);
     }
+    long activeCount = 0;
+    for (var v : getJson(get("/api/v1/config-versions")))
+      if (v.path("isActive").asBoolean()) activeCount++;
+    assertThat(activeCount).isEqualTo(1);
+  }
 
-    @Test
-    void validatesQueriesAndDoesNotForwardMissingAssetsOrApis() throws Exception {
-        for (String path : List.of("/api/v1/events?size=101", "/api/v1/events?page=-1", "/api/v1/metrics?category=INVALID",
-            "/api/v1/metrics?from=2025-01-01T00:00:00Z&to=2026-10-30T00:00:00Z", "/api/v1/metrics?from=2026-10-30T00:00:00",
-            "/api/v1/metrics?service=chatgpt&service=claude")) {
-            mvc.perform(get(path)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").exists());
-        }
-        mvc.perform(get("/api/v1/health")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UP"));
-        mvc.perform(get("/api/v1/events/9999999")).andExpect(status().isNotFound());
-        mvc.perform(get("/api/v1/people/missing")).andExpect(status().isNotFound());
-        mvc.perform(get("/assets/missing.js")).andExpect(status().isNotFound());
-        mvc.perform(get("/api/v1/missing")).andExpect(status().isNotFound());
-        mvc.perform(get("/random-page")).andExpect(status().isNotFound());
-        mvc.perform(get("/events/123")).andExpect(forwardedUrl("/index.html"));
-    }
+  @Test
+  void retainsMicrosecondHalfOpenBoundsAndHourlyLimits() throws Exception {
+    String v = version(true);
+    person("p", "담당");
+    create(event("precise", v, "p", "a", List.of(), "1987-06-01T14:30:00.123456789Z"));
+    assertThat(
+            getJson(
+                    get("/api/v1/events")
+                        .param("from", "1987-06-01T14:30:00.123456001Z")
+                        .param("to", "1987-06-01T14:30:01Z"))
+                .path("totalElements")
+                .asInt())
+        .isZero();
+    assertThat(
+            getJson(
+                    get("/api/v1/events")
+                        .param("from", "1987-06-01T14:30:00Z")
+                        .param("to", "1987-06-01T14:30:00.123456001Z"))
+                .path("totalElements")
+                .asInt())
+        .isEqualTo(1);
+    var m =
+        getJson(
+            get("/api/v1/metrics")
+                .param("from", "1987-05-31T14:00:00Z")
+                .param("to", "1987-06-02T14:00:00Z"));
+    assertThat(m.path("series").get(0).path("bucket").asText()).isEqualTo("1987-06-01");
+    assertThat(m.path("series").get(1).path("eventCount").asInt()).isEqualTo(1);
+    mvc.perform(
+            get("/api/v1/metrics")
+                .param("from", "2026-01-01T00:00:00Z")
+                .param("to", "2026-03-01T00:00:00Z")
+                .param("interval", "hour"))
+        .andExpect(status().isBadRequest());
+  }
 
-    @Test
-    void boundsJsonParsingAndRejectsBothDeclaredAndChunkedOversizeBodies() throws Exception {
-        byte[] oversized = ("{\"name\":\"" + "x".repeat(ApiBodyLimitFilter.MAX_BYTES) + "\"}").getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        mvc.perform(post("/api/v1/people").contentType(MediaType.APPLICATION_JSON).content(oversized))
-            .andExpect(status().isPayloadTooLarge()).andExpect(jsonPath("$.code").value("PAYLOAD_TOO_LARGE"));
-        mvc.perform(post("/api/v1/people").contentType(MediaType.APPLICATION_JSON).content(oversized)
-            .with(request -> new org.springframework.mock.web.MockHttpServletRequest() {
-                { setMethod("POST"); setRequestURI("/api/v1/people"); setContentType(MediaType.APPLICATION_JSON_VALUE); setContent(oversized); }
-                @Override public int getContentLength() { return -1; }
-                @Override public long getContentLengthLong() { return -1; }
-            }))
-            .andExpect(status().isPayloadTooLarge()).andExpect(jsonPath("$.code").value("PAYLOAD_TOO_LARGE"));
-        mvc.perform(post("/api/v1/people").contentType(MediaType.APPLICATION_JSON)
-            .content("{\"id\":\"oversized-name\",\"name\":\"" + "x".repeat(5000) + "\"}"))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_JSON"));
-        mvc.perform(post("/api/v1/people").contentType(MediaType.APPLICATION_JSON)
-            .content("{\"id\":" + "[".repeat(20) + "0" + "]".repeat(20) + "}"))
-            .andExpect(status().isBadRequest());
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM people", Long.class)).isZero();
-    }
+  @Test
+  void supportsFullSizeCatalogAndDetectionLimits() throws Exception {
+    String id = createDraft("최대 크기", null).path("id").asText();
+    List<Map<String, Object>> catalog = new ArrayList<>();
+    for (int n = 0; n < 1000; n++)
+      catalog.add(tag("n" + n, "태그" + n, n == 0 ? null : n < 32 ? "n" + (n - 1) : "n0"));
+    call(
+        put("/api/v1/config-versions/" + id),
+        Map.of("revision", 0, "name", "최대 크기", "tags", catalog, "policyStates", List.of()),
+        200);
+    catalog.add(tag("extra", "초과", null));
+    call(
+        put("/api/v1/config-versions/" + id),
+        Map.of("revision", 1, "name", "초과", "tags", catalog, "policyStates", List.of()),
+        400);
+    call(post("/api/v1/config-versions/" + id + "/publish"), Map.of("revision", 1), 200);
+    call(post("/api/v1/config-versions/" + id + "/activate"), null, 200);
+    person("p", "담당");
+    List<Map<String, Object>> spans = new ArrayList<>();
+    for (int n = 0; n < 1000; n++) spans.add(span(n, n + 1, "a", "n31"));
+    var body = event("max-detections", id, "p", "a".repeat(1000), spans, null);
+    var created = create(body);
+    assertThat(created.path("findingCount").asInt()).isEqualTo(1000);
+    spans.add(span(0, 1, "a", "n0"));
+    body.put("eventId", "too-many");
+    call(post("/api/v1/events"), body, 400);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM security_events", Long.class))
+        .isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM detections", Long.class)).isEqualTo(1000);
+  }
 
-    private void person(String id, String name) throws Exception {
-        mvc.perform(post("/api/v1/people").contentType(MediaType.APPLICATION_JSON)
-            .content(json.writeValueAsString(Map.of("id", id, "name", name)))).andExpect(status().isCreated());
-    }
+  @Test
+  void acceptsLargePromptAndRejectsOversizedChunkedOrMalformedSensitiveInput() throws Exception {
+    String v = version(true);
+    person("p", "담당");
+    create(event("large", v, "p", "😀".repeat(200000), List.of(), null));
+    byte[] oversized =
+        ("{\"name\":\"" + "x".repeat(ApiBodyLimitFilter.MAX_BYTES) + "\"}")
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    mvc.perform(post("/api/v1/people").contentType(MediaType.APPLICATION_JSON).content(oversized))
+        .andExpect(status().isPayloadTooLarge());
+    mvc.perform(
+            post("/api/v1/people")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(oversized)
+                .with(
+                    request ->
+                        new org.springframework.mock.web.MockHttpServletRequest() {
+                          {
+                            setMethod("POST");
+                            setRequestURI("/api/v1/people");
+                            setContentType("application/json");
+                            setContent(oversized);
+                          }
 
-    private JsonNode postEvent(String body, int status) throws Exception {
-        return json.readTree(mvc.perform(post("/api/v1/events").contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(status().is(status)).andReturn().getResponse().getContentAsString());
-    }
+                          @Override
+                          public long getContentLengthLong() {
+                            return -1;
+                          }
+                        }))
+        .andExpect(status().isPayloadTooLarge());
+    String malformed = "{\"sourceId\":123,\"prompt\":\"sensitive-example\"}";
+    var response =
+        mvc.perform(
+                post("/api/v1/events").contentType(MediaType.APPLICATION_JSON).content(malformed))
+            .andExpect(status().isBadRequest())
+            .andReturn();
+    assertThat(response.getResponse().getContentAsString()).doesNotContain("sensitive-example");
+  }
 
-    private String event(String eventId, String personId, String time, String service, String policy, List<Map<String, Object>> findings) throws Exception {
-        var value = new java.util.LinkedHashMap<String, Object>();
-        value.put("sourceId", "src"); value.put("eventId", eventId); value.put("personId", personId);
-        value.put("occurredAt", time); value.put("service", service);
-        if (policy != null) value.put("policyState", policy);
-        value.put("findings", findings);
-        return json.writeValueAsString(value);
-    }
+  private JsonNode call(MockHttpServletRequestBuilder request, Object body, int status)
+      throws Exception {
+    request.contentType(MediaType.APPLICATION_JSON);
+    if (body != null) request.content(json.writeValueAsString(body));
+    return json.readTree(
+        mvc.perform(request)
+            .andExpect(status().is(status))
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
+  }
+
+  private JsonNode getJson(MockHttpServletRequestBuilder request) throws Exception {
+    return json.readTree(
+        mvc.perform(request)
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
+  }
+
+  private JsonNode createDraft(String name, String base) throws Exception {
+    var m = new LinkedHashMap<String, Object>();
+    m.put("name", name);
+    if (base != null) m.put("baseVersionId", base);
+    return call(post("/api/v1/config-versions"), m, 201);
+  }
+
+  private String publishEmpty() throws Exception {
+    String id = createDraft("빈 게시 버전", null).path("id").asText();
+    call(post("/api/v1/config-versions/" + id + "/publish"), Map.of("revision", 0), 200);
+    return id;
+  }
+
+  private String version(boolean activate) throws Exception {
+    String id = createDraft("설정", null).path("id").asText();
+    call(
+        put("/api/v1/config-versions/" + id),
+        Map.of("revision", 0, "name", "설정", "tags", tags(true), "policyStates", policies()),
+        200);
+    call(post("/api/v1/config-versions/" + id + "/publish"), Map.of("revision", 1), 200);
+    if (activate) call(post("/api/v1/config-versions/" + id + "/activate"), null, 200);
+    return id;
+  }
+
+  private List<Map<String, Object>> tags(boolean unused) {
+    return List.of(tag("root", "상위", null), tag("a", "이전 A", "root"), tag("b", "이전 B", "root"));
+  }
+
+  private Map<String, Object> tag(String id, String name, String parent) {
+    var m = new LinkedHashMap<String, Object>();
+    m.put("id", id);
+    m.put("name", name);
+    m.put("parentId", parent);
+    return m;
+  }
+
+  private List<Map<String, Object>> policies() {
+    return List.of(Map.of("id", "custom", "name", "직접 만든 정책", "color", "#ABCDEF"));
+  }
+
+  private void person(String id, String name) throws Exception {
+    call(post("/api/v1/people"), Map.of("id", id, "name", name), 201);
+  }
+
+  private Map<String, Object> event(
+      String event, String version, String person, String prompt, List<?> spans, String time) {
+    var m = new LinkedHashMap<String, Object>();
+    m.put("sourceId", "src");
+    m.put("eventId", event);
+    m.put("personId", person);
+    m.put("versionId", version);
+    m.put("prompt", prompt);
+    m.put("detections", spans);
+    if (time != null) m.put("occurredAt", time);
+    return m;
+  }
+
+  private Map<String, Object> span(int start, int end, String text, String... ids) {
+    return Map.of("start", start, "end", end, "text", text, "tagIds", List.of(ids));
+  }
+
+  private JsonNode create(Map<String, Object> input) throws Exception {
+    return call(post("/api/v1/events"), input, 201);
+  }
+
+  private MockHttpServletRequestBuilder range(MockHttpServletRequestBuilder q) {
+    return q.param("from", "2026-10-19T15:00:00Z").param("to", "2026-10-22T15:00:00Z");
+  }
+
+  private JsonNode find(JsonNode nodes, String id) {
+    for (var n : nodes) if (n.path("id").asText().equals(id)) return n;
+    throw new AssertionError("missing " + id);
+  }
+
+  private JsonNode findEvent(JsonNode nodes, String id) {
+    for (var n : nodes) if (n.path("eventId").asText().equals(id)) return n;
+    throw new AssertionError("missing " + id);
+  }
 }

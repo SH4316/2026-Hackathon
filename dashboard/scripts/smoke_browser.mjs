@@ -1,166 +1,175 @@
 #!/usr/bin/env node
-// Install Playwright separately; set PLAYWRIGHT_MODULE to its absolute index.mjs path.
-// Run only against an isolated test database: this test registers a labeled demo person.
+/** V2 browser flow. Run against a packaged app on a dedicated test DB. */
 import assert from 'node:assert/strict';
-import { writeFile, mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const baseUrl = (process.env.DASHBOARD_URL || 'http://127.0.0.1:8081').replace(/\/$/, '');
+import { pathToFileURL } from 'node:url';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');
+const baseUrl = (process.env.DASHBOARD_URL || 'http://127.0.0.1:8083').replace(/\/$/, '');
+const suffix = Date.now().toString(36);
+async function api(method, path, payload, expected = 200) {
+  const response = await fetch(baseUrl + '/api/v1' + path, { method, headers: { 'Content-Type': 'application/json' }, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
+  const text = await response.text(); const body = text ? JSON.parse(text) : null;
+  assert.equal(response.status, expected, `${method} ${path}: ${text}`); return body;
+}
+const personId = 'browser-' + suffix;
+const personName = '데모 UI 검증 ' + suffix;
+await api('POST', '/people', { id: personId, name: personName }, 201);
+let version = await api('POST', '/config-versions', { name: '데모 UI 데이터 ' + suffix }, 201);
+const tag = (id, name, parentId, order = 0) => ({ id, name, parentId, order, description: '가상 데모', examples: ['합성 예시'], guidance: '데모 판단 지침', color: '#6684F1' });
+version = await api('PUT', '/config-versions/' + version.id, { revision: version.revision, name: version.name, tags: [tag('group', '검증 묶음', null), tag('name', '검증 이름', 'group'), tag('email', '검증 이메일', 'group', 1)], policyStates: [{ id: 'review', name: '검증 정책', description: '', color: '#4B9F8A', order: 0 }] });
+version = await api('POST', '/config-versions/' + version.id + '/publish', { revision: version.revision });
+await api('POST', '/config-versions/' + version.id + '/activate');
+const prompt = '데모 😀 김하늘 demo.person@example.invalid · 합성 데이터';
+const at = text => Array.from(prompt.slice(0, prompt.indexOf(text))).length;
+const nameStart = at('김하늘');
+const emailStart = at('demo.person');
+const eventBody = { sourceId: 'browser-' + suffix, eventId: 'detected', personId, versionId: version.id, prompt, service: 'chatgpt', policyStateId: 'review', occurredAt: new Date(Date.now() - 3600000).toISOString(), detections: [{ start: nameStart, end: nameStart + 3, text: '김하늘', tagIds: ['group', 'name'] }, { start: emailStart, end: emailStart + 27, text: 'demo.person@example.invalid', tagIds: ['email'] }] };
+const event = await api('POST', '/events', eventBody, 201);
+await api('POST', '/events', { ...eventBody, eventId: 'zero', prompt: '데모 감지 없는 Prompt', detections: [] }, 201);
 const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: 'Asia/Seoul' });
-const page = await context.newPage();
-const checks = [];
-const errors = [];
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+const errors = []; const checks = []; let apiRequests = 0;
 page.on('pageerror', error => errors.push(error.message));
-let apiRequests = 0;
-page.on('request', request => { if (request.url().includes('/api/v1/')) apiRequests++; });
-
+page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests++; });
+page.on('dialog', dialog => dialog.accept());
+const query = new URLSearchParams({ personId, versionId: version.id }).toString();
 async function ready(title) {
   await page.getByRole('heading', { name: title, exact: true }).waitFor();
-  await page.getByRole('button', { name: '새로고침', exact: true }).waitFor({ state: 'visible' });
-  await page.waitForFunction(() => !document.querySelector('button.button:disabled')?.textContent?.includes('새로고침'));
+  await page.waitForFunction(() => !document.querySelector('.loading-state'));
 }
-
 try {
-  await page.goto(baseUrl);
-  await ready('전체 현황');
-  await page.locator('.stat-strip').waitFor();
-  assert.equal(await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link').count(), 4);
-  const settledRequests = apiRequests;
-  await page.waitForTimeout(1400);
-  assert.equal(apiRequests, settledRequests, 'settled page should not poll');
+  await page.goto(baseUrl + '/?' + query); await ready('전체 현황');
+  await page.getByRole('img', { name: /시계열 탐지량/ }).waitFor();
+  const settled = apiRequests; await page.waitForTimeout(1100); assert.equal(apiRequests, settled);
   await page.getByRole('button', { name: '새로고침', exact: true }).click();
-  await page.waitForFunction(previous => {
-    const button = [...document.querySelectorAll('button')].find(item => item.textContent.includes('새로고침'));
-    return button && !button.disabled && document.querySelector('.stat-strip');
-  }, settledRequests);
-  assert(apiRequests > settledRequests, 'manual refresh should request current data');
-  checks.push('overview loads from real API, navigation and explicit refresh; no idle polling');
-
-  await page.locator('.category-distribution a').first().click();
+  await page.waitForFunction(() => !document.querySelector('.loading-state'));
+  assert(apiRequests > settled);
+  await page.getByRole('button', { name: '24시간', exact: true }).click();
+  await page.waitForURL(url => url.searchParams.get('interval') === 'hour');
+  await page.getByRole('button', { name: '검증 묶음 펼치기', exact: true }).click();
+  await page.locator('.metric-tree-label').filter({ hasText: '검증 이름' }).click();
   await ready('탐지 이력');
-  assert(new URL(page.url()).searchParams.has('category'), 'category chart should link to filtered history');
-  await page.getByRole('region', { name: '이벤트 목록' }).waitFor();
-  await page.getByRole('link', { name: /이벤트 \d+ 상세 보기/ }).first().click();
-  await page.getByRole('heading', { name: /^이벤트 #/ }).waitFor();
-  await page.getByRole('heading', { name: '수집 정보', exact: true }).waitFor();
-  const detailUrl = page.url();
-  await page.reload();
-  await page.getByRole('heading', { name: /^이벤트 #/ }).waitFor();
-  await page.locator('.event-info .person-cell').click();
-  await page.getByRole('heading', { name: /님의 기록$/ }).waitFor();
-  await page.locator('.stat-strip').waitFor();
-  checks.push('category drill-down, event detail, direct-route reload and person history');
+  assert.equal(new URL(page.url()).searchParams.get('tagId'), 'name');
+  assert.equal(new URL(page.url()).searchParams.get('personId'), personId);
+  checks.push('graph-first overview, manual refresh with no automatic polling, 24-hour interval and tree drill-down preserving filters');
 
-  await page.goto(baseUrl + '/events');
-  await ready('탐지 이력');
-  await page.getByRole('region', { name: '이벤트 목록' }).waitFor();
-  const nextPage = page.getByRole('button', { name: '다음 페이지', exact: true });
-  if (await nextPage.isEnabled()) {
-    const firstEvent = await page.getByRole('link', { name: /이벤트 \d+ 상세 보기/ }).first().getAttribute('aria-label');
-    await nextPage.click();
-    await page.waitForURL(url => url.searchParams.get('page') === '1');
-    await page.getByRole('region', { name: '이벤트 목록' }).waitFor();
-    await page.waitForFunction(previous => {
-      const link = document.querySelector('a[aria-label^="이벤트 "][aria-label$=" 상세 보기"]');
-      return link && link.getAttribute('aria-label') !== previous;
-    }, firstEvent);
-    await page.getByRole('button', { name: '이전 페이지', exact: true }).click();
-    await page.waitForURL(url => url.searchParams.get('page') === '0');
-    await page.getByRole('region', { name: '이벤트 목록' }).waitFor();
-    await page.waitForFunction(previous => document.querySelector('a[aria-label^="이벤트 "][aria-label$=" 상세 보기"]')?.getAttribute('aria-label') === previous, firstEvent);
-    checks.push('history pagination advances and returns while updating the URL');
-  }
-  const beforeInvalidDates = apiRequests;
-  await page.locator('input[name="from"]').fill('2099-01-02');
-  await page.locator('input[name="to"]').fill('2099-01-01');
-  await page.getByRole('button', { name: '조회', exact: true }).click();
-  await page.getByRole('alert').waitFor();
-  assert.equal(apiRequests, beforeInvalidDates, 'invalid date range must not request data');
-  await page.getByRole('button', { name: '초기화', exact: true }).click();
-  await page.goto(baseUrl + '/events?from=malformed&to=malformed');
-  await page.getByRole('alert').waitFor();
-  await page.goto(baseUrl + '/events');
-  await ready('탐지 이력');
-  await page.locator('input[name="service"]').fill('browser-empty-service');
-  await page.getByRole('button', { name: '조회', exact: true }).click();
-  await page.getByRole('heading', { name: '표시할 이벤트가 없습니다' }).waitFor();
-  await page.getByRole('button', { name: '초기화', exact: true }).click();
-  await page.getByRole('region', { name: '이벤트 목록' }).waitFor();
-  await page.locator('select[name="category"]').selectOption('CREDENTIAL');
-  await page.locator('select[name="policyState"]').selectOption('TRAINING_ALLOWED');
-  await page.locator('input[name="service"]').fill('chatgpt');
-  await page.getByRole('button', { name: '조회', exact: true }).click();
-  await page.getByRole('region', { name: '이벤트 목록' }).waitFor();
-  const applied = new URL(page.url()).searchParams;
-  assert.equal(applied.get('category'), 'CREDENTIAL');
-  assert.equal(applied.get('policyState'), 'TRAINING_ALLOWED');
-  assert.equal(applied.get('service'), 'chatgpt');
-  checks.push('invalid/reversed dates, empty events, filter reset and combined service/category/policy filters');
+  await page.goto(baseUrl + '/events/' + event.id + '?' + query); await ready('Prompt #' + event.id);
+  assert.equal(await page.locator('.prompt-content').innerText(), prompt);
+  assert.deepEqual(await page.locator('.prompt-content mark').allTextContents(), ['김하늘', 'demo.person@example.invalid']);
+  await page.locator('.detection-item').first().click();
+  assert.equal(await page.locator('.detection-item').first().getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('.prompt-content .mark-muted').count(), 1);
+  await page.getByRole('link', { name: new RegExp(personName) }).click();
+  await ready(personName + '님의 기록');
+  assert.equal(new URL(page.url()).pathname, '/people/' + personId);
+  checks.push('full prompt, Unicode emoji highlighting, multiple tags, selected detection and person-detail navigation');
 
-  await page.goto(baseUrl + '/people');
-  await ready('사람 관리');
-  const suffix = Date.now().toString(36);
-  const personId = 'browser-' + suffix;
-  const personName = '데모 UI 검증 ' + suffix;
+  await page.goto(baseUrl + '/events?' + query); await ready('탐지 이력');
+  await page.locator('input[name="q"]').fill('definitely-no-matching-prompt-' + suffix);
+  await page.locator('.filter-bar').getByRole('button', { name: '검색', exact: true }).click();
+  await page.getByRole('heading', { name: '표시할 기록이 없습니다', exact: true }).waitFor();
+  await page.locator('input[name="q"]').fill('');
+  await page.locator('select[name="hasDetections"]').selectOption('false');
+  await page.locator('.filter-bar').getByRole('button', { name: '검색', exact: true }).click();
+  await page.getByRole('region', { name: '이벤트 목록' }).waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('.prompt-table tbody tr').length === 1);
+  assert.equal(await page.locator('.prompt-table tbody tr').count(), 1);
+  assert((await page.locator('.prompt-table').innerText()).includes('감지 없음'));
+  await page.goto(baseUrl + '/events?' + query); await ready('탐지 이력');
+  await page.getByRole('button', { name: '결과 저장', exact: true }).click();
+  const savedName = '데모 UI 고정 검색 ' + suffix;
+  await page.getByRole('textbox', { name: '저장 이름', exact: true }).fill(savedName);
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.waitForURL(url => url.pathname.startsWith('/saved-searches/'));
+  await ready(savedName);
+  const savedId = new URL(page.url()).pathname.split('/').pop();
+  const saved = await api('GET', '/saved-searches/' + savedId);
+  assert.equal(saved.eventCount, 2);
+  await api('POST', '/events', { ...eventBody, eventId: 'after-snapshot', detections: [] }, 201);
+  await page.reload(); await ready(savedName);
+  assert.equal(await page.locator('.prompt-table tbody tr').count(), 2);
+  await page.getByRole('button', { name: '현재 데이터로 다시 조회', exact: true }).click();
+  await ready('탐지 이력');
+  assert.equal(new URL(page.url()).searchParams.get('versionId'), version.id);
+  assert.equal(await page.locator('.prompt-table tbody tr').count(), 3);
+  checks.push('literal prompt filters, zero-detection records, saved whole-result snapshot remains fixed after ingestion and explicit requery');
+
+  await page.goto(baseUrl + '/settings/metrics?versionId=' + version.id); await ready('메트릭 설정');
+  await page.getByRole('button', { name: '새 버전', exact: true }).click();
+  await page.getByRole('textbox', { name: '버전 이름', exact: true }).fill('데모 UI 편집 ' + suffix);
+  await page.getByRole('button', { name: '최상위 태그 추가', exact: true }).click();
+  await page.getByRole('textbox', { name: '태그 이름', exact: true }).fill('직접 만든 부모');
+  await page.getByRole('textbox', { name: '태그 예시', exact: true }).fill('첫 예시\n두 번째 예시');
+  await page.getByRole('textbox', { name: '판단 참고사항', exact: true }).fill('가상 정보인지 맥락을 확인합니다.');
+  await page.getByRole('button', { name: '하위 태그', exact: true }).click();
+  await page.getByRole('textbox', { name: '태그 이름', exact: true }).fill('직접 만든 자식');
+  await page.getByRole('button', { name: /^정책 상태 \d/ }).click();
+  await page.getByRole('button', { name: '정책 상태 추가', exact: true }).click();
+  await page.getByRole('textbox', { name: '정책 상태 이름', exact: true }).fill('직접 만든 정책');
+  await page.getByRole('button', { name: '초안 저장', exact: true }).click();
+  await page.getByText('초안을 저장했습니다.', { exact: true }).waitFor();
+  const editedId = new URL(page.url()).searchParams.get('versionId');
+  const edited = await api('GET', '/config-versions/' + editedId);
+  assert.equal(edited.tags.length, 2);
+  const parent = edited.tags.find(t => t.name === '직접 만든 부모');
+  assert.deepEqual(parent.examples, ['첫 예시', '두 번째 예시']);
+  assert.equal(edited.tags.find(t => t.name === '직접 만든 자식').parentId, parent.id);
+  assert.equal(edited.policyStates[0].name, '직접 만든 정책');
+  await page.getByRole('button', { name: '발행', exact: true }).click();
+  await page.getByText('버전을 발행했습니다. 활성화하면 분류기에 제공됩니다.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '활성화', exact: true }).click();
+  await page.getByText('활성 버전을 변경했습니다. 분류기는 새 설정을 읽어야 합니다.', { exact: true }).waitFor();
+  assert(await page.getByRole('textbox', { name: '버전 이름', exact: true }).isDisabled());
+  await page.getByRole('button', { name: '복제', exact: true }).click();
+  await page.getByText('초안을 만들었습니다. 태그와 정책 상태를 편집한 뒤 저장하세요.', { exact: true }).waitFor();
+  const clonedId = new URL(page.url()).searchParams.get('versionId');
+  const clone = await api('GET', '/config-versions/' + clonedId);
+  assert.deepEqual(clone.tags.map(t => t.id).sort(), edited.tags.map(t => t.id).sort());
+  await page.getByRole('textbox', { name: '버전 이름', exact: true }).fill('저장 충돌 대상');
+  await api('PUT', '/config-versions/' + clonedId, { revision: clone.revision, name: '다른 편집자의 저장', tags: clone.tags, policyStates: clone.policyStates });
+  await page.getByRole('button', { name: '초안 저장', exact: true }).click();
+  await page.locator('.editor-error [role="alert"]').waitFor();
+  await page.getByRole('button', { name: '서버 내용 다시 불러오기', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('input[aria-label="버전 이름"]')?.value === '다른 편집자의 저장');
+  checks.push('UI creates parent/child tags, examples/guidance and custom policies; save/publish/activate, immutable published input, stable-ID clone and revision-conflict recovery');
+
+  await page.goto(baseUrl + '/people'); await ready('사람 관리');
   await page.getByRole('button', { name: '사람 등록', exact: true }).click();
-  await page.locator('.registration-panel input[name="id"]').fill(personId);
-  await page.locator('.registration-panel input[name="name"]').fill(personName);
+  const registeredId = 'browser-new-' + suffix;
+  await page.locator('.registration-panel input[name="id"]').fill(registeredId);
+  await page.locator('.registration-panel input[name="name"]').fill('데모 UI 신규 ' + suffix);
   await page.getByRole('button', { name: '등록하기', exact: true }).click();
   await page.locator('.success-notice').waitFor();
-  await page.locator('input[name="q"]').fill(personId);
-  await page.getByRole('button', { name: '조회', exact: true }).click();
-  await page.waitForURL(url => url.searchParams.get('q') === personId);
-  await page.getByRole('region', { name: '사람 목록' }).getByRole('link', { name: new RegExp(personName) }).waitFor();
-  await page.waitForFunction(id => {
-    const rows = document.querySelectorAll('.people-table tbody tr');
-    return rows.length === 1 && rows[0].textContent.includes(id);
-  }, personId);
-  assert.equal(await page.locator('.people-table tbody tr').count(), 1);
-  assert((await page.locator('.people-table tbody').innerText()).includes('기록 없음'));
-  await page.getByRole('button', { name: '사람 등록', exact: true }).click();
-  await page.locator('.registration-panel input[name="id"]').fill(personId);
-  await page.locator('.registration-panel input[name="name"]').fill(personName);
-  await page.getByRole('button', { name: '등록하기', exact: true }).click();
-  await page.locator('.registration-panel [role="alert"]').waitFor();
-  assert((await page.locator('.registration-panel [role="alert"]').innerText()).length > 0);
-  checks.push('person registration, success feedback, search, zero events and duplicate form error');
-
-  await page.goto(baseUrl + '/settings/monitoring');
-  await page.getByRole('heading', { name: '감시 설정', exact: true }).waitFor();
-  assert.equal(await page.locator('fieldset input').count(), 7);
+  await page.getByRole('textbox', { name: '사람 검색', exact: true }).fill(registeredId);
+  await page.locator('.people-toolbar').getByRole('button', { name: '검색', exact: true }).click();
+  await page.waitForURL(url => url.searchParams.get('personQuery') === registeredId);
+  await page.getByRole('region', { name: '사람 목록' }).waitFor();
+  await page.waitForFunction(id => { const rows = document.querySelectorAll('.data-table tbody tr'); return rows.length === 1 && rows[0].textContent.includes(id); }, registeredId);
+  assert.equal(await page.locator('.data-table tbody tr').count(), 1);
+  await page.goto(baseUrl + '/settings/monitoring'); await ready('감시 연동');
+  assert.equal(await page.locator('fieldset input').count(), 2);
+  assert(await page.getByRole('button', { name: '연동 설정 저장', exact: true }).isDisabled());
   for (const input of await page.locator('fieldset input').all()) assert(await input.isDisabled());
-  assert(await page.getByRole('button', { name: '설정 저장', exact: true }).isDisabled());
-  const settingsRequests = apiRequests;
-  const checkedBefore = await page.locator('fieldset input').evaluateAll(inputs => inputs.map(input => input.checked));
-  await page.locator('fieldset label').first().evaluate(label => label.click());
-  await page.getByRole('button', { name: '설정 저장', exact: true }).evaluate(button => button.click());
-  assert.deepEqual(await page.locator('fieldset input').evaluateAll(inputs => inputs.map(input => input.checked)), checkedBefore);
-  assert.equal(apiRequests, settingsRequests, 'disabled monitoring controls must not request data');
-  checks.push('monitoring settings and save remain disabled and send no request');
+  checks.push('person registration/personQuery and dynamic readonly monitoring view of active custom tags');
 
-  await page.route('**/api/v1/metrics?*', route => route.abort(), { times: 1 });
-  await page.goto(baseUrl + '/');
+  await page.goto(baseUrl + '/'); await ready('전체 현황');
+  await page.locator('.stat-strip').waitFor();
+  await page.route('**/api/v1/metrics?*', route => route.abort());
+  await page.getByRole('button', { name: '새로고침', exact: true }).click();
   await page.getByRole('alert').waitFor();
+  await page.unroute('**/api/v1/metrics?*');
   await page.getByRole('button', { name: '다시 시도', exact: true }).click();
   await page.locator('.stat-strip').waitFor();
   await page.goto(baseUrl + '/events/9223372036854775807');
   await page.getByRole('alert').waitFor();
-  checks.push('recoverable network error, retry and missing-detail error state');
-
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(baseUrl + '/settings/monitoring');
-  await page.getByRole('heading', { name: '감시 설정', exact: true }).waitFor();
+  await page.goto(baseUrl + '/saved-searches'); await ready('저장된 검색');
   await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: '사람 관리', exact: true }).click();
   await ready('사람 관리');
-  checks.push('mobile navigation remains usable at 390px width');
-  assert.deepEqual(errors, [], 'browser should have no uncaught JavaScript exceptions');
-
-  const report = { status: 'PASS', checkedAt: new Date().toISOString(), baseUrl, personId, detailUrl, checks, uncaughtErrors: errors };
-  const output = process.env.BROWSER_REPORT;
-  if (output) { await mkdir(dirname(output), { recursive: true }); await writeFile(output, JSON.stringify(report, null, 2) + '\n'); }
+  checks.push('network retry, missing event detail and mobile navigation');
+  assert.deepEqual(errors, [], 'uncaught browser JavaScript errors');
+  const report = { status: 'PASS', checkedAt: new Date().toISOString(), baseUrl, personId, eventId: event.id, savedId, editedId, checks, uncaughtErrors: errors };
+  if (process.env.BROWSER_REPORT) { await mkdir(dirname(process.env.BROWSER_REPORT), { recursive: true }); await writeFile(process.env.BROWSER_REPORT, JSON.stringify(report, null, 2) + '\n'); }
   console.log(JSON.stringify(report, null, 2));
-} finally {
-  await browser.close();
-}
+} finally { await browser.close(); }

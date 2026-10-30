@@ -1,22 +1,31 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
-  CATEGORY_LABELS,
-  POLICY_LABELS,
-  SERVICE_LABELS,
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { api } from "./api";
+import { useResource } from "./hooks";
+import {
   dateRangeToFilters,
   getDefaultDateRange,
   formatDateTime,
   formatNumber,
+  SERVICE_LABELS,
+  flattenTree,
 } from "./format";
-import type {
-  Category,
-  Filters,
-  Page,
-  PolicyState,
-  SecurityEvent,
-} from "./types";
 import { normalizeServiceFilter, personDetailHref } from "./query";
+import type {
+  ConfigVersion,
+  Filters,
+  Metrics,
+  Page,
+  SecurityEvent,
+  VersionSummary,
+} from "./types";
 
 export type IconName =
   | "overview"
@@ -32,11 +41,16 @@ export type IconName =
   | "lock"
   | "check"
   | "close"
-  | "calendar"
   | "filter"
   | "info"
   | "back"
-  | "external";
+  | "tree"
+  | "save"
+  | "copy"
+  | "trash"
+  | "code"
+  | "up"
+  | "down";
 const paths: Record<IconName, ReactNode> = {
   overview: (
     <>
@@ -70,11 +84,7 @@ const paths: Record<IconName, ReactNode> = {
       <path d="m8.5 12 2.5 2.5 4.5-5" />
     </>
   ),
-  arrow: (
-    <>
-      <path d="M5 12h14m-5-5 5 5-5 5" />
-    </>
-  ),
+  arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
   refresh: (
     <>
       <path d="M20 7v5h-5M4 17v-5h5" />
@@ -97,17 +107,7 @@ const paths: Record<IconName, ReactNode> = {
   ),
   check: <path d="m5 12 4 4L19 6" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,
-  calendar: (
-    <>
-      <rect x="3" y="5" width="18" height="16" rx="2" />
-      <path d="M7 3v4M17 3v4M3 11h18M7 15h2M13 15h2" />
-    </>
-  ),
-  filter: (
-    <>
-      <path d="M4 6h16M7 12h10M10 18h4" />
-    </>
-  ),
+  filter: <path d="M4 6h16M7 12h10M10 18h4" />,
   info: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -115,11 +115,38 @@ const paths: Record<IconName, ReactNode> = {
     </>
   ),
   back: <path d="M19 12H5m5-5-5 5 5 5" />,
-  external: (
+  tree: (
     <>
-      <path d="M14 3h7v7m0-7L10 14M10 4H4v16h16v-6" />
+      <rect x="3" y="3" width="6" height="5" rx="1" />
+      <path d="M6 8v11h7M6 12h7" />
+      <rect x="13" y="9" width="8" height="5" rx="1" />
+      <rect x="13" y="17" width="8" height="5" rx="1" />
     </>
   ),
+  save: (
+    <>
+      <path d="M4 3h13l4 4v14H3V3h1Z" />
+      <path d="M7 3v6h9V3M7 21v-8h10v8" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="8" y="8" width="12" height="13" rx="2" />
+      <path d="M16 8V3H3v13h5" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
+    </>
+  ),
+  code: (
+    <>
+      <path d="m8 6-6 6 6 6M16 6l6 6-6 6M14 3l-4 18" />
+    </>
+  ),
+  up: <path d="m6 15 6-6 6 6" />,
+  down: <path d="m6 9 6 6 6-6" />,
 };
 export function Icon({
   name,
@@ -146,6 +173,30 @@ export function Icon({
       {paths[name]}
     </svg>
   );
+}
+const WorkspaceContext = createContext<{
+  versions: VersionSummary[];
+  loading: boolean;
+  error: string | null;
+  reload: () => void;
+}>({ versions: [], loading: true, error: null, reload: () => {} });
+export function WorkspaceProvider({ children }: { children: ReactNode }) {
+  const r = useResource((signal) => api.versions(signal), []);
+  return (
+    <WorkspaceContext.Provider
+      value={{
+        versions: r.data || [],
+        loading: r.loading,
+        error: r.error,
+        reload: r.refresh,
+      }}
+    >
+      {children}
+    </WorkspaceContext.Provider>
+  );
+}
+export function useWorkspace() {
+  return useContext(WorkspaceContext);
 }
 export function PageTitle({
   title,
@@ -175,6 +226,7 @@ export function RefreshButton({
   loading: boolean;
   updatedAt: Date | null;
 }) {
+  const workspace = useWorkspace();
   return (
     <div className="refresh-control">
       {updatedAt && (
@@ -188,7 +240,14 @@ export function RefreshButton({
           갱신
         </span>
       )}
-      <button className="button" onClick={refresh} disabled={loading}>
+      <button
+        className="button"
+        onClick={() => {
+          workspace.reload();
+          refresh();
+        }}
+        disabled={loading}
+      >
         <Icon
           name="refresh"
           size={16}
@@ -199,11 +258,49 @@ export function RefreshButton({
     </div>
   );
 }
-export function PolicyBadge({ state }: { state: PolicyState | null }) {
+export function VersionBadge({
+  version,
+}: {
+  version: Pick<VersionSummary, "isActive" | "status">;
+}) {
   return (
-    <span className={"badge policy-" + (state || "NONE")}>
+    <span
+      className={
+        "badge " +
+        (version.isActive
+          ? "version-active"
+          : version.status === "DRAFT"
+            ? "version-draft"
+            : "version-published")
+      }
+    >
+      {version.isActive
+        ? "활성"
+        : version.status === "DRAFT"
+          ? "초안"
+          : "발행됨"}
+    </span>
+  );
+}
+export function TagChip({
+  name,
+  color = "#5776c6",
+}: {
+  name: string;
+  color?: string;
+}) {
+  return (
+    <span className="tag-chip">
+      <span style={{ background: color }} />
+      {name}
+    </span>
+  );
+}
+export function PolicyBadge({ name }: { name: string | null }) {
+  return (
+    <span className={"badge " + (name ? "policy-custom" : "policy-NONE")}>
       <span className="status-dot" />
-      {state ? POLICY_LABELS[state] : "정책 정보 없음"}
+      {name || "정책 정보 없음"}
     </span>
   );
 }
@@ -214,19 +311,12 @@ export function ServiceLabel({
   service: string;
   model?: string | null;
 }) {
-  const name = SERVICE_LABELS[service] || service;
+  const name =
+    SERVICE_LABELS[service] || (service === "unspecified" ? "미지정" : service);
   return (
     <span className="service-cell">
-      <span
-        className={
-          "service-monogram service-" +
-          (["chatgpt", "claude", "gemini"].includes(service)
-            ? service
-            : "other")
-        }
-        aria-hidden="true"
-      >
-        {name.slice(0, 1).toUpperCase()}
+      <span className="service-monogram" aria-hidden="true">
+        {name[0]}
       </span>
       <span>
         <span className="cell-primary">{name}</span>
@@ -238,90 +328,22 @@ export function ServiceLabel({
 export function PersonName({
   name,
   id,
-  link = true,
+  search = "",
 }: {
   name: string;
   id: string;
-  link?: boolean;
+  search?: string;
 }) {
-  const location = useLocation();
-  const content = (
-    <>
+  return (
+    <Link to={personDetailHref(id, search)} className="person-cell">
       <span className="avatar" aria-hidden="true">
-        {name.trim().slice(0, 1)}
+        {name[0]}
       </span>
       <span>
         <span className="cell-primary">{name}</span>
         <span className="cell-secondary person-id">{id}</span>
       </span>
-    </>
-  );
-  return link ? (
-    <Link to={personDetailHref(id, location.search)} className="person-cell">
-      {content}
     </Link>
-  ) : (
-    <span className="person-cell">{content}</span>
-  );
-}
-export function EmptyState({
-  title = "아직 수집된 이벤트가 없습니다",
-  description = "사람을 등록하고 수집 API로 이벤트를 전송하면 기록이 표시됩니다.",
-  action,
-}: {
-  title?: string;
-  description?: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="empty-state">
-      <span className="empty-icon">
-        <Icon name="events" size={26} />
-      </span>
-      <h3>{title}</h3>
-      <p>{description}</p>
-      {action}
-    </div>
-  );
-}
-export function LoadingState() {
-  return (
-    <div
-      className="loading-state"
-      role="status"
-      aria-label="데이터 불러오는 중"
-    >
-      <div className="skeleton skeleton-heading" />
-      <div className="skeleton-row">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="skeleton skeleton-number" />
-        ))}
-      </div>
-      <div className="skeleton skeleton-chart" />
-      <span className="sr-only">데이터를 불러오고 있습니다.</span>
-    </div>
-  );
-}
-export function ErrorState({
-  message,
-  retry,
-}: {
-  message: string;
-  retry?: () => void;
-}) {
-  return (
-    <div className="error-state" role="alert">
-      <Icon name="info" />
-      <div>
-        <h3>데이터를 불러오지 못했습니다</h3>
-        <p>{message}</p>
-      </div>
-      {retry && (
-        <button className="button" onClick={retry}>
-          다시 시도
-        </button>
-      )}
-    </div>
   );
 }
 export function Panel({
@@ -350,6 +372,67 @@ export function Panel({
     </section>
   );
 }
+export function EmptyState({
+  title = "표시할 기록이 없습니다",
+  description = "새 기록이 수집되면 이곳에 표시됩니다.",
+  action,
+  icon = "events",
+}: {
+  title?: string;
+  description?: string;
+  action?: ReactNode;
+  icon?: IconName;
+}) {
+  return (
+    <div className="empty-state">
+      <span className="empty-icon">
+        <Icon name={icon} size={26} />
+      </span>
+      <h3>{title}</h3>
+      <p>{description}</p>
+      {action}
+    </div>
+  );
+}
+export function LoadingState() {
+  return (
+    <div
+      className="loading-state"
+      role="status"
+      aria-label="데이터 불러오는 중"
+    >
+      <div className="skeleton skeleton-heading" />
+      <div className="skeleton-row">
+        {[0, 1, 2, 3].map((x) => (
+          <div className="skeleton skeleton-number" key={x} />
+        ))}
+      </div>
+      <div className="skeleton skeleton-chart" />
+    </div>
+  );
+}
+export function ErrorState({
+  message,
+  retry,
+}: {
+  message: string;
+  retry?: () => void;
+}) {
+  return (
+    <div className="error-state" role="alert">
+      <Icon name="info" />
+      <div>
+        <h3>요청을 처리하지 못했습니다</h3>
+        <p>{message}</p>
+      </div>
+      {retry && (
+        <button className="button" onClick={retry}>
+          다시 시도
+        </button>
+      )}
+    </div>
+  );
+}
 export function Pagination({
   page,
   onChange,
@@ -358,40 +441,40 @@ export function Pagination({
   onChange: (page: number) => void;
 }) {
   if (!page.totalElements) return null;
-  if (page.page >= page.totalPages) {
+  if (page.page >= page.totalPages)
     return (
       <div className="pagination">
         <span>요청한 페이지에 기록이 없습니다</span>
-        <button className="button button-small" onClick={() => onChange(0)}>
+        <button className="button" onClick={() => onChange(0)}>
           첫 페이지로
         </button>
       </div>
     );
-  }
-  const first = page.page * page.size + 1;
-  const last = Math.min((page.page + 1) * page.size, page.totalElements);
   return (
     <div className="pagination">
       <span>
         전체 <strong>{formatNumber(page.totalElements)}</strong>개 중{" "}
-        {formatNumber(first)}–{formatNumber(last)}
+        {formatNumber(page.page * page.size + 1)}–
+        {formatNumber(
+          Math.min((page.page + 1) * page.size, page.totalElements),
+        )}
       </span>
       <div>
         <button
           className="button button-small"
-          disabled={page.page === 0}
           onClick={() => onChange(page.page - 1)}
+          disabled={!page.page}
           aria-label="이전 페이지"
         >
           <Icon name="back" size={16} />
         </button>
         <span>
-          {page.page + 1} / {Math.max(page.totalPages, 1)}
+          {page.page + 1} / {page.totalPages}
         </span>
         <button
           className="button button-small"
-          disabled={page.page + 1 >= page.totalPages}
           onClick={() => onChange(page.page + 1)}
+          disabled={page.page + 1 >= page.totalPages}
           aria-label="다음 페이지"
         >
           <Icon name="arrow" size={16} />
@@ -403,256 +486,407 @@ export function Pagination({
 export function EventTable({
   events,
   search = "",
-  emptyAction,
+  returnTo,
 }: {
   events: SecurityEvent[];
   search?: string;
-  emptyAction?: ReactNode;
+  returnTo?: string;
 }) {
   if (!events.length)
     return (
-      <EmptyState
-        title="표시할 이벤트가 없습니다"
-        description="선택한 조건에 맞는 기록이 없습니다. 필터를 변경하거나 새 이벤트를 수집해 보세요."
-        action={emptyAction}
-      />
+      <EmptyState description="선택한 검색 조건에 맞는 기록이 없습니다." />
     );
   return (
     <div
       className="table-scroll"
-      tabIndex={0}
       role="region"
+      tabIndex={0}
       aria-label="이벤트 목록"
     >
-      <table className="data-table event-table">
+      <table className="data-table prompt-table">
         <thead>
           <tr>
-            <th>
-              발생 시각 <span className="sort-indicator">↓</span>
-            </th>
+            <th>Prompt · 발생 시각</th>
             <th>사람</th>
             <th>AI 서비스</th>
-            <th>정책 상태</th>
-            <th>감지 항목 · 수량</th>
-            <th>
-              <span className="sr-only">상세 보기</span>
-            </th>
+            <th>감지 영역</th>
+            <th>감지 태그</th>
+            <th />
           </tr>
         </thead>
         <tbody>
-          {events.map((event) => (
-            <tr key={event.id}>
-              <td className="time-cell">
-                <Link to={"/events/" + event.id + (search ? "?" + search : "")}>
-                  {formatDateTime(event.occurredAt)}
-                </Link>
-              </td>
-              <td>
-                <PersonName name={event.personName} id={event.personId} />
-              </td>
-              <td>
-                <ServiceLabel service={event.service} model={event.model} />
-              </td>
-              <td>
-                <PolicyBadge state={event.policyState} />
-              </td>
-              <td>
-                <div className="finding-list">
-                  {event.findings.length ? (
-                    event.findings.map((f) => (
-                      <span
-                        className={"finding-chip category-" + f.category}
-                        key={f.category}
-                      >
-                        {CATEGORY_LABELS[f.category]}
-                        <strong>{formatNumber(f.quantity)}</strong>
-                      </span>
-                    ))
-                  ) : (
-                    <span className="muted">감지 항목 없음</span>
-                  )}
-                </div>
-              </td>
-              <td>
-                <Link
-                  className="icon-link"
-                  to={"/events/" + event.id + (search ? "?" + search : "")}
-                  aria-label={"이벤트 " + event.id + " 상세 보기"}
-                >
-                  <Icon name="chevron" size={17} />
-                </Link>
-              </td>
-            </tr>
-          ))}
+          {events.map((e) => {
+            const tags = [
+              ...new Map(
+                e.detections.flatMap((d) => d.tags).map((t) => [t.id, t]),
+              ).values(),
+            ];
+            return (
+              <tr key={e.id}>
+                <td>
+                  <Link
+                    className="prompt-preview"
+                    to={"/events/" + e.id + (search ? "?" + search : "")}
+                    state={returnTo ? { returnTo } : undefined}
+                  >
+                    {e.prompt}
+                  </Link>
+                  <span className="cell-secondary">
+                    {formatDateTime(e.occurredAt)}
+                  </span>
+                </td>
+                <td>
+                  <PersonName
+                    name={e.personName}
+                    id={e.personId}
+                    search={search}
+                  />
+                </td>
+                <td>
+                  <ServiceLabel service={e.service} />
+                </td>
+                <td>
+                  <strong className="table-number">
+                    {formatNumber(e.findingCount)}
+                  </strong>
+                  <span className="unit">개</span>
+                </td>
+                <td>
+                  <div className="finding-list">
+                    {tags.slice(0, 3).map((t) => (
+                      <TagChip key={t.id} {...t} />
+                    ))}
+                    {tags.length > 3 && (
+                      <span className="small-count">+{tags.length - 3}</span>
+                    )}
+                    {!tags.length && <span className="muted">감지 없음</span>}
+                  </div>
+                </td>
+                <td>
+                  <Link
+                    className="icon-link"
+                    aria-label={"이벤트 " + e.id + " 상세 보기"}
+                    to={"/events/" + e.id + (search ? "?" + search : "")}
+                    state={returnTo ? { returnTo } : undefined}
+                  >
+                    <Icon name="chevron" size={16} />
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-export function usePageFilters(personId?: string) {
+export function filterQuery(filters: Filters) {
+  return new URLSearchParams(
+    Object.entries(filters).filter(([, v]) => v != null && v !== "") as [
+      string,
+      string,
+    ][],
+  ).toString();
+}
+export function seoulDate(value: string | Date) {
+  const d = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+export function useDashboardFilters(personId?: string) {
+  const { versions } = useWorkspace();
   const [params, setParams] = useSearchParams();
-  const defaults = getDefaultDateRange();
-  const range = {
-    from: params.get("from") || defaults.from,
-    to: params.get("to") || defaults.to,
+  const text = params.toString();
+  const active = versions.find((v) => v.isActive);
+  const result = useMemo(() => {
+    try {
+      const f: Filters = {
+        ...dateRangeToFilters(getDefaultDateRange()),
+        interval: "day",
+      };
+      for (const key of [
+        "from",
+        "to",
+        "versionId",
+        "service",
+        "personId",
+        "tagId",
+        "policyStateId",
+        "q",
+        "hasDetections",
+        "unmapped",
+        "interval",
+      ] as (keyof Filters)[]) {
+        const value = params.get(key);
+        if (value) (f as Record<string, string>)[key] = value;
+      }
+      if (!f.versionId && active) f.versionId = active.id;
+      if (personId) f.personId = personId;
+      f.service = normalizeServiceFilter(f.service);
+      if (
+        !Number.isFinite(Date.parse(f.from!)) ||
+        !Number.isFinite(Date.parse(f.to!)) ||
+        Date.parse(f.from!) >= Date.parse(f.to!)
+      )
+        throw new Error("시작 시각과 종료 시각을 확인해 주세요.");
+      return { filters: f, error: null };
+    } catch (e) {
+      return {
+        filters: {} as Filters,
+        error: e instanceof Error ? e.message : "조회 조건을 확인해 주세요.",
+      };
+    }
+  }, [text, active?.id, personId]);
+  const rawPage = Number(params.get("page"));
+  const page = Number.isSafeInteger(rawPage) && rawPage >= 0 ? rawPage : 0;
+  const setPage = (value: number) => {
+    const n = new URLSearchParams(params);
+    n.set("page", String(value));
+    setParams(n);
   };
-  let filters: Filters = {};
-  let filterError: string | null = null;
-  try {
-    filters = {
-      ...dateRangeToFilters(range),
-      service: normalizeServiceFilter(params.get("service")),
-      personId: personId || params.get("personId") || undefined,
-      category: (params.get("category") || undefined) as Category | undefined,
-      policyState: (params.get("policyState") || undefined) as
-        PolicyState | undefined,
-    };
-  } catch (e) {
-    filterError = e instanceof Error ? e.message : "조회 기간을 확인해 주세요.";
-  }
-  const requestedPage = Number(params.get("page"));
-  const page =
-    Number.isSafeInteger(requestedPage) && requestedPage >= 0
-      ? requestedPage
-      : 0;
-  function setPage(value: number) {
-    const next = new URLSearchParams(params);
-    next.set("page", String(value));
-    setParams(next);
-  }
   return {
-    filters,
-    filterError,
-    range,
+    ...result,
     params,
     setParams,
     page,
     setPage,
-    key: JSON.stringify(filters) + (filterError || ""),
+    key: JSON.stringify(result.filters) + (result.error || ""),
   };
 }
-export type PageFilters = ReturnType<typeof usePageFilters>;
-export function FilterBar({
-  state,
-  hidePerson = false,
-  showSearch = false,
-}: {
-  state: PageFilters;
-  hidePerson?: boolean;
-  showSearch?: boolean;
-}) {
-  const [error, setError] = useState("");
-  const { params, setParams, range } = state;
-  const activeCount = [
-    "service",
-    "category",
-    "policyState",
-    ...(hidePerson ? [] : ["personId"]),
-  ].filter((k) => params.get(k)).length;
-  function apply(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const next = new URLSearchParams();
-    const newRange = {
-      from: String(data.get("from") || ""),
-      to: String(data.get("to") || ""),
-    };
-    try {
-      dateRangeToFilters(newRange);
-      normalizeServiceFilter(String(data.get("service") || ""));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "날짜를 확인해 주세요.");
-      return;
+export type DashboardFilters = ReturnType<typeof useDashboardFilters>;
+export function VersionSelect({ state }: { state: DashboardFilters }) {
+  const { versions } = useWorkspace();
+  return (
+    <label className="version-select">
+      <Icon name="tree" size={16} />
+      <span className="sr-only">조회 트리 버전</span>
+      <select
+        aria-label="조회 트리 버전"
+        value={state.filters.versionId || ""}
+        onChange={(e) => {
+          const p = new URLSearchParams(state.params);
+          if (e.target.value) p.set("versionId", e.target.value);
+          else p.delete("versionId");
+          p.delete("page");
+          p.delete("tagId");
+          p.delete("policyStateId");
+          p.delete("unmapped");
+          state.setParams(p);
+        }}
+      >
+        <option value="">
+          활성 버전{versions.some((v) => v.isActive) ? " 사용" : " 없음"}
+        </option>
+        {versions
+          .filter((v) => v.status === "PUBLISHED")
+          .map((v) => (
+            <option value={v.id} key={v.id}>
+              {v.name}
+              {v.isActive ? " · 활성" : ""}
+            </option>
+          ))}
+      </select>
+    </label>
+  );
+}
+export function RangeControls({ state }: { state: DashboardFilters }) {
+  function change(period: string) {
+    const p = new URLSearchParams(state.params);
+    const now = new Date();
+    if (period === "24h") {
+      p.set("from", new Date(now.getTime() - 86400000).toISOString());
+      p.set("to", now.toISOString());
+      p.set("interval", "hour");
+    } else {
+      const range = getDefaultDateRange();
+      if (period === "30d") {
+        const end = new Date(range.to + "T00:00:00+09:00");
+        range.from = seoulDate(new Date(end.getTime() - 29 * 86400000));
+      }
+      const f = dateRangeToFilters(range);
+      p.set("from", f.from!);
+      p.set("to", f.to!);
+      p.set("interval", "day");
     }
-    for (const [key, value] of data.entries())
-      if (String(value).trim()) next.set(key, String(value).trim());
-    const service = normalizeServiceFilter(next.get("service"));
-    if (service) next.set("service", service);
-    else next.delete("service");
-    setError("");
-    setParams(next);
-  }
-  function reset() {
-    setError("");
-    setParams({});
+    p.set("period", period);
+    p.delete("page");
+    state.setParams(p);
   }
   return (
-    <form className="filter-bar" onSubmit={apply} key={params.toString()}>
+    <div className="range-controls">
+      <div className="range-buttons" aria-label="조회 기간">
+        {[
+          ["24h", "24시간"],
+          ["7d", "7일"],
+          ["30d", "30일"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            className={
+              (state.params.get("period") || "7d") === key ? "selected" : ""
+            }
+            onClick={() => change(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <VersionSelect state={state} />
+    </div>
+  );
+}
+export function SearchFilters({
+  state,
+  config,
+  hidePerson = false,
+  peopleSearch = false,
+}: {
+  state: DashboardFilters;
+  config?: ConfigVersion | null;
+  hidePerson?: boolean;
+  peopleSearch?: boolean;
+}) {
+  const [error, setError] = useState("");
+  function apply(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const d = new FormData(e.currentTarget);
+    try {
+      const range = dateRangeToFilters({
+        from: String(d.get("from")),
+        to: String(d.get("to")),
+      });
+      const p = new URLSearchParams();
+      for (const [k, v] of d.entries()) {
+        const value = k === "q" ? String(v) : String(v).trim();
+        if (k !== "from" && k !== "to" && value !== "") p.set(k, value);
+      }
+      p.set("from", range.from!);
+      p.set("to", range.to!);
+      p.set("interval", "day");
+      if (state.filters.versionId) p.set("versionId", state.filters.versionId);
+      if (p.get("tagId") === "__unmapped") {
+        p.delete("tagId");
+        p.set("unmapped", "true");
+      }
+      const service = normalizeServiceFilter(p.get("service"));
+      if (service) p.set("service", service);
+      setError("");
+      state.setParams(p);
+    } catch (x) {
+      setError(x instanceof Error ? x.message : "검색 조건을 확인해 주세요.");
+    }
+  }
+  const defaultRange = getDefaultDateRange();
+  const from = state.error ? defaultRange.from : seoulDate(state.filters.from!);
+  const to = state.error
+    ? defaultRange.to
+    : seoulDate(new Date(Date.parse(state.filters.to!) - 1));
+  return (
+    <form
+      className="filter-bar advanced-filter"
+      onSubmit={apply}
+      key={
+        state.params.toString() +
+        ":" +
+        (config?.id || "") +
+        ":" +
+        (config?.revision ?? "")
+      }
+    >
       <div className="filter-top">
-        <div className="filter-caption">
+        <span className="filter-caption">
           <Icon name="filter" size={17} />
-          <span>조회 조건</span>
-          {activeCount > 0 && (
-            <span className="filter-count">{activeCount}</span>
-          )}
-        </div>
-        <button className="text-button" type="button" onClick={reset}>
+          상세 검색
+        </span>
+        <button
+          className="text-button"
+          type="button"
+          onClick={() => state.setParams({})}
+        >
           초기화
         </button>
       </div>
-      <div className={"filter-fields " + (showSearch ? "with-search" : "")}>
+      <div className="advanced-fields">
         <label className="date-range-field">
-          <span>
-            조회 기간 <small>한국 시간</small>
-          </span>
+          <span>조회 기간 · 한국 시간</span>
           <span className="date-inputs">
             <input
               type="date"
               name="from"
               aria-label="시작일"
-              defaultValue={range.from}
               required
+              defaultValue={from}
             />
             <span>—</span>
             <input
               type="date"
               name="to"
               aria-label="종료일"
-              defaultValue={range.to}
               required
+              defaultValue={to}
             />
           </span>
         </label>
-        <label>
-          <span>AI 서비스</span>
+        <label className="search-query">
+          <span>Prompt 검색</span>
           <input
-            name="service"
-            list="ai-services"
-            placeholder="전체 서비스"
-            title="영문, 숫자, 하이픈, 밑줄로 된 1~64자 서비스 ID"
-            defaultValue={params.get("service") || ""}
+            name="q"
+            placeholder="원문에 포함된 내용"
+            defaultValue={state.params.get("q") || ""}
           />
-          <datalist id="ai-services">
-            <option value="chatgpt">ChatGPT</option>
-            <option value="claude">Claude</option>
-            <option value="gemini">Gemini</option>
-          </datalist>
         </label>
         <label>
-          <span>감지 항목</span>
-          <select name="category" defaultValue={params.get("category") || ""}>
-            <option value="">전체 항목</option>
-            {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
+          <span>메트릭 태그</span>
+          <select
+            name="tagId"
+            defaultValue={
+              state.params.get("unmapped")
+                ? "__unmapped"
+                : state.params.get("tagId") || ""
+            }
+          >
+            <option value="">전체 태그</option>
+            {config &&
+              flattenTree(config.tags).map((t) => (
+                <option value={t.id} key={t.id}>
+                  {"　".repeat(t.depth) + t.name}
+                </option>
+              ))}
+            <option value="__unmapped">선택 버전에 없는 태그</option>
           </select>
         </label>
         <label>
           <span>정책 상태</span>
           <select
-            name="policyState"
-            defaultValue={params.get("policyState") || ""}
+            name="policyStateId"
+            defaultValue={state.params.get("policyStateId") || ""}
           >
-            <option value="">전체 상태</option>
-            {Object.entries(POLICY_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
+            <option value="">전체 정책</option>
+            {config?.policyStates.map((p) => (
+              <option value={p.id} key={p.id}>
+                {p.name}
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          <span>AI 서비스</span>
+          <input
+            name="service"
+            list="services"
+            placeholder="전체 서비스"
+            defaultValue={state.params.get("service") || ""}
+          />
+          <datalist id="services">
+            <option value="chatgpt" />
+            <option value="claude" />
+            <option value="gemini" />
+          </datalist>
         </label>
         {!hidePerson && (
           <label>
@@ -660,29 +894,93 @@ export function FilterBar({
             <input
               name="personId"
               placeholder="전체 사람"
-              defaultValue={params.get("personId") || ""}
+              defaultValue={state.params.get("personId") || ""}
             />
           </label>
         )}
-        {showSearch && (
-          <label className="search-field">
+        {peopleSearch && (
+          <label>
             <span>사람 검색</span>
             <input
-              name="q"
+              name="personQuery"
               placeholder="이름 또는 ID"
-              defaultValue={params.get("q") || ""}
+              defaultValue={state.params.get("personQuery") || ""}
             />
           </label>
         )}
-        <button className="button button-primary apply-button" type="submit">
-          조회
+        <label>
+          <span>감지 유무</span>
+          <select
+            name="hasDetections"
+            defaultValue={state.params.get("hasDetections") || ""}
+          >
+            <option value="">전체 Prompt</option>
+            <option value="true">감지 있음</option>
+            <option value="false">감지 없음</option>
+          </select>
+        </label>
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={!!state.filters.versionId && !config}
+        >
+          검색
         </button>
       </div>
       {error && (
-        <p className="field-error" role="alert">
+        <p role="alert" className="field-error">
           {error}
         </p>
       )}
     </form>
+  );
+}
+export function StatStrip({ metrics }: { metrics: Metrics }) {
+  const s = metrics.summary;
+  return (
+    <section className="stat-strip" aria-label="조회 기간 요약">
+      {[
+        {
+          label: "분석한 Prompt",
+          value: s.eventCount,
+          unit: "건",
+          note: "중복 전송 제외",
+          icon: "events",
+        },
+        {
+          label: "감지 영역",
+          value: s.findingCount,
+          unit: "개",
+          note: "같은 위치는 한 번만 계산",
+          icon: "shield",
+        },
+        {
+          label: "감지된 Prompt",
+          value: s.detectedEventCount,
+          unit: "건",
+          note: "감지 영역이 있는 기록",
+          icon: "search",
+        },
+        {
+          label: "기록이 있는 사람",
+          value: s.personCount,
+          unit: "명",
+          note: "조회 기간 내 수집 기준",
+          icon: "people",
+        },
+      ].map((s) => (
+        <div className="stat" key={s.label}>
+          <div className="stat-label">
+            {s.label}
+            <Icon name={s.icon as IconName} size={17} />
+          </div>
+          <div className="stat-value">
+            {formatNumber(s.value)}
+            <span>{s.unit}</span>
+          </div>
+          <p>{s.note}</p>
+        </div>
+      ))}
+    </section>
   );
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real HTTP integration checks. Adds explicitly named smoke data; never deletes data."""
+"""V2 HTTP integration checks. Use an isolated test database: this creates immutable records."""
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
@@ -7,124 +7,155 @@ from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import uuid
-from zoneinfo import ZoneInfo
 
 from api_client import Api
 
 
-def require(condition, message):
-    if not condition:
-        raise AssertionError(message)
-
-
 def main():
-    parser = argparse.ArgumentParser(description="로컬 API와 실제 DB 연결을 검증합니다. 테스트 전용 DB 권장.")
-    parser.add_argument("--base-url", default="http://127.0.0.1:8080")
-    parser.add_argument("--report", type=Path, help="검증 결과 JSON 저장 경로")
+    parser = argparse.ArgumentParser(description="분리된 테스트 DB에서 V2 API 계약을 검증합니다.")
+    parser.add_argument("--base-url", default="http://127.0.0.1:8083")
+    parser.add_argument("--report", type=Path)
     args = parser.parse_args()
     api = Api(args.base_url)
+    suffix = uuid.uuid4().hex[:12]
+    person = "v2-smoke-" + suffix
     checks = []
-    token = uuid.uuid4().hex[:12]
-    person_id = f"smoke-{token}"
-    zero_id = f"smoke-zero-{token}"
-    source_id = f"smoke-{token}"
-    now = datetime.now(timezone.utc).replace(microsecond=123456)
-    seoul = ZoneInfo("Asia/Seoul")
-    day = now.astimezone(seoul).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=2)
-    start = day.isoformat()
-    end = (day + timedelta(days=2)).isoformat()
-    filters = {"personId": person_id, "from": start, "to": end}
-
-    require(api.expect("GET", "/health", 200) == {"status": "UP"}, "health response")
-    api.expect("POST", "/people", 201, {"id": person_id, "name": f"데모 검증 {token} 100%"})
-    api.expect("POST", "/people", 201, {"id": zero_id, "name": f"데모 검증 미발생 {token}"})
-    api.expect("POST", "/people", 409, {"id": person_id, "name": "데모 중복"})
-    checks.append("health, person registration and duplicate rejection")
-
-    def event(key, offset, service, policy, findings):
-        result = {"sourceId": source_id, "eventId": key, "personId": person_id,
-                  "occurredAt": (day + timedelta(hours=offset)).isoformat(),
-                  "service": service, "findings": findings}
-        if policy is not None:
-            result["policyState"] = policy
-        return result
-
-    payload = event("a", 0, "chatgpt", "TRAINING_ALLOWED", [
-        {"category": "PERSONAL_DATA", "quantity": 2}, {"category": "CREDENTIAL", "quantity": 1}])
-    with ThreadPoolExecutor(max_workers=12) as pool:
-        duplicates = list(pool.map(lambda _: api.request("POST", "/events", payload), range(12)))
-    require(sum(status == 201 for status, _ in duplicates) == 1, "one concurrent insert must return 201")
-    require(all(status in (200, 201) for status, _ in duplicates), "concurrent duplicates must be accepted")
-    ids = {body["id"] for _, body in duplicates}
-    require(len(ids) == 1, "concurrent duplicates must share one event id")
-    first_id = next(iter(ids))
-    canonical = dict(payload, service="CHATGPT", findings=list(reversed(payload["findings"])),
-                     occurredAt=day.astimezone(timezone.utc).isoformat())
-    require(api.expect("POST", "/events", 200, canonical)["id"] == first_id, "canonical duplicate")
-    api.expect("POST", "/events", 409, dict(payload, model="conflict"))
-    checks.append("12 concurrent duplicate requests, canonical replay and conflict")
-
-    api.expect("POST", "/events", 201, event("b", 1, "claude", "TRAINING_DISABLED", [{"category": "CREDENTIAL", "quantity": 3}]))
-    api.expect("POST", "/events", 201, event("c", 24, "gemini", None, [{"category": "CONFIDENTIAL", "quantity": 4}]))
-    api.expect("POST", "/events", 201, event("d", 25, "custom-service", "UNKNOWN", []))
-    metrics = api.expect("GET", "/metrics", 200, query=filters)
-    require(metrics["summary"] == {"eventCount": 4, "findingCount": 10, "personCount": 1, "unknownPolicyCount": 1}, "unfiltered metric totals")
-    require(len(metrics["daily"]) == 2 and metrics["daily"][0]["eventCount"] == 2 and metrics["daily"][1]["findingCount"] == 4, "Seoul calendar buckets")
-    require(sum(item["eventCount"] for item in metrics["policies"]) == 3, "null policy excluded from policy chart")
-    selected = api.expect("GET", "/metrics", 200, query=dict(filters, category="CREDENTIAL"))
-    require(selected["summary"]["eventCount"] == 2 and selected["summary"]["findingCount"] == 4, "category selects events and category quantities")
-    require(sum(item["count"] for item in selected["categories"]) == 4, "unselected categories have zero totals")
-    require(len(selected["categories"]) == 3 and len(selected["policies"]) == 3, "all enum buckets returned")
-    allowed = api.expect("GET", "/metrics", 200, query=dict(filters, policyState="TRAINING_ALLOWED"))
-    require(allowed["summary"]["eventCount"] == 1 and allowed["summary"]["findingCount"] == 3, "policy filter")
-    custom = api.expect("GET", "/events", 200, query=dict(filters, service="custom-service"))
-    require(custom["totalElements"] == 1 and custom["items"][0]["findingCount"] == 0, "additional service and policy-only event")
-    boundary = api.expect("GET", "/events", 200, query=dict(filters, to=(day + timedelta(days=1)).isoformat()))
-    require(boundary["totalElements"] == 2, "exclusive end boundary")
-    empty = api.expect("GET", "/metrics", 200, query=dict(filters, service="empty-service"))
-    require(all(row["eventCount"] == 0 and row["findingCount"] == 0 for row in empty["daily"]), "zero-filled daily buckets")
-    checks.append("metrics, category/policy/service filters, UTC offsets, Seoul buckets and [from,to) bounds")
-
-    page0 = api.expect("GET", "/events", 200, query=dict(filters, size=2, page=0))
-    page1 = api.expect("GET", "/events", 200, query=dict(filters, size=2, page=1))
-    require(page0["totalElements"] == 4 and page0["totalPages"] == 2, "pagination totals")
-    require([row["eventId"] for row in page0["items"] + page1["items"]] == ["d", "c", "b", "a"], "newest-first pages")
-    person = api.expect("GET", f"/people/{person_id}", 200, query=filters)
-    require(person["eventCount"] == 4 and person["findingCount"] == 10, "person aggregate")
-    zero = api.expect("GET", "/people", 200, query=dict(filters, personId=zero_id))
-    require(zero["totalElements"] == 1 and zero["items"][0]["eventCount"] == 0, "registered people with zero events")
-    literal = api.expect("GET", "/people", 200, query={"q": f"{token} 100%"})
-    require(literal["totalElements"] == 1, "literal person search")
-    require(api.expect("GET", f"/events/{first_id}", 200)["sourceId"] == source_id, "event detail")
-    checks.append("event/person details, pagination, literal search and zero-event people")
-
-    bad_payloads = [dict(payload, eventId="bad-unknown", rawPrompt="smoke-invalid-field"),
-                    dict(payload, eventId="bad-person", personId="missing-person"),
-                    dict(payload, eventId="bad-future", occurredAt=(now + timedelta(minutes=10)).isoformat()),
-                    dict(payload, eventId="bad-offset", occurredAt="2026-01-01T10:00:00"),
-                    dict(payload, eventId="bad-findings", findings=[{"category": "CREDENTIAL", "quantity": 0}]),
-                    dict(payload, eventId="bad-duplicate", findings=[{"category": "CREDENTIAL", "quantity": 1}] * 2),
-                    dict(payload, eventId="bad-empty", policyState=None, findings=[])]
-    for index, bad in enumerate(bad_payloads):
-        body = api.expect("POST", "/events", 422 if index == 1 else 400, bad)
-        require("code" in body and "message" in body and "smoke-invalid-field" not in json.dumps(body), "safe error shape")
-    for query in ({"category": "WRONG"}, {"policyState": "WRONG"}, {"size": 101}, {"page": -1},
-                  {"service": "bad.service"}, {"from": "2026-01-01T00:00:00"},
-                  {"from": end, "to": start},
-                  {"from": start, "to": (day + timedelta(days=367)).isoformat()}):
-        api.expect("GET", "/events", 400, query=query)
-    api.expect("GET", "/events/9223372036854775807", 404)
-    api.expect("GET", "/people/missing-person", 404)
-    checks.append("invalid payloads/filters, unknown fields, future timestamps and 404 errors")
-
-    report = {"status": "PASS", "checkedAt": datetime.now(timezone.utc).isoformat(),
-              "baseUrl": args.base_url, "sourceId": source_id, "personId": person_id,
-              "eventId": first_id, "checks": checks}
+    api.expect("GET", "/health", 200)
+    initial = api.expect("GET", "/config-versions", 200)
+    if not initial:
+        error = api.expect("GET", "/classifier-config", 404)
+        assert error["code"] == "NO_ACTIVE_VERSION"
+        empty = api.expect("GET", "/metrics", 200)
+        assert empty["versionId"] is None and empty["tags"] == []
+        assert empty["summary"] == dict(eventCount=0, findingCount=0, personCount=0, detectedEventCount=0)
+        api.expect("POST", "/saved-searches", 409, {"name":"버전 없는 저장", "filters":{}})
+        checks.append("fresh normal database has no config, active version, tags or events; snapshots require published view")
+    api.expect("POST", "/people", 201, {"id":person,"name":"데모 검증 · 가상 사용자"})
+    api.expect("POST", "/people", 409, {"id":person,"name":"중복"})
+    api.expect("POST", "/people", 201, {"id":person+"-zero","name":"데모 검증 · 이벤트 없는 사용자"})
+    tags = [dict(id="group",name="사용자 기술",parentId=None,description="",examples=[],guidance="",color="#6684F1",order=0),
+            dict(id="name",name="가상 이름",parentId="group",description="",examples=["김하늘"],guidance="가상 예시",color="#57A7A0",order=0),
+            dict(id="email",name="가상 이메일",parentId="group",description="",examples=[],guidance="",color="#BD9854",order=1),
+            dict(id="other",name="업무 분류",parentId=None,description="",examples=[],guidance="",color="#9C87B9",order=1)]
+    policies = [dict(id="custom-policy",name="직접 정의한 상태",description="데모",color="#4B9F8A",order=0)]
+    v1 = api.expect("POST", "/config-versions", 201, {"name":"데모 검증 v1 " + suffix})
+    def update(version, newtags, newpolicies=policies):
+        return api.expect("PUT", "/config-versions/"+version["id"], 200,
+                          dict(revision=version["revision"],name=version["name"],tags=newtags,policyStates=newpolicies))
+    oldrev=v1["revision"]
+    v1=update(v1,tags)
+    api.expect("PUT", "/config-versions/"+v1["id"],409,
+               dict(revision=oldrev,name=v1["name"],tags=tags,policyStates=policies))
+    v1=api.expect("POST","/config-versions/"+v1["id"]+"/publish",200,{"revision":v1["revision"]})
+    api.expect("POST","/config-versions/"+v1["id"]+"/activate",200)
+    assert api.expect("GET","/classifier-config",200)["id"]==v1["id"]
+    api.expect("DELETE","/config-versions/"+v1["id"],409)
+    api.expect("PUT","/config-versions/"+v1["id"],409,
+               dict(revision=v1["revision"],name=v1["name"],tags=tags,policyStates=policies))
+    checks.append("custom tag tree/policy catalog, revision conflicts, publish immutability and singleton activation")
+    prompt="데모 😀 김하늘 demo.person@example.invalid 100%_literal"
+    start=prompt.index("김하늘"); email=prompt.index("demo.person")
+    instant=(datetime.now(timezone.utc)-timedelta(hours=2)).replace(microsecond=123456)
+    base=dict(sourceId="v2-smoke-"+suffix,eventId="same",personId=person,versionId=v1["id"],prompt=prompt,
+              occurredAt=instant.isoformat(),service="CHATGPT",model="demo-model",policyStateId="custom-policy",
+              detections=[dict(start=start,end=start+3,text="김하늘",tagIds=["name"]),
+                          dict(start=start,end=start+3,text="김하늘",tagIds=["group","name"]),
+                          dict(start=email,end=email+len("demo.person@example.invalid"),text="demo.person@example.invalid",tagIds=["email"])])
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        responses=list(executor.map(lambda _:api.request("POST","/events",base),range(12)))
+    statuses=[status for status,_ in responses]
+    assert statuses.count(201)==1 and statuses.count(200)==11, statuses
+    ids={body["id"] for _,body in responses}; assert len(ids)==1
+    event=responses[0][1]; assert event["findingCount"]==2 and len(event["detections"])==2
+    assert event["occurredAt"].endswith("123456Z") and event["service"]=="chatgpt"
+    assert {t["id"] for t in event["detections"][0]["tags"]}=={"name","group"}
+    reordered={**base,"service":"chatgpt","detections":list(reversed(base["detections"]))}
+    assert api.expect("POST","/events",200,reordered)["id"]==event["id"]
+    api.expect("POST","/events",409,{**base,"prompt":prompt+" 변경"})
+    zero=api.expect("POST","/events",201,{**base,"eventId":"zero","prompt":"데모 감지 없는 요청","detections":[],"policyStateId":None})
+    assert zero["findingCount"]==0
+    omitted={**base,"eventId":"omitted-defaults","prompt":"데모 기본값","detections":[]}
+    for field in ["occurredAt","service","model","policyStateId"]:omitted.pop(field,None)
+    defaulted=api.expect("POST","/events",201,omitted)
+    assert defaulted["service"]=="unspecified" and defaulted["model"] is None
+    assert api.expect("POST","/events",200,omitted)["id"]==defaulted["id"]
+    checks.append("12 concurrent idempotent requests, code-point emoji spans, duplicate-range union, canonical replay, microseconds and omitted defaults")
+    filters={"personId":person,"versionId":v1["id"],"from":(instant-timedelta(minutes=1)).isoformat(),"to":(instant+timedelta(minutes=1)).isoformat()}
+    metrics=api.expect("GET","/metrics",200,query=filters)
+    assert metrics["summary"]==dict(eventCount=2,findingCount=2,personCount=1,detectedEventCount=1),metrics
+    group=next(t for t in metrics["tags"] if t["id"]=="group")
+    assert group["count"]==2 and group["eventCount"]==1
+    assert api.expect("GET","/metrics",200,query={**filters,"tagId":"name"})["summary"]["findingCount"]==1
+    assert api.expect("GET","/metrics",200,query={**filters,"hasDetections":"false"})["summary"]["eventCount"]==1
+    assert api.expect("GET","/events",200,query={**filters,"q":"100%_literal"})["totalElements"]==1
+    assert api.expect("GET","/events",200,query={**filters,"to":instant.isoformat()})["totalElements"]==0
+    people=api.expect("GET","/people",200,query={**filters,"personQuery":person,"q":"100%_literal"})
+    assert people["totalElements"]==1 and people["items"][0]["eventCount"]==1
+    korean_people=api.expect("GET","/people",200,query={**filters,"personQuery":"가상 사용자"})
+    assert korean_people["totalElements"]==1 and korean_people["items"][0]["id"]==person
+    zero_registry=api.expect("GET","/people",200,query={**filters,"personId":person+"-zero","personQuery":person+"-zero","q":"100%_literal","service":"chatgpt"})
+    assert zero_registry["totalElements"]==1 and zero_registry["items"][0]["eventCount"]==0
+    assert zero_registry["items"][0]["findingCount"]==0 and zero_registry["items"][0]["lastEventAt"] is None
+    hourly=api.expect("GET","/metrics",200,query={**filters,"interval":"hour"})
+    assert hourly["series"] and all("T" in p["bucket"] for p in hourly["series"])
+    snapshot=api.expect("POST","/saved-searches",201,{"name":"데모 고정 검색 "+suffix,"filters":filters})
+    assert snapshot["eventCount"]==2 and snapshot["findingCount"]==2
+    relative=api.expect("POST","/saved-searches",201,{"name":"데모 기본 기간 고정 "+suffix,"filters":{"personId":person}})
+    assert relative["versionId"]==v1["id"] and relative["filters"]["from"] and relative["filters"]["to"]
+    snapshot_before=api.expect("GET","/saved-searches/"+snapshot["id"]+"/metrics",200)
+    assert api.expect("GET","/saved-searches/"+snapshot["id"]+"/events",200,query={"size":1})["totalElements"]==2
+    checks.append("distinct span/tree counts, literal prompt search vs personQuery, registered zero-event people retained, zero detections, exclusive end, hour buckets and whole-result snapshot")
+    v2=api.expect("POST","/config-versions",201,{"name":"데모 검증 v2 "+suffix,"baseVersionId":v1["id"]})
+    changed=[{**t,"name":"새 버전 이름","parentId":"other"} if t["id"]=="name" else t for t in tags if t["id"]!="email"]
+    v2=update(v2,changed,[])
+    v2=api.expect("POST","/config-versions/"+v2["id"]+"/publish",200,{"revision":v2["revision"]})
+    api.expect("POST","/config-versions/"+v2["id"]+"/activate",200)
+    projected=api.expect("GET","/metrics",200,query={**filters,"versionId":v2["id"]})
+    assert projected["summary"]==metrics["summary"],projected
+    assert projected["unmapped"]==dict(count=1,eventCount=1)
+    assert next(t for t in projected["tags"] if t["id"]=="other")["count"]==1
+    assert projected["policies"][0]["mapped"] is False and projected["policies"][0]["name"]=="직접 정의한 상태"
+    assert api.expect("GET","/events",200,query={**filters,"versionId":v2["id"]})["totalElements"]==2
+    original=api.expect("GET","/events/"+str(event["id"]),200)
+    assert any(t["name"]=="가상 이름" for d in original["detections"] for t in d["tags"])
+    api.expect("POST","/events",200,base)
+    api.expect("POST","/events",409,{**base,"eventId":"stale-version"})
+    api.expect("POST","/events",201,{**base,"versionId":v2["id"],"policyStateId":None,"eventId":"new-after-snapshot","detections":[]})
+    assert api.expect("GET","/saved-searches/"+snapshot["id"]+"/metrics",200)==snapshot_before
+    assert api.expect("GET","/saved-searches/"+snapshot["id"]+"/events",200)["totalElements"]==2
+    saved=api.expect("GET","/saved-searches/"+snapshot["id"],200)
+    assert saved["versionId"]==v1["id"] and saved["filters"]["from"] and saved["filters"]["to"]
+    assert sum(v["isActive"] for v in api.expect("GET","/config-versions",200))==1
+    checks.append("published version projects all historical events, moved IDs/unmapped tags and policies, captured labels, stale rejection and immutable snapshot after ingestion/activation")
+    invalid={**base,"versionId":v2["id"],"policyStateId":None,"eventId":"bad-span","detections":[dict(start=0,end=1,text="SECRET-PROMPT",tagIds=["name"])]}
+    errors=[]
+    api.expect("POST","/events",400,{**invalid,"eventId":"prompt-code-point-limit","prompt":"x"*200001,"detections":[]})
+    api.expect("POST","/events",413,{**invalid,"eventId":"body-byte-limit","prompt":"가"*180000,"detections":[]})
+    api.expect("POST","/events",400,{**invalid,"eventId":"too-many-detections","detections":[dict(start=start,end=start+3,text="김하늘",tagIds=["name"])]*1001})
+    for body,status in [(invalid,400),({**invalid,"eventId":"bad-tag","detections":[dict(start=start,end=start+3,text="김하늘",tagIds=["missing"])]},422),
+                        ({**invalid,"eventId":"missing-person","personId":"missing","detections":[]},422)]:
+        error=api.expect("POST","/events",status,body)
+        assert isinstance(error.get("code"),str) and isinstance(error.get("message"),str)
+        assert any("가" <= char <= "힣" for char in error["message"]), error
+        assert "SECRET-PROMPT" not in json.dumps(error) and "stack" not in json.dumps(error).lower()
+        errors.append(error["code"])
+    api.expect("GET","/metrics",400,query={**filters,"tagId":"name","unmapped":"true"})
+    api.expect("GET","/metrics",400,query={**filters,"interval":"hour","from":(instant-timedelta(days=32)).isoformat()})
+    draft=api.expect("POST","/config-versions",201,{"name":"삭제할 초안"})
+    cycle=[{**tags[0],"parentId":"name"},tags[1]]
+    api.expect("PUT","/config-versions/"+draft["id"],400,dict(revision=draft["revision"],name=draft["name"],tags=cycle,policyStates=[]))
+    api.expect("DELETE","/config-versions/"+draft["id"],204)
+    api.expect("DELETE","/saved-searches/"+relative["id"],204)
+    api.expect("DELETE","/saved-searches/"+snapshot["id"],204)
+    api.expect("GET","/events/"+str(event["id"]),200)
+    checks.append("Korean safe errors for invalid Unicode ranges/tags/person, code-point/body/detection limits, conflicting filters, hourly range limit, cyclic tree and non-destructive saved-search deletion")
+    report=dict(status="PASS",checkedAt=datetime.now(timezone.utc).isoformat(),baseUrl=args.base_url,personId=person,
+                versions=[v1["id"],v2["id"]],concurrentStatuses={str(x):statuses.count(x) for x in set(statuses)},errorCodes=errors,checks=checks)
     if args.report:
-        args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+        args.report.parent.mkdir(parents=True,exist_ok=True)
+        args.report.write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n")
+    print(json.dumps(report,ensure_ascii=False,indent=2))
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
     main()

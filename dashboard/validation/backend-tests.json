@@ -1,37 +1,51 @@
 {
   "status": "PASS",
-  "checkedAt": "2026-10-30T15:16:13.120106+00:00",
+  "checkedAt": "2026-10-30T17:21:52.964097+00:00",
+  "java": "OpenJDK 21.0.12.1",
   "database": "MySQL Community Server 8.4.7",
-  "databasePort": 33306,
-  "testSchema": "ai_security_dashboard_test",
-  "java": "21.0.12.1",
+  "testDatabase": "sending_test",
+  "tests": 21,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
   "suites": [
     {
+      "name": "com.example.securitydashboard.FlywayMigrationIntegrationTest",
+      "tests": "1",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-30T17:21:05.118Z"
+    },
+    {
       "name": "com.example.securitydashboard.CanonicalEventTest",
-      "tests": 2,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0
+      "tests": "4",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-30T17:21:05.111Z"
     },
     {
       "name": "com.example.securitydashboard.EventFilterTest",
-      "tests": 2,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0
+      "tests": "3",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-30T17:21:05.115Z"
     },
     {
       "name": "com.example.securitydashboard.MySqlApiIntegrationTest",
-      "tests": 9,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0
+      "tests": "13",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-30T17:21:02.982Z"
     }
   ],
-  "totals": {
-    "tests": 13,
-    "failures": 0,
-    "errors": 0,
-    "skipped": 0
-  }
+  "boundaries": [
+    "1000 tag nodes and depth32 accepted; 1001 rejected",
+    "1000 detection ranges accepted; 1001 rejected atomically",
+    "200000 Unicode emoji code points accepted"
+  ],
+  "peopleRegistry": "Registered zero-event people retained; event filters alter statistics; personId/personQuery control membership; Korean query supported"
 }

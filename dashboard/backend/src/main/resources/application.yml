@@ -14,14 +14,6 @@ spring:
     password: ${DB_PASSWORD:dashboard-local}
     hikari:
       maximum-pool-size: 10
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -29,3 +21,8 @@ spring:
       accept-float-as-int: false
   mvc:
     log-request-details: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true

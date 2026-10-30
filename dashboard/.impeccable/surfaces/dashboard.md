@@ -1,17 +1,19 @@
-# Dashboard surface
+# Dashboard V2 surface
 
-Mode: Operate.
+Mode: Operate. Preserve the established bright Korean administrator interface.
 
-Approved direction: bright Korean administrator interface, implemented directly in React. This is a local demonstration of received security events, not a working detector or organization-wide surveillance deployment.
+First viewport: period shortcuts and published version selector, compact numeric summary, dominant detection time series and service chart. Detailed filter form and recent event table belong on /events, not the overview.
 
-First viewport: persistent navigation, page heading, explicit date/service/category/policy/person filters, and four clearly named numeric summaries. The numbers use counts from the same selected event scope.
+Primary paths: graph/tree → filtered Prompt records → safe Unicode span highlights; draft tag/policy editor → save → publish → activate; filtered results → immutable snapshot → explicit live requery.
 
-Primary path: overall metrics → selected category/policy/service event list → event detail or person's history. Person registration precedes event ingestion. Context filters survive drilldowns while list pagination does not.
+Tree behavior: every node is a tag, collapsible and independently selectable. Ancestor counts are unions, not sums of children. User colors are accompanied by names and numbers.
 
-Signature interaction: the category and policy distributions are links to the matching event history. Every count has an explicit unit.
+Versions: stable tag IDs across clones, editable drafts, immutable published configurations, one active configuration. No default classifications on a normal empty installation. Dev-only SQL data is explicitly labeled synthetic.
 
-State requirements: empty storage, loading, retriable API failure, zero results, unknown person/event, invalid date input, duplicate person ID, out-of-range pagination recovery, and disabled monitoring settings. No polling or focus refetch. Data loads on entry and query changes; the refresh button explicitly reloads the current scope. The timestamp records the last successful fetch in Korean time and is hidden at 1280px and below.
+Responsive evidence: desktop 1440/mobile 390, plus functional overflow checks at 320/768/1280. Six nav items become a 3-column, 2-row mobile grid. Tables scroll inside named focusable regions. Editor tree and form stack on mobile. The monitoring tag list uses a named focusable scroll region outside its disabled fieldset.
 
-Responsive contract: 1440px desktop and 390px mobile. Mobile navigation appears above the content and scrolls with the document; wide tables have local scrolling and accessible region names. No document overflow.
+States: empty versions, empty searches, zero detections, loading/error/retry, stale edits and activation conflicts, saved draft status, published read-only state, immutable snapshot membership. External monitoring-engine settings remain disabled.
 
-Evidence: transient screenshots under .impeccable/review; code-led work has no image comp. Review both overall overview and disabled settings at desktop/mobile plus people/events/person detail.
+Visual code authored directly by root; no generated image comp. Screenshots in .impeccable/review are transient evidence.
+
+Verification: all 11 final screenshots received SHIP. Frontend 44 tests and backend 21 tests passed, with MySQL/API browser verification. The final accessibility report records 18 axe scans and 45 overflow measurements, with zero recorded violations or page overflow failures. Monitoring was rechecked at desktop 1440/mobile 390 after its keyboard scroll wrapper was added; automated checks do not replace manual assistive-technology review.
