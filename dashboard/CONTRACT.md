@@ -1,0 +1,122 @@
+# V2 implementation contract
+
+Approved plan: user-defined tag tree + versioned policy catalog; Prompt/span ingestion, saved queries with immutable snapshots, graph-first overview, Swagger, dev-only SQL data. Work ONLY in existing fix/dashboard-compose-backend worktree. Preserve Spring Boot3.5/Java21/MySQL/React, local no-auth design. No new branch. User authorized clearing all old people/events/findings in V2 migration. Normal fresh DB has NO tags, policy states, versions, people or events. Existing V1 migration is immutable; add V2. Do not change external extension.
+
+## Configuration model
+
+IDs are strings matching [A-Za-z0-9_-]{1,80}; server generates version/saved-search IDs. UI can generate new tag/policy IDs using a supplied nonvisual helper; IDs stable across cloned versions. Tag={id,name,description,examples:string[],guidance,jevPrompt:string,pythonRegex:string,color,parentId:string|null,order:number}. PolicyDefinition={id,name,description,color,order:number}. Name1..80, description/guidance up to4000, examples max20 strings <=1000, color #RRGGBB; use sensible defaults for empty optional strings/arrays/color. ConfigVersion={id,name,status:'DRAFT'|'PUBLISHED',isActive:boolean,revision:number,createdAt,publishedAt:string|null,tags:Tag[],policyStates:PolicyDefinition[]}. VersionSummary is ConfigVersion without tags/policyStates. Each tag appears once in a version, any node can receive detections. Tag trees must have valid parents/no cycles, maxdepth32/max1000nodes. Catalog metadata and structure are per-version; no hardcoded category or policy enums.
+
+`jevPrompt` is the independent Jev judgment prompt for that tag, up to12000 Unicode code points (an astral emoji counts as one). It is optional in a tag input; omitted or null values default to `""`, and responses always include a string. Preserve all supplied leading/trailing whitespace and newlines without trimming or normalization. A blank prompt remains blank even when a parent tag has a prompt: there is no implicit inheritance or concatenation. `guidance` remains the separate classification context field and is not copied into `jevPrompt`. V4 adds prompt storage and initializes existing tags to `""` without deleting data or creating initial tags.
+
+`pythonRegex` is independent Python `re` pattern source for that tag, up to4000 Unicode code points. Omitted or null input defaults to `""`; responses always include a string. Preserve backslashes, inline flags, named groups, whitespace and newlines exactly. JSON encodes each pattern backslash as `\\`, for example `"pythonRegex":"(?i)\\b(?P<label>internal|confidential)\\b"`. The dashboard only stores the source; it does not execute it or validate Python syntax using Java or JavaScript regular-expression engines. The connected detector must validate and execute the pattern with its Python runtime. Parent/child patterns do not inherit, and changing `pythonRegex` does not change `jevPrompt` or `guidance`. V5 adds pattern storage and initializes existing tags to `""` while preserving other data and the empty fresh-DB state.
+
+Sibling tree order uses `order`, then stable ID in ASCII binary order when values tie, matching MySQL `ascii_bin`. Editable names never determine tree placement, so renaming a published tag cannot move it within the frozen tree.
+
+- GET /api/v1/config-versions -> VersionSummary[]
+- POST /api/v1/config-versions {name,baseVersionId?} ->201 ConfigVersion; absent base creates empty draft, clone keeps logical tag/policy IDs.
+- GET /api/v1/config-versions/{id} -> ConfigVersion.
+- PUT /api/v1/config-versions/{id} {revision,name,tags,policyStates} -> ConfigVersion; draft only; increments revision; conflict409 on stale revision. No name/code/meaning inferred from labels.
+- PUT /api/v1/config-versions/{id}/tags/{tagId} {revision,name,description,examples,guidance,jevPrompt,pythonRegex,color} -> ConfigVersion; edit one existing tag's details in the selected draft or published version, incrementing that version's revision. Stale revision409; unknown tag404. Reject structural fields (`id`, `parentId`, `order`) and other unknown request fields. Preserve version ID/name/status/active state, tree membership/parents/order, policies and every other tag. A matching logical tag ID in another version is untouched; no global sharing or automatic inheritance.
+- POST /api/v1/config-versions/{id}/publish {revision} -> ConfigVersion; tree structure, version name and policy definitions are immutable afterwards; tag details remain editable through the tag endpoint. Revision validated. An empty valid tree is allowed.
+- POST /api/v1/config-versions/{id}/activate -> ConfigVersion; published only. Atomic singleton active version pointer, no two active versions. First startup none.
+- DELETE /api/v1/config-versions/{id} ->204; draft only.
+- GET /api/v1/classifier-config -> active ConfigVersion including tag examples/guidance/jevPrompt/pythonRegex/tree/definitions. 404 NO_ACTIVE_VERSION if none.
+
+Draft saves, tag-detail saves, version reads, clones, publish/activate responses and classifier configuration preserve each tag's `jevPrompt` and `pythonRegex`. The UI saves the selected tag's details separately and retains other unsaved tag, tree and policy changes. A new unsaved tag must first be included in a full draft save. All mutations use the latest version revision so stale full draft saves cannot overwrite a detail edit.
+
+Saving an inactive version or a draft does not change active configuration. Saving details in the active published version changes the next `GET /api/v1/classifier-config` response immediately, keeping the same version ID and returning a higher revision. Consumers must fetch configuration again and apply that revision. This dashboard only stores and serves configuration: it makes no Jev or detector execution request and does not deploy or reload an external runtime. No external Jev execution contract is defined here.
+
+## Ingestion
+
+POST /api/v1/events body {sourceId,eventId,personId,versionId,prompt,detections:[{start,end,text,tagIds:string[]}],occurredAt?,service?,model?,policyStateId?}.
+sourceId/eventId/personId/versionId mandatory, registered person required422. prompt nonblank, <=200000 Unicode code points; total body1MiB and matching parser string limits; detections max1000; each nonempty tagIds. Span units Unicode code points, start inclusive/end exclusive, exact substring equals text, don't trim/normalize prompt. Same [start,end] repeated input merged into one detection with union tagIds; order-independent canonical replay. Different overlapping intervals remain different detections. Empty detections allowed (0findingCount). Optional occurredAt uses server receivedAt; service defaults 'unspecified' (normalize supplied lowercase slug); model/policy null. Keep original UTC precision, future validation and safe input limits.
+Every new event requires active versionId; reject inactive/stale409; unknown tag/policy in that version422. Existing identical sourceId+eventId replay returns200 even after activation changed, different content409; omitted server-default timestamps must not make identical replay conflict. Creation201. Event writes atomic, concurrent idempotency preserved.
+Event={id:number,sourceId,eventId,versionId,personId,personName,prompt,occurredAt,receivedAt,service,model:string|null,policyStateId:string|null,policyStateName:string|null,detections:[{id:number,start,end,text,tags:[{id,name,color}]}],findingCount:number}. Event details use captured published-version labels; viewVersion metadata used separately by charts. Full prompt/detections available on list/detail for v2; no update/delete events.
+V6 stores captured tag names/colors on detection-tag associations. It backfills existing rows from their event's configuration version without deleting events, saved searches or configuration; subsequent detail edits leave these captured labels unchanged. New event ingestion captures names/colors atomically with the selected active configuration's details. Ordinary and detector event list/detail and saved-search event responses use these snapshots; metric tag captions/colors still use current view-version details.
+GET /api/v1/events + filters/page -> Page<Event>; GET /events/{id} -> Event. Keep people POST{id,name},GET paginated,GET/{id}; Person={id,name,eventCount,findingCount,lastEventAt}. Page={items,page,size,totalElements,totalPages},0based,size20 default max100.
+
+## Detector HTTP ingestion
+
+The detector adapter adds endpoints alongside the existing public API; `/events` and its camelCase request/response contract remain unchanged. Preserve the existing empty initial configuration, registered people, published tree structure and local no-auth runtime. Do not change the detector or extension to call this endpoint as part of this implementation. Producer reference: `origin/main` commit `e2021df`, `docs/rule-formats.md`, `server/app/schemas.py` and `server/docs/api-contract.md`.
+
+`POST /api/v1/detector-events` accepts JSON with snake_case envelope fields:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `source_id` | yes | Existing dashboard ID syntax; stable producer namespace. |
+| `person_id` | yes | Already registered dashboard person. |
+| `version_id` | yes | Active published dashboard configuration for a new event. |
+| `text` | yes | Exact original inspected prompt; empty/blank text is valid, at most 200000 Unicode code points. Existing `/events` still requires nonblank text. |
+| `result` | yes | Unchanged detector `InspectResponse` JSON, retained with all metadata. |
+| `occurred_at` | no | ISO 8601 timestamp with timezone; otherwise server receipt time. Existing event timestamp bounds apply. |
+| `service` | no | Existing service normalization; otherwise `result.destination.provider`. |
+| `model` | no | Explicit destination LLM model name; otherwise null. Detector model versions do not identify it. |
+| `policy_state_id` | no | Configured policy state in `version_id`; otherwise null. Do not infer it from `decision`. |
+| `tag_map` | no | Object mapping detector `finding.type` to an existing tag ID in `version_id`. |
+| `files` | no | At most 100 `{name}` entries; filename metadata only. |
+| `images` | no | At most 20 `{name,media_type,data_base64}` entries; `image/*` MIME type, canonical padded standard Base64 without whitespace or a data URI prefix. |
+
+The result uses the producer's exact snake_case fields: `request_id` (1..128 characters), `input_version` (integer or string), `status` (`complete|incomplete|error`), `decision` (`allow|warn|block`), `signal` (`green|yellow|red|gray`), `findings`, `policy_version`, `destination`, `detector_versions`, and optional `notices`. Every finding has `finding_id`, `type`, `category`, `rule_id`, `detector` (`rule|model`), `confidence` (`high|medium|low`), `severity` (`critical|high|medium|low|info`), `action` (`block|mask|warn|allow`), `span`, `reason` and optional nullable `replacement`. `span` contains `start,end,start_utf16,end_utf16`. `destination` contains `provider,channel,tier,verified,basis`; required nullable `basis` is valid. OpenAPI3.1 represents `input_version` as integer-or-string `oneOf` without an int64 bound or a `JsonNode` object reference, and nullable strings as `type: [string, null]`. Preserve the complete result object, including metadata fields not projected into the dashboard event.
+
+Validate code-point ranges against `text` and verify UTF-16 positions match the same boundaries; all ranges are start-inclusive/end-exclusive. Derive detection text from the original prompt without trimming or normalization. For `A😀 hong@example.com`, the email has code-point `[3,19)` and UTF-16 `[4,20)`. The adapter imposes no additional finding count cap beyond the16MiB body limit; existing `/events` retains its1000-detection limit. Equal ranges merge into one dashboard detection with the union of mapped tags; the original result findings remain intact.
+
+Resolve a finding's tag from explicit `tag_map`, otherwise from an active tag with the same ID as `finding.type`. If neither exists, retain an untagged detection and count it as unmapped. An explicit mapping to a missing tag returns422. Do not seed a built-in taxonomy. Dashboard `version_id` is independent of detector `policy_version` and `detector_versions.ruleset`; no equivalence may be inferred. Require existing person/configuration and preserve current 409 version mismatch and 422 person/policy checks for new events.
+
+Names are nonblank and contain 1..255 Unicode code points; slash, backslash, control characters and names `.` or `..` are invalid. Images decode to at most 5MiB each and 10MiB combined. Preserve input order, file names, media type metadata and original decoded image bytes; do not re-encode images. POST body limit16MiB; other existing API body limits remain1MiB. Reject malformed Base64 and oversize uploads safely. V3 adds detector metadata/attachment storage without changing V1/V2 migrations or deleting existing data. Prompt, result and attachments are committed atomically.
+
+Idempotency identity is the tuple `(source_id,result.request_id,typed result.input_version)`, serialized as a JSON array and represented by `d_` plus its SHA-256 hash in the existing event ID. Numeric `3` and string `"3"` are distinct identities. New201, identical replay200, changed content under the same identity409. Compare original detector payload and attachments as well as projected event fields; JSON object key order must not cause conflicts. Omitted server-default occurrence times must not make retries conflict. A valid identical replay succeeds after activation changes. Do not truncate request IDs to the existing80-character event ID limit.
+
+POST returns the same shape as `GET /api/v1/detector-events/{id}`:
+
+```text
+{
+  id, event_id, event: Event,
+  source_id, person_id, version_id, text, result,
+  occurred_at, service, model, policy_state_id, tag_map,
+  files: [{name}],
+  images: [{id,name,media_type,size_bytes,download_path}]
+}
+```
+
+`id` is the existing numeric dashboard event ID; `event_id` is the deterministic external event ID. `event` is the existing camelCase dashboard `Event`; the surrounding adapter fields are snake_case. Image Base64 is not repeated in responses. `download_path` points to `GET /api/v1/detector-events/{id}/images/{imageId}`, which returns the stored bytes as an `application/octet-stream` attachment with `X-Content-Type-Options: nosniff`. Image lookup is scoped to its detector event. Missing detector records/images return404. Regular `/events` list/detail, metrics and saved searches continue to use projected events/detections; detector metadata is retrieved through the adapter detail endpoint.
+
+Invalid spans, Base64 or names return400 `INVALID_INPUT`; malformed JSON, unknown fields and invalid enum values return400 `INVALID_JSON`. Explicit unknown tag mappings return422 `TAG_NOT_IN_VERSION`, stale active versions return409 `VERSION_MISMATCH`, and changed replay metadata/files/image bytes return409 `EVENT_CONFLICT`. Existing safe error envelopes remain `{code,message,fieldErrors?}`.
+
+These records represent inspection decisions. They do not assert that a prompt was transmitted, blocked by a client, or accepted by an external AI. Confidence describes detection certainty; severity describes risk; action and decision are policy outcomes. Keep these values separate.
+
+## Filters / aggregates
+
+Filters={from?,to?,versionId?,service?,personId?,tagId?,policyStateId?,hasDetections?:'true'|'false',q?,interval?:'hour'|'day',unmapped?:'true'}. from/to ISO instants, [from,to), default last7Seoul calendar dates, max366days. q literal substring in prompt (not SQL wildcard). Person list search is separate `personQuery` query parameter; no collision with prompt q. People registry membership is restricted only by personQuery/personId; all event filters affect stats/lastEventAt only, so registered people with zero matching events remain visible. `versionId` selects PUBLISHED interpretation tree only; it NEVER filters by event.version_id. Omitted selects active. No active with no explicit version =>200 empty-tree metrics/event browsing; tag filters invalid without published version. q/from/etc apply consistently across events/people/metrics. tagId includes itself+all descendants under selected version. hasDetections controls event-level presence. policyStateId filters exact stableID. unmapped mutually exclusive tagId; means detection whose tag IDs are all absent from selected tree.
+Summary/counts: eventCount=distinct matching events, findingCount=distinct detection IDs after tag/unmapped restriction, personCount=persons with matching events, detectedEventCount=events with at least one matched detection. Multi-tags never duplicate a detection. Tree node count=union of own+descendant tags; distinct events per node; don't sum child counts. An unmapped detection only means none of its tagIDs in viewed tree. Global counts include all matching spans regardless version; selected tree has unmapped aggregate in addition. policy null omitted from state distribution; version-unmapped states use captured names and mapped:false, never a synthetic user-defined state.
+GET /api/v1/metrics -> Metrics={versionId:string|null,summary:{eventCount,findingCount,personCount,detectedEventCount},series:[{bucket:string,eventCount,findingCount}],tags:[{id,parentId,name,color,order,count,eventCount}],unmapped:{count,eventCount},policies:[{id,name,color,eventCount,mapped:boolean}],services:[{service,eventCount,findingCount}]}. bucket is ISO date YYYY-MM-DD for day, full UTC instant for hour; fill zero buckets with Seoul boundaries. Max hourly range31days (clear400 beyond). Counts derive SQL, don't load whole event population in Java to aggregate.
+
+## Saved searches
+
+POST /api/v1/saved-searches {name,filters:Filters} ->201 SavedSearch; resolve relative/default date range and active version to absolute published version/range, persist all matching event IDs transactionally, not current page; require published view version409 if absent.
+SavedSearch={id,name,versionId,createdAt,filters:Filters,eventCount,findingCount}. GET list ->SavedSearch[]; GET /{id}->SavedSearch; DELETE /{id}->204 removes membership/config only, never original events.
+GET /saved-searches/{id}/events?page&size ->Page<Event>; GET /saved-searches/{id}/metrics ->Metrics. Snapshot is immutable event membership plus frozen filters/version. Original event labels/colors are captured at ingestion and remain unchanged when tag details change; metrics captions/colors use the selected version's current tag details. Tag-detail edits cannot change count values, saved membership, filters or tree structure. New ingestion/active version cannot change snapshot membership. Requery is client navigation to /events with saved filters, never overwrites snapshot.
+
+## Swagger/errors/routes
+
+Add springdoc-openapi-starter-webmvc-ui2.10.0 compatibleBoot3.5. Swagger /swagger-ui.html redirect and /swagger-ui/index.html, JSON /v3/api-docs. Relative server '/' and all API groups/examples documented incl Unicode offsets, version mismatch, replay. Don't SPA-forward docs or missingAPI/assets. Errors {code,message,fieldErrors?}, Korean, no stack/prompt echo.
+SPA routes /,/events,/events/:id,/people,/people/:id,/settings/metrics,/settings/monitoring,/saved-searches,/saved-searches/:id.
+
+## Dev SQL
+
+compose-dev.yml: retain APP_BIND_IP/APP_PORT, use dev-mysql-data volume replacing base volume, mount ./dev/sql read-only into backend /app/dev-sql and set SPRING_FLYWAY_LOCATIONS=classpath:db/migration,filesystem:/app/dev-sql. SQL callback afterMigrate__demo.sql inserts sample data after schema only for dev. BaseCompose unchanged, no devseed inside classpath. Idempotent fixed IDs / date-specific eventIDs; don't overwrite user-edited configs or chosen active version. Activate demoV1 only if no active version exists. Seed two published versions (one active), provided14categories+PII name/phone/email submetrics, examples+guidance, editable policies, explicitly labeled demo people and fake prompts; varied30day/hour data incl zero detections/multi-tags/repeated spans. Coordinate actual schema backend -> SQL agent promptly. Normal V2 startup empty; old data reset ONCE via migration, never on ordinary startup.
+
+## Ownership
+
+The root `DashboardApplication` remains the component-scan entry point. Backend packages are `api` (shared page response), `configuration` (catalog lifecycle), `person` (person registration and person-query coordination), `event` (event ingestion and atomic replay), `detector` (producer adapter), `query` (filters, reads and aggregates), `savedsearch` (immutable search snapshots), `common` (validation/errors/JDBC helpers), and `web` (HTTP infrastructure, JSON/OpenAPI settings and SPA routes). Controllers live with their feature, including `person.PersonController`; health and SPA controllers stay in `web`.
+
+Feature controllers own HTTP binding, request validation, response status and headers, and delegate business work to services. Services own business validation, orchestration and transaction boundaries. Repositories own SQL construction, JDBC access, persistence serialization and row mapping. Controllers must not depend on repositories, services must not contain SQL, and repositories must not depend on services or controllers. Cross-feature coordination uses service entry points; SQL query records and row-mapping results remain internal to their feature.
+
+API models live in `person.model`, `configuration.model`, `event.model`, `detector.model`, `query.model` and `savedsearch.model`; `api.model.Page<T>` is the shared page response. Each Java `record` has its own source file named after the type, including internal records such as `DashboardQuery`, `DetectionRow`, `TimeBucket`, `VersionState` and ingestion results. API model names, record components, validation annotations and JSON mappings are preserved so HTTP payloads and OpenAPI schema names remain stable. Public API models and cross-feature entry points stay public; controllers, repositories, feature constructors and internal implementation records stay package-private unless another feature requires access.
+
+`ConfigurationService` validates catalog data and controls draft edits, revision checks, publishing and activation; `ConfigurationRepository` reads and writes versions, catalog entries and closure rows. `PersonService` coordinates registration through `PersonRepository` and delegates person statistics to `DashboardQueryService`.
+
+`EventService` coordinates replay checks, registration and active-version validation, and the event transaction; `EventRepository` persists events and detections. `DetectorEventNormalizer` validates producer JSON, projects code-point spans, decodes original image bytes and prepares the deterministic identity/fingerprint. `DetectorEventService` coordinates ingestion and detail/image reads through `EventService`, `DashboardQueryService` and `DetectorEventRepository`. Its metadata callback writes original results and attachments through `DetectorEventRepository` within the same transaction as a new event.
+
+`DashboardQueryService` resolves the interpretation version, checks tag membership, assembles events with detections, merges policy counts with the configured policy list and calculates time buckets. `DashboardRepository` owns the corresponding SQL, JDBC reads and aggregates. `SavedSearchService` controls snapshot creation in one transaction: `SavedSearchRepository` stores frozen filters and counts, while `DashboardQueryService.captureSnapshotMembers` requires that caller transaction and delegates complete matching-event membership insertion to `DashboardRepository`. Query SQL fragments stay inside the query feature.
+
+`InputValidation` centralizes the shared ID pattern and Unicode, text, time and service checks. `JdbcRows` owns shared JDBC row/time conversion. Unit tests live with feature internals; HTTP and migration integration tests remain in the root test package for Spring Boot discovery. This separation preserves HTTP paths, fields, statuses, database contracts and frontend behavior; database migrations and the external detector remain unchanged.

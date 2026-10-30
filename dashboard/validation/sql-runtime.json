@@ -1,0 +1,68 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T17:24:00.779591+00:00",
+  "database": "MySQL Community Server 8.4.7",
+  "freshNormalStartup": {
+    "schema": "sending_http_v2_test",
+    "flywayVersions": [
+      "1",
+      "2"
+    ],
+    "noVersionsTagsPoliciesPeopleEvents": true,
+    "evidence": "fresh-start-api-smoke.json initial fresh-start assertions"
+  },
+  "v1Upgrade": {
+    "schema": "sending_upgrade_v2_test",
+    "legacyBefore": {
+      "people": 1,
+      "events": 1,
+      "findings": 1
+    },
+    "v2After": {
+      "people": 0,
+      "events": 0,
+      "detections": 0,
+      "versions": 0
+    },
+    "realFlywayMigrateFromVersion1": true,
+    "v1FileUnchanged": true,
+    "ordinaryV2RestartPreservedPerson": "v2-persistent-person",
+    "migrationCountAfterRestart": 2
+  },
+  "devCallback": {
+    "schema": "sending_empty_v2_test",
+    "applications": 3,
+    "versions": 2,
+    "tagNodes": 96,
+    "policies": 6,
+    "people": 6,
+    "events": 209,
+    "detections": 246,
+    "tagAssignments": 492,
+    "badCodePointSpans": 0,
+    "activeAfterSecondRun": "demo-v2",
+    "editedVersionNamePreserved": "사용자 지정 보존",
+    "editedTagNamePreserved": "사용자 지정 태그 보존",
+    "rowsUnchangedOnSecondRun": true,
+    "quietReplayWarnings": 0,
+    "freshGuardedCallbackSchema": "sending_seedfresh_v2_test",
+    "freshGuardedCallbackApplications": 2,
+    "freshGuardedCallbackCounts": {
+      "versions": 2,
+      "events": 209,
+      "detections": 246,
+      "tagAssignments": 492
+    },
+    "sqlSha256": "91950bed32f01653fec459284e18be6ac167841a1dcccf8d3abbcf5d02beefbc",
+    "replayUsesExistenceGuards": true
+  },
+  "actualApplicationCallback": {
+    "schema": "sending_demo_v2",
+    "port": 8082,
+    "flywayDiscoveredFilesystemAfterMigrate": true,
+    "finalPort": 8080,
+    "finalCallbackWarnings": 0,
+    "finalStartupPreservedCountsAndActive": true
+  },
+  "limitation": "No Docker Engine runtime or Compose volume lifecycle was executed; SQL and apps ran on local real MySQL 8.4.7."
+}

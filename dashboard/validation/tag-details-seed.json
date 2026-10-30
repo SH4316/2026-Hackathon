@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T18:55:50.340669+00:00",
+  "scope": "Native MySQL8.4 SQL callback replay on isolated test schema; not Docker runtime",
+  "capturedTagRows": 507,
+  "capturedTagsUnchanged": true,
+  "capturedTagsSha256": "97770c4464ad07cf1c0a3fc9f9c37ad93f09edebfba95ea07d6cf37ca14d39b1",
+  "activeVersionUnchanged": true,
+  "versionMetadataAndRevisionsUnchanged": true,
+  "editedDemoTagPreserved": true,
+  "demoTagEditPreservesCapturedHistory": true,
+  "tagCatalogUnchangedOnSeedReplay": true,
+  "migrationVersion": "6"
+}

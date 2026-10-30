@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "reportedAt": "2026-10-30T17:33:00.811322+00:00",
+  "verification": "Frontend data agent reported final npm test and production build success; test source files enumerated from worktree.",
+  "tests": 44,
+  "suites": 6,
+  "failures": 0,
+  "productionBuild": "PASS",
+  "assets": [
+    "index-B7N3KnUK.js",
+    "index-CuicbBHA.css"
+  ],
+  "testFiles": [
+    "src/query.test.ts",
+    "src/api.test.ts",
+    "src/integration.behavior.test.tsx",
+    "src/ui.behavior.test.ts",
+    "src/hooks.test.ts",
+    "src/format.test.ts"
+  ]
+}

@@ -1,0 +1,478 @@
+{
+  "generatedAt": "2026-10-30T15:23:05.728Z",
+  "baseUrl": "http://127.0.0.1:8080",
+  "browser": "156.0.8078.4",
+  "axeVersion": "4.14.0",
+  "standards": [
+    "wcag2a",
+    "wcag2aa",
+    "wcag21a",
+    "wcag21aa"
+  ],
+  "axeViewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "axeRoutes": [
+    {
+      "route": "/",
+      "violations": [],
+      "passes": 28,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 15
+        }
+      ]
+    },
+    {
+      "route": "/events",
+      "violations": [],
+      "passes": 24,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 1
+        }
+      ]
+    },
+    {
+      "route": "/people",
+      "violations": [],
+      "passes": 24,
+      "incomplete": []
+    },
+    {
+      "route": "/people/demo-person-01",
+      "violations": [],
+      "passes": 28,
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 15
+        }
+      ]
+    },
+    {
+      "route": "/events/1",
+      "violations": [],
+      "passes": 18,
+      "incomplete": []
+    },
+    {
+      "route": "/settings/monitoring",
+      "violations": [],
+      "passes": 18,
+      "incomplete": []
+    }
+  ],
+  "responsiveWidths": [
+    320,
+    390,
+    768,
+    1280,
+    1440
+  ],
+  "measurements": [
+    {
+      "route": "/",
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 282,
+          "scrollWidth": 711,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events",
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 282,
+          "scrollWidth": 711,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people",
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 282,
+          "scrollWidth": 516,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people/demo-person-01",
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 282,
+          "scrollWidth": 688,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events/1",
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "route": "/settings/monitoring",
+      "viewportWidth": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "route": "/",
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 352,
+          "scrollWidth": 711,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events",
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 352,
+          "scrollWidth": 711,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people",
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 352,
+          "scrollWidth": 516,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people/demo-person-01",
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 352,
+          "scrollWidth": 688,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events/1",
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "route": "/settings/monitoring",
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "route": "/",
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 538,
+          "scrollWidth": 722,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events",
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 538,
+          "scrollWidth": 722,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people",
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 538,
+          "scrollWidth": 538,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people/demo-person-01",
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 538,
+          "scrollWidth": 699,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events/1",
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "route": "/settings/monitoring",
+      "viewportWidth": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "route": "/",
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 1018,
+          "scrollWidth": 1018,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events",
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 1018,
+          "scrollWidth": 1018,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people",
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 1018,
+          "scrollWidth": 1018,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people/demo-person-01",
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 1018,
+          "scrollWidth": 1018,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events/1",
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "route": "/settings/monitoring",
+      "viewportWidth": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "route": "/",
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 1134,
+          "scrollWidth": 1134,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events",
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 1134,
+          "scrollWidth": 1134,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people",
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 1134,
+          "scrollWidth": 1134,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/people/demo-person-01",
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflowing": false,
+      "tableScrollRegions": [
+        {
+          "clientWidth": 1134,
+          "scrollWidth": 1134,
+          "overflowX": "auto"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "route": "/events/1",
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    },
+    {
+      "route": "/settings/monitoring",
+      "viewportWidth": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "overflowing": false,
+      "tableScrollRegions": [],
+      "diagnostics": []
+    }
+  ],
+  "runtimeErrors": [],
+  "summary": {
+    "routesScanned": 6,
+    "violationRules": 0,
+    "violationNodes": 0,
+    "responsiveMeasurements": 30,
+    "horizontalOverflowFailures": 0,
+    "runtimeErrorCount": 0
+  },
+  "limitations": "Automated axe WCAG A/AA checks and document overflow measurements; manual assistive technology testing is not included. Table contents may scroll within their labeled regions."
+}
