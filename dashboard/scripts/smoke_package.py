@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
     routes = ["/", "/events", "/events/1", "/people", "/people/demo-person", "/settings/metrics",
-              "/settings/jev", "/settings/monitoring", "/saved-searches", "/saved-searches/demo-snapshot"]
+              "/settings/jev", "/settings/connections", "/settings/monitoring", "/saved-searches", "/saved-searches/demo-snapshot"]
     html = None
     for route in routes:
         status, content_type, body = fetch(base, route)

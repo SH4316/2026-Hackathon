@@ -52,7 +52,7 @@ function ImageAttachment({
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
-  const downloadPath = `/api/v1/detector-events/${eventId}/images/${image.id}`;
+  const downloadPath = `/api/v1/events/${eventId}/attachments/images/${image.id}`;
   useEffect(() => {
     const controller = new AbortController();
     let objectUrl = "";

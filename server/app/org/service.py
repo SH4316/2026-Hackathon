@@ -17,7 +17,7 @@ from app.detection.base import Candidate
 from app.detection.model import ContextModelDetector, ModelUnavailable
 from app.org.dashboard import DashboardClient, DashboardUnavailable
 from app.org.rules import OrgRules, compile_org
-from app.org.settings import OrgSettings, OrgSettingsStore
+from app.org.settings import OrgSettings, OrgSettingsStore, from_dashboard
 from app.runtime import RuntimeState
 from app.schemas import Confidence
 
@@ -50,7 +50,16 @@ class OrgService:
 
     @property
     def settings(self) -> OrgSettings:
-        return self.settings_store.current()
+        """대시보드 '검사 서버 연결' 설정이 있으면 그것을, 없으면 이 서버의 설정. 기록의 source_id 는 연결 ID."""
+        local = self.settings_store.current()
+        remote = self.client.remote_settings if self.client else None
+        source_id = (self.client.connection.connector_id if self.client else None) or local.source_id
+        if remote is not None:
+            try:
+                return from_dashboard(remote, source_id)
+            except (KeyError, TypeError, ValueError):
+                log.warning("dashboard detector settings invalid; using server settings")
+        return local.model_copy(update={"source_id": source_id})
 
     async def rules(self, reserved_types: set[str], force: bool = False) -> OrgRules:
         """대시보드 활성 설정을 컴파일한 조직 규칙. 받을 수 없으면 DashboardUnavailable."""
@@ -61,7 +70,7 @@ class OrgService:
             self._compiled = None
             raise
         s = self.settings
-        key = (config.get("id"), config.get("revision"), s.version, frozenset(reserved_types))
+        key = (config.get("id"), config.get("revision"), s.key, frozenset(reserved_types))
         if self._compiled is None or self._compiled[0] != key:
             rules = compile_org(config, reserved_types, jev_enabled=s.jev_enabled)
             if rules.skipped:
@@ -136,6 +145,8 @@ class OrgService:
             return {"managed": False}
         compiled = self._compiled[1] if self._compiled else None
         return {"managed": True, "dashboard_error": self.client.last_error,
+                "connector_id": self.client.connection.connector_id,
+                "settings_source": self.settings.source,
                 "version_id": compiled.version_id if compiled else None,
                 "revision": compiled.revision if compiled else None,
                 "regex_tags": len(compiled.regex) if compiled else 0,

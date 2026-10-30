@@ -767,14 +767,14 @@ class FlywayMigrationIntegrationTest {
   }
 
   @Test
-  void v9AddsNullableSendActionWithoutChangingExistingEventsOrPayloads() {
+  void v11AddsNullableSendActionWithoutChangingExistingEventsOrPayloads() {
     var source = migrationSource();
     var previous =
         Flyway.configure()
             .dataSource(source)
             .locations("classpath:db/migration")
             .cleanDisabled(false)
-            .target("8")
+            .target("10")
             .load();
     previous.clean();
     previous.migrate();
@@ -796,7 +796,7 @@ class FlywayMigrationIntegrationTest {
         Flyway.configure()
             .dataSource(source)
             .locations("classpath:db/migration")
-            .target("9")
+            .target("11")
             .load();
     assertThat(next.migrate().migrationsExecuted).isEqualTo(1);
     var after = snapshotVersionedData(jdbc);

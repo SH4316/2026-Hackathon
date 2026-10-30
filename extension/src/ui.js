@@ -171,19 +171,10 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
 .where { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
 .hitname { font-weight: 600; }
 .snippet { grid-column: 1 / -1; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
-.diag {
   position: fixed; top: 12px; right: 12px; z-index: 2147483646; width: 340px;
   background: var(--bg); color: var(--fg); border: 2px dashed #f2a600; border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0,0,0,.18); font-size: 12px; line-height: 1.45; padding: 10px 12px;
 }
-.diag[hidden] { display: none; }
-.diag h3 { margin: 0 0 6px; font-size: 13px; }
-.diag dl { display: grid; grid-template-columns: 74px 1fr; gap: 3px 8px; margin: 0; }
-.diag dt { color: var(--muted); }
-.diag dd { margin: 0; word-break: break-all; }
-.diag .ok { color: var(--green); font-weight: 600; }
-.diag .bad { color: var(--red); font-weight: 600; }
-.diag .close { position: absolute; top: 6px; right: 8px; border: 0; background: none; padding: 2px 6px; font-size: 14px; }
 .ov-frame {
   position: fixed; z-index: 2147483645; pointer-events: none; box-sizing: border-box;
   border: 2px solid rgba(16,163,127,.85); border-radius: 12px; box-shadow: 0 0 0 4px rgba(16,163,127,.15);
@@ -661,41 +652,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     overlayEl.dataset.policyKey = policy.key;
   }
 
-  // ── 테스트 모드 진단 패널 ──
-  // 자동 점검 스크립트가 읽을 수 있도록 결과를 data-* 속성에도 남긴다.
-  let diagEl, toastTimer;
-
-  function setDiag(info) {
-    ensureRoot();
-    if (!diagEl) {
-      diagEl = h("div", { class: "diag", role: "status" });
-      rootEl.append(diagEl);
-    }
-    if (diagEl.dataset.dismissed) return;
-    const yes = (v, label) => h("span", { class: v ? "ok" : "bad" }, v ? `✓ ${v}` : `✗ ${label}`);
-    const counts = Object.entries(info.intercepts).map(([k, n]) => `${k} ${n}회`).join(", ") || "없음";
-    diagEl.replaceChildren(
-      h("button", { class: "close", title: "이 페이지에서 닫기",
-        onclick: () => { diagEl.dataset.dismissed = "1"; diagEl.hidden = true; } }, "×"),
-      h("h3", null, "Prompt Guard 테스트 모드 · 실제 전송 안 함"),
-      h("dl", null,
-        h("dt", null, "사이트"), h("dd", null, `${info.host} → ${info.destination ?? "목적지 미지정"}`),
-        h("dt", null, "입력창"), h("dd", null, yes(info.editor, "찾지 못함(로그인 필요?)")),
-        h("dt", null, "전송 버튼"), h("dd", null, yes(info.sendButton, "찾지 못함 → 클릭 전송은 막지 못함")),
-        h("dt", null, "검사 서버"), h("dd", null, info.server ?? "확인 중…"),
-        h("dt", null, "가로챔"), h("dd", null, counts),
-        h("dt", null, "마지막 결과"), h("dd", null, info.lastOutcome ?? "-")));
-    Object.assign(diagEl.dataset, {
-      editor: info.editor ?? "", sendButton: info.sendButton ?? "", destination: info.destination ?? "",
-      intercepts: JSON.stringify(info.intercepts), lastEvent: info.lastEvent ?? "",
-      lastOutcome: info.lastOutcome ?? "", dryRuns: String(info.dryRuns),
-    });
-    diagEl.hidden = false;
-  }
-
-  function hideDiag() {
-    if (diagEl) diagEl.hidden = true;
-  }
+  let toastTimer;
 
   function toast(message) {
     ensureRoot();
@@ -788,5 +745,5 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
   PG.ui = { entryPolicyKey: () => overlayEl?.dataset.kind === "entry-policy" ? overlayEl.dataset.policyKey : null,
             showEntryPolicy, reviewFiles, setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showForce,
             showTokenOverlay, clearTokenOverlay, refreshTokenOverlay, hasTokenOverlay: () => !!ov,
-            closeModal, setDiag, hideDiag, toast, isOpen: () => !!overlayEl };
+            closeModal, toast, isOpen: () => !!overlayEl };
 })();

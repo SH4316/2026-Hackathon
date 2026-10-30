@@ -86,7 +86,7 @@ describe("send actions and attachments", () => {
         .getByRole("link", { name: "원본 다운로드" })
         .getAttribute("download"),
     ).toBe("원본.png");
-    expect(fetcher.mock.calls[0][0]).toBe("/api/v1/detector-events/9/images/3");
+    expect(fetcher.mock.calls[0][0]).toBe("/api/v1/events/9/attachments/images/3");
     fireEvent.error(screen.getByRole("img"));
     await screen.findByText(/지원하지 않거나 손상된 이미지/);
     expect(screen.getByRole("link", { name: "원본 다운로드" })).toBeTruthy();

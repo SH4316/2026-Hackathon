@@ -1,6 +1,5 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api } from "./api";
 import { EnabledSetting as UsageSetting } from "./EnabledSetting";
 import { formatDateTime } from "./format";
 import { ModelWarning } from "./GuardBanner";
@@ -10,11 +9,9 @@ import {
   guardApi,
   guardRequest,
   validateRule,
-  type Enrollment,
   type GuardClient,
   type GuardJudgment,
   type GuardModules,
-  type GuardOrg,
   type GuardResponse,
   type GuardRule,
   type GuardRuleset,
@@ -29,7 +26,6 @@ import {
   LoadingState,
   PageTitle,
   Panel,
-  Pagination,
   RefreshButton,
 } from "./ui";
 
@@ -176,7 +172,7 @@ export function GuardSettings() {
       <PageTitle
         title="검사 서버 관리"
         description="검사 서버의 실행 상태와 조직 규칙, 사용자 연결을 관리하세요."
-        action={<RefreshButton {...resource} loading={busy} />}
+        action={<><Link className="button" to="/settings/connections">검사 서버 연결·조직 설정</Link><RefreshButton {...resource} loading={busy} /></>}
       />
       <div className="guard-tabs" role="tablist" aria-label="검사 서버 관리 탭">
         {tabs.map(([id, title]) => (
@@ -280,7 +276,7 @@ export function GuardSettings() {
                 update={update}
               />
             )}
-            {tab === "org" && <OrgTab pending={busy} run={run} />}
+            {tab === "org" && <OrgTab />}
             {tab === "clients" && <ClientsTab pending={busy} run={run} />}
           </div>
         </>
@@ -966,256 +962,19 @@ function JudgmentsTab({
     </>
   );
 }
-function OrgTab({ pending, run }: Actions) {
-  const resource = useResource((signal) => guardApi.org(signal), []);
-  return resource.error ? (
-    <ErrorState message={resource.error} retry={resource.refresh} />
-  ) : !resource.data ? (
-    <LoadingState />
-  ) : (
-    <OrgForm settings={resource.data.data} pending={pending} run={run} />
-  );
-}
-function OrgForm({ settings, pending, run }: Actions & { settings: GuardOrg }) {
-  const [draft, setDraft] = useState(settings);
-  const [tags, setTags] = useState(
-    JSON.stringify(settings.tag_map ?? {}, null, 2),
-  );
-  const [policies, setPolicies] = useState(
-    JSON.stringify(
-      settings.policy_state_map ?? { allow: null, warn: null, block: null },
-      null,
-      2,
-    ),
-  );
-  function map(text: string, policy: boolean) {
-    let value: unknown;
-    try {
-      value = JSON.parse(text);
-    } catch {
-      throw new Error(
-        `${policy ? "정책 상태" : "태그"} 매핑의 JSON 형식을 확인해 주세요.`,
-      );
-    }
-    if (
-      !value ||
-      typeof value !== "object" ||
-      Array.isArray(value) ||
-      Object.entries(value).some(
-        ([key, item]) =>
-          !key ||
-          (item === null
-            ? !policy
-            : typeof item !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(item)),
-      ) ||
-      (policy &&
-        Object.keys(value).some(
-          (key) => !["allow", "warn", "block"].includes(key),
-        ))
-    )
-      throw new Error(
-        "매핑에는 유효한 ID를 입력해 주세요. 정책 상태에는 null을 사용할 수 있습니다.",
-      );
-    return value;
-  }
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    void run(async () => {
-      await guardRequest("org/settings", {
-        method: "PUT",
-        body: {
-          report_text: draft.report_text,
-          tag_action: draft.tag_action,
-          jev_enabled: draft.jev_enabled,
-          source_id: draft.source_id,
-          tag_map: map(tags, false),
-          policy_state_map: map(policies, true),
-        },
-      });
-    });
-  }
+function OrgTab() {
   return (
-    <Panel
-      title="조직 설정"
-      description="원문 기록 방식과 조직 태그·정책 상태 연결을 설정합니다."
-    >
-      <form onSubmit={submit}>
-        <fieldset disabled={pending}>
-          <div className="guard-form-grid">
-            <Field title="원문 기록 (report_text)">
-              <select
-                value={draft.report_text}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    report_text: e.target.value as GuardOrg["report_text"],
-                  })
-                }
-              >
-                <option value="full">전체 원문</option>
-                <option value="masked">마스킹한 원문</option>
-                <option value="off">기록 안 함</option>
-              </select>
-            </Field>
-            <Field title="조직 태그 조치 (tag_action)">
-              <ActionSelect
-                value={draft.tag_action}
-                change={(tag_action) => setDraft({ ...draft, tag_action })}
-              />
-            </Field>
-            <Field title="수집 시스템 ID (source_id)">
-              <input
-                required
-                pattern="[A-Za-z0-9_-]{1,80}"
-                value={draft.source_id}
-                onChange={(e) =>
-                  setDraft({ ...draft, source_id: e.target.value })
-                }
-              />
-            </Field>
-          </div>
-          <EnabledSetting
-            label="조직 Jev 판단 사용 (jev_enabled)"
-            checked={draft.jev_enabled}
-            onChange={(jev_enabled) => setDraft({ ...draft, jev_enabled })}
-          />
-          <Field
-            title="태그 매핑 (tag_map)"
-            help="JSON 객체: 탐지 유형을 대시보드 태그 ID에 연결합니다."
-          >
-            <textarea
-              className="code-value"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-          </Field>
-          <Field
-            title="정책 상태 매핑 (policy_state_map)"
-            help="allow·warn·block을 활성 버전의 정책 상태 ID에 연결합니다. null은 연결하지 않습니다."
-          >
-            <textarea
-              className="code-value"
-              value={policies}
-              onChange={(e) => setPolicies(e.target.value)}
-            />
-          </Field>
-          <Submit pending={pending}>조직 설정 저장</Submit>
-        </fieldset>
-      </form>
+    <Panel title="조직 설정" description="연결된 검사 서버는 대시보드의 공통 조직 설정을 따릅니다.">
+      <Link className="text-link" to="/settings/connections">검사 서버 연결에서 원문 기록·태그 조치·Jev·정책 상태 매핑 설정</Link>
     </Panel>
   );
 }
 function ClientsTab({ pending, run }: Actions) {
   const clients = useResource((signal) => guardApi.clients(signal), []);
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(0);
-  const people = useResource(
-    (signal) => api.people({}, query, page, signal),
-    [query, page],
-  );
-  const [person, setPerson] = useState("");
-  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   return (
     <>
-      <Panel
-        title="등록 코드 발급"
-        description="등록된 사람을 선택해 일회용 코드를 발급합니다. 코드는 이번 응답에서만 표시됩니다."
-      >
-        <form
-          className="guard-actions"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setQuery(
-              String(new FormData(e.currentTarget).get("personQuery") ?? ""),
-            );
-            setPage(0);
-            setPerson("");
-          }}
-        >
-          <Field title="등록할 사람 검색">
-            <input
-              name="personQuery"
-              placeholder="이름 또는 ID"
-              disabled={pending}
-            />
-          </Field>
-          <button className="button" disabled={pending}>
-            검색
-          </button>
-        </form>
-        {people.error ? (
-          <ErrorState message={people.error} retry={people.refresh} />
-        ) : !people.data ? (
-          <LoadingState />
-        ) : !people.data.items.length ? (
-          <p>
-            등록된 사람이 없습니다.{" "}
-            <Link className="text-link" to="/people">
-              사람 관리
-            </Link>
-            에서 먼저 등록해 주세요.
-          </p>
-        ) : (
-          <>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setEnrollment(null);
-                void run(async () => {
-                  const selected = people.data!.items.find(
-                    (item) => item.id === person,
-                  )!;
-                  setEnrollment(
-                    (
-                      await guardRequest<Enrollment>("enrollments", {
-                        method: "POST",
-                        body: {
-                          person_id: person,
-                          label: selected.name.slice(0, 60),
-                        },
-                      })
-                    ).data,
-                  );
-                }, "등록 코드를 발급했습니다.");
-              }}
-            >
-              <fieldset disabled={pending}>
-                <Field title="등록할 사람">
-                  <select
-                    required
-                    value={person}
-                    onChange={(e) => {
-                      setPerson(e.target.value);
-                      setEnrollment(null);
-                    }}
-                  >
-                    <option value="">사람 선택</option>
-                    {people.data.items.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} ({item.id})
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Submit pending={pending}>등록 코드 발급</Submit>
-              </fieldset>
-            </form>
-            <Pagination
-              page={people.data}
-              onChange={(next) => {
-                setPage(next);
-                setPerson("");
-              }}
-            />
-          </>
-        )}
-        {enrollment && (
-          <div className="guard-enrollment" role="status">
-            <span>일회용 등록 코드</span>
-            <strong className="code-value">{enrollment.code}</strong>
-            <span>만료 {formatDateTime(enrollment.expires_at)}</span>
-          </div>
-        )}
+      <Panel title="등록 코드 발급" description="사람 관리에서 사용자를 선택해 대시보드의 일회용 등록 코드를 발급하세요.">
+        <Link className="text-link" to="/people">사람 관리에서 등록 코드 발급</Link>
       </Panel>
       <Panel title="연결된 사용자" action={<RefreshButton {...clients} />}>
         {clients.error ? (

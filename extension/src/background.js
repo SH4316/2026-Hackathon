@@ -14,7 +14,6 @@ const DEFAULTS = {
   enabled: true,
   serverEnabled: true,
   localAiEnabled: false,
-  testMode: false, // 실제 사이트 점검용: 어떤 경우에도 전송하지 않음
   timeoutMs: 15000,
   // 내용을 검사할 수 없는 파일(이미지·음성 등) 첨부를 막을지
   blockUnscannableFiles: false,

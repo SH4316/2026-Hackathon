@@ -95,12 +95,21 @@ API 문서: http://127.0.0.1:8000/docs
 
 | | 로컬 | 조직 관리 |
 |---|---|---|
-| 조건 | `PG_DASHBOARD_URL` 없음, 또는 확장이 등록 코드로 연결되지 않음 | `PG_DASHBOARD_URL` 이 있는 서버에 대시보드 사람 ID 로 등록 |
+| 조건 | `PG_DASHBOARD_CONNECTION` 없음, 또는 확장이 등록 코드로 연결되지 않음 | 대시보드 연결 URL(`PG_DASHBOARD_CONNECTION`)이 있는 서버에 대시보드 사람 ID 로 등록 |
 | 자체 판단 | 내장 규칙 + 사용자 규칙 + Jev(서버), 기기 내 AI·개인 정규식(확장) | 같음 |
 | 대시보드 규칙 | 없음 | 대시보드 활성 설정의 태그 `pythonRegex`, Jev 프롬프트(`jevThreshold`)를 모든 검사에 적용 |
 | 기록 | 서버 감사 이벤트(원문 없음)만 | + 전송 시점 검사를 대시보드 `/api/v1/detector-events` 로 전송 |
 
 조직 서버는 대시보드 계약(dashboard/CONTRACT.md)의 "연결된 탐지기" 역할을 합니다.
+
+### 대시보드 연결
+
+1. 대시보드 **검사 서버 연결** → **연결 URL 만들기**. `http://대시보드/api/v1/connectors/c_…#sk_…` 가 한 번만 표시됩니다.
+2. 이 서버를 `PG_DASHBOARD_CONNECTION=<연결 URL>` 로 실행합니다. `#` 뒤 비밀값은 `Authorization: Bearer` 로만 보냅니다.
+3. `POST /v1/admin/org/refresh`(관리 키)로 연결과 활성 설정을 확인합니다. `/v1/admin/org/status` 의 `connector_id`, `settings_source` 로 상태를 봅니다.
+4. 대시보드에서 연결을 해지하면 401 이 되어 조직 규칙을 적용할 수 없으므로 검사는 회색(전송 보류)입니다.
+
+대시보드 기록의 `source_id` 는 연결 ID 입니다. `PG_DASHBOARD_URL`(주소만, 인증 없음)은 대시보드가 아직 연결을 발급하지 않았을 때만 동작하는 이전 방식입니다.
 
 - **태그 정규식:** Python `re`로 실행하며 최대 4,000자입니다. 검사 서버가 설정된 대시보드는 초안·태그 세부 저장 전에 변경된 비어 있지 않은 패턴을 `/v1/admin/org/regex/check`로 검증하고, 길이 초과·문법 오류·빈 문자열 일치·중첩 수량자를 거부합니다. 연결 실패도 저장을 거부합니다(503). 검사 서버 URL이 없을 때는 원격 검증 없이 저장합니다. 기존에 실행에서 건너뛴 규칙은 `/v1/admin/org/status`의 `skipped_regex`에 남고 메트릭 설정·검사 서버 관리 상태·전체 현황 배너에서 태그 이름과 사유를 표시합니다.
 - **Jev:** 프롬프트마다 출력 태그별 점수(0~1)를 받고, 태그의 `jevThreshold` 가 설정된 경우에만 `점수 >= 임계값` 이면 탐지입니다.
@@ -116,7 +125,11 @@ API 문서: http://127.0.0.1:8000/docs
   모델 엔드포인트가 설정된 상태에서 실행할 조직 Jev가 있는데 모델을 끄거나 호출이 실패하면 회색(`org_jev_model_disabled`, `org_jev_failed`, 모델 필수면 error)입니다. 엔드포인트 미설정은 아래 비활성 동작을 따릅니다.
 - 활성 설정은 `PG_DASHBOARD_REFRESH_S`(기본 30초)마다 다시 받습니다. 바로 반영하려면 `POST /v1/admin/org/refresh`.
 
-### 조직 설정 (`GET·PUT /v1/admin/org/settings`, 관리 키)
+### 조직 설정
+
+대시보드 **검사 서버 연결 → 검사 서버 설정**이 기준입니다(대시보드 `GET /api/v1/detector-settings` 를 활성 설정과 함께 받음).
+대시보드 설정을 받을 수 없을 때만 이 서버의 `GET·PUT /v1/admin/org/settings`(관리 키) 값을 쓰고,
+대시보드 설정을 따르는 중에는 서버 PUT 이 409 입니다. 항목은 같습니다.
 
 ```json
 { "report_text": "full", "tag_map": {"email": "pii-3", "phone": "pii-2"},
@@ -143,6 +156,12 @@ API 문서: http://127.0.0.1:8000/docs
 - 겹쳐서 하나로 병합된 탐지도 병합 전 후보마다 보내 각 태그가 집계되게 합니다.
 
 ### 사용자 등록
+
+**대시보드에서(권장):** 사람 상세 화면 → **확장프로그램 연결 → 연결 코드 발급**. 대시보드가 일회용 코드를 발급하고,
+사용자가 확장에 넣으면 이 서버가 대시보드에 코드 사용을 요청(`POST /api/v1/enrollments/redeem`, 연결 인증)해
+그 사람으로 개인 토큰을 발급합니다. 연결 URL(`PG_DASHBOARD_CONNECTION`)로 연결된 경우에만 동작합니다.
+
+**이 서버의 관리 API로:**
 
 ```bash
 # 대시보드에 등록된 사람(person_id)으로 등록 코드 발급. label 을 비우면 대시보드의 이름을 씀

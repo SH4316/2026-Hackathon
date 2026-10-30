@@ -65,7 +65,7 @@ page.on('pageerror', e => errors.push(e.message));
 const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent('serviceworker');
 const popup = await ctx.newPage(); await popup.goto(new URL('../popup.html', sw.url()).href);
 await popup.evaluate(port => chrome.storage.local.set({ enabled: true, serverEnabled: true, localAiEnabled: false,
-  serverUrl: `http://127.0.0.1:${port}`, apiKey: 'synthetic-token', linkedClient: { clientId: 'fixture', managed: true }, testMode: false }), api.address().port);
+  serverUrl: `http://127.0.0.1:${port}`, apiKey: 'synthetic-token', linkedClient: { clientId: 'fixture', managed: true } }), api.address().port);
 async function eventually(fn, label) {
   for (let end = Date.now() + 9000; Date.now() < end;) { if (await fn()) return; await new Promise(r => setTimeout(r, 50)); }
   throw new Error(label);

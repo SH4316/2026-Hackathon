@@ -16,6 +16,7 @@ class SpaController {
     "/settings/metrics",
     "/settings/jev",
     "/settings/guard",
+    "/settings/connections",
     "/saved-searches",
     "/saved-searches/{id:[A-Za-z0-9_-]+}"
   })

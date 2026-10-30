@@ -227,3 +227,41 @@ export interface DetectorAttachments {
   files: { name: string }[];
   images: DetectorImage[];
 }
+
+/** 대시보드가 발급한 검사 서버 연결. 비밀값은 발급 응답의 connectionUrl에만 있습니다. */
+export interface Connector {
+  id: string;
+  name: string;
+  /** 사용자가 확장에 넣을 검사 서버 주소(선택) */
+  serverUrl: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface CreatedConnector {
+  connector: Connector;
+  connectionUrl: string;
+}
+
+/** 사람별 확장 연결 코드. connectionInfo = "<검사 서버 주소>#<code>"(주소가 등록된 연결이 있을 때) */
+export interface Enrollment {
+  code: string;
+  personId: string;
+  expiresAt: string;
+  connectionInfo: string | null;
+}
+
+export type ReportText = "masked" | "full" | "off";
+export type TagAction = "warn" | "mask" | "block";
+
+/** 연결된 검사 서버가 따르는 조직 설정. */
+export interface DetectorSettings {
+  reportText: ReportText;
+  policyStateMap: Record<"allow" | "warn" | "block", string | null>;
+  tagMap: Record<string, string>;
+  tagAction: TagAction;
+  jevEnabled: boolean;
+  revision: number;
+  updatedAt: string | null;
+}

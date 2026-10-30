@@ -331,59 +331,18 @@ describe("guard administration", () => {
     );
     expect(mutations("prompt")[0].headers["If-Match"]).toBe('"8"');
   });
-  it("persists all organization fields and rejects malformed mappings", async () => {
+  it("links organization editing to the dashboard settings without writing server settings", async () => {
     mount("org");
-    const mapping = await screen.findByRole("textbox", {
-      name: /^정책 상태 매핑/,
-    });
-    fireEvent.change(mapping, {
-      target: { value: '{"allow":null,"warn":"review","block":"blocked"}' },
-    });
-    fireEvent.click(
-      screen.getByRole("switch", { name: "조직 Jev 판단 사용 (jev_enabled)" }),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "조직 설정 저장" }));
-    await screen.findByText("설정을 저장했습니다.");
-    expect(mutations("org/settings")[0].body).toEqual({
-      report_text: "full",
-      tag_action: "mask",
-      jev_enabled: false,
-      source_id: "prompt-guard",
-      tag_map: {},
-      policy_state_map: { allow: null, warn: "review", block: "blocked" },
-    });
-    fireEvent.change(mapping, { target: { value: "[]" } });
-    fireEvent.click(screen.getByRole("button", { name: "조직 설정 저장" }));
-    await screen.findByText(/매핑에는 유효한 ID/);
-    expect(mutations("org/settings")).toHaveLength(1);
+    const link = await screen.findByRole("link", { name: /원문 기록·태그 조치/ });
+    expect(link.getAttribute("href")).toBe("/settings/connections");
+    expect(calls.filter((c) => c.path === "org/settings")).toEqual([]);
   });
-  it("issues a person-bound code and supports client rename and revoke", async () => {
-    vi.spyOn(api, "people").mockResolvedValue({
-      items: [
-        {
-          id: "person_demo",
-          name: "데모 사람",
-          eventCount: 0,
-          findingCount: 0,
-          lastEventAt: null,
-        },
-      ],
-      page: 0,
-      size: 20,
-      totalElements: 1,
-      totalPages: 1,
-    });
+  it("links enrollment to people and supports client rename and revoke", async () => {
     mount("clients");
-    fireEvent.change(
-      await screen.findByRole("combobox", { name: "등록할 사람" }),
-      { target: { value: "person_demo" } },
-    );
-    fireEvent.click(screen.getByRole("button", { name: "등록 코드 발급" }));
-    await screen.findByText("DEMO-1234");
-    expect(mutations("enrollments")[0].body).toEqual({
-      person_id: "person_demo",
-      label: "데모 사람",
-    });
+    const link = await screen.findByRole("link", { name: "사람 관리에서 등록 코드 발급" });
+    expect(link.getAttribute("href")).toBe("/people");
+    expect(mutations("enrollments")).toEqual([]);
+    await screen.findByRole("textbox", { name: "데모 사용자 연결 이름" });
     fireEvent.change(
       screen.getByRole("textbox", { name: "데모 사용자 연결 이름" }),
       { target: { value: "변경한 이름" } },

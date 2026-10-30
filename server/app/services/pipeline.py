@@ -129,6 +129,10 @@ class Pipeline:
         if self.org is None or not person_id:
             return FileReportResponse(recorded=False, reason="not_managed")
         org = self.org
+        try:
+            await org.rules(set(self.policy.types))
+        except DashboardUnavailable:
+            return FileReportResponse(recorded=False, reason="dashboard_unavailable")
         if org.settings.report_text == "off":
             return FileReportResponse(recorded=False, reason="report_off")
         files, images = file_attachments(req)
@@ -168,7 +172,7 @@ class Pipeline:
             org = await self.org.rules(set(base.types))
         except DashboardUnavailable:
             return RequestRules(base, org_unavailable=True)
-        key = (self.compiled.ruleset.version, org.key, self.org.settings.version)
+        key = (self.compiled.ruleset.version, org.key, self.org.settings.key)
         if self._org_policy is None or self._org_policy[0] != key:
             self._org_policy = (key, base.with_custom_types(org.type_policies(self.org.settings.tag_action)))
         return RequestRules(self._org_policy[1], org)

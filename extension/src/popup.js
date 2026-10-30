@@ -3,14 +3,10 @@ void initAIControls();
 const statusEl = document.getElementById("status");
 const detailEl = document.getElementById("detail");
 const enabledEl = document.getElementById("enabled");
-
-const testModeEl = document.getElementById("testMode");
-chrome.storage.local.get({ enabled: true, testMode: false, linkedClient: null }).then(({ enabled, testMode, linkedClient }) => {
+chrome.storage.local.get({ enabled: true, linkedClient: null }).then(({ enabled, linkedClient }) => {
   enabledEl.checked = enabled || !!linkedClient?.managed;
-  testModeEl.checked = testMode;
 });
 enabledEl.addEventListener("change", () => chrome.storage.local.set({ enabled: enabledEl.checked }));
-testModeEl.addEventListener("change", () => chrome.storage.local.set({ testMode: testModeEl.checked }));
 document.getElementById("options").addEventListener("click", () => chrome.runtime.openOptionsPage());
 
 async function health() {
