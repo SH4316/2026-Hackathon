@@ -18,4 +18,7 @@ public record Event(
     String policyStateId,
     String policyStateName,
     List<Detection> detections,
-    long findingCount) {}
+    long findingCount,
+    String sendAction,
+    int fileCount,
+    int imageCount) {}

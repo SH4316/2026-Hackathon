@@ -105,7 +105,10 @@ class DashboardQueryServiceTest {
             "allowed",
             "Captured policy",
             List.of(),
-            0);
+            0,
+            "forced",
+            2,
+            1);
     var tag = new DetectionTag("tag", "Captured tag", "#123456");
     when(repository.event(9)).thenReturn(event);
     when(repository.detections(List.of(9L)))
@@ -117,6 +120,9 @@ class DashboardQueryServiceTest {
     assertThat(result.versionId()).isEqualTo("captured");
     assertThat(result.policyStateName()).isEqualTo("Captured policy");
     assertThat(result.findingCount()).isEqualTo(1);
+    assertThat(result.sendAction()).isEqualTo("forced");
+    assertThat(result.fileCount()).isEqualTo(2);
+    assertThat(result.imageCount()).isEqualTo(1);
     assertThat(result.detections()).containsExactly(new Detection(17, 0, 5, "hello", List.of(tag)));
     verifyNoInteractions(configs);
   }

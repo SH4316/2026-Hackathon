@@ -23,6 +23,7 @@ public record StoredDetectorEvent(
     String service,
     String model,
     String policyStateId,
+    String sendAction,
     Map<String, String> tagMap,
     List<FileName> files,
     List<ImageMetadata> images) {}

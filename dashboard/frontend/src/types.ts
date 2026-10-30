@@ -147,6 +147,9 @@ export interface SecurityEvent {
   policyStateName: string | null;
   detections: Detection[];
   findingCount: number;
+  sendAction: "normal" | "confirmed" | "forced" | null;
+  fileCount: number;
+  imageCount: number;
 }
 
 export type Event = SecurityEvent;
@@ -211,4 +214,16 @@ export interface ApiErrorResponse {
   code: string;
   message: string;
   fieldErrors?: Record<string, string>;
+}
+
+export interface DetectorImage {
+  id: number;
+  name: string;
+  media_type: string;
+  size_bytes: number;
+  download_path: string;
+}
+export interface DetectorAttachments {
+  files: { name: string }[];
+  images: DetectorImage[];
 }

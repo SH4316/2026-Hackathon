@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "./api";
+import { GuardBanner } from "./GuardBanner";
 import { EnabledSetting } from "./EnabledSetting";
 import { flattenTree, formatNumber } from "./format";
 import { useResource } from "./hooks";
@@ -260,6 +261,7 @@ export function JevSettings() {
 
   return (
     <>
+      <GuardBanner />
       <PageTitle
         title="Jev 설정"
         description="판단 프롬프트와 결과 태그를 연결하고, 태그별 점수 임계값을 설정하세요."

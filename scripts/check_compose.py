@@ -37,6 +37,8 @@ def main():
         "PG_MODEL_NAME": "host-must-not-leak",
         "SPRING_FLYWAY_LOCATIONS": "filesystem:/host-must-not-leak",
         "UNRELATED_SECRET": "synthetic-must-not-leak",
+        "GUARD_SERVER_URL": "http://host-must-not-leak:7777",
+        "GUARD_ADMIN_KEY": "synthetic-wrong-admin-key",
     })
     credentials = {"MYSQL_ROOT_PASSWORD": "synthetic-root-password",
                    "DB_PASSWORD": "synthetic-db-password",
@@ -67,6 +69,7 @@ def main():
         example = config(credentials, template=(root / ".env.example").read_text())
         gpu = config(credentials, gpu=True)
         gpu_custom = config({**credentials, "DECIDER_GPU_LAYERS": "8"}, gpu=True)
+        multiple_admin = config({**credentials, "PG_ADMIN_KEYS": "synthetic-first,synthetic-second"})
         without_admin = config({k: v for k, v in credentials.items() if k != "PG_ADMIN_KEYS"})
         for key in ("MYSQL_ROOT_PASSWORD", "PG_API_KEYS"):
             config({k: v for k, v in credentials.items() if k != key}, valid=False)
@@ -93,7 +96,10 @@ def main():
         require(pg_env["PG_MODEL_API"] == "decider" and pg_env["PG_MODEL_BASE_URL"] == "http://decider:8000"
                 and pg_env["PG_MODEL_NAME"] == "Mapika/decider-4b" and not pg_env["PG_MODEL_API_KEY"],
                 "Model must use internal Decider typed-decision API")
-        require(set(db_env) == {"DB_URL", "DB_USERNAME", "DB_PASSWORD", "SERVER_ADDRESS", "SERVER_PORT"}, "Unexpected dashboard environment")
+        require(set(db_env) == {"DB_URL", "DB_USERNAME", "DB_PASSWORD", "SERVER_ADDRESS", "SERVER_PORT", "GUARD_SERVER_URL", "GUARD_ADMIN_KEY"}, "Unexpected dashboard environment")
+        require(db_env["GUARD_SERVER_URL"] == "http://server:8000", "Guard URL must use internal service")
+        require(db_env["GUARD_ADMIN_KEY"] == pg_env["PG_ADMIN_KEYS"], "Guard must share generated admin keys")
+        require("server" not in dashboard["depends_on"], "Dashboard must connect lazily without a dependency cycle")
         require(set(mysql_env) == {"MYSQL_DATABASE", "MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_ROOT_PASSWORD", "TZ"}, "Unexpected MySQL environment")
         require(all(key.startswith("PG_") for key in pg_env), "Only PG_* settings belong in server")
         require(mysql_env["MYSQL_PASSWORD"] == db_env["DB_PASSWORD"] == credentials["DB_PASSWORD"], "DB credentials disagree")
@@ -159,6 +165,9 @@ def main():
             and custom["services"]["server"]["environment"]["PG_MODEL_TIMEOUT_S"] == "150"
             and custom["services"]["decider"]["environment"]["DECIDER_THREADS"] == "6"
             and custom["services"]["decider-pull"]["environment"]["DECIDER_OFFLINE"] == "true", "Model runtime settings must be configurable")
+    require(multiple_admin["services"]["dashboard"]["environment"]["GUARD_ADMIN_KEY"] == "synthetic-first,synthetic-second",
+            "Dashboard must receive all keys for backend first-key selection")
+    require(without_admin["services"]["dashboard"]["environment"]["GUARD_ADMIN_KEY"] == "", "Missing admin key must stay empty")
     require(without_admin["services"]["server"]["environment"]["PG_ADMIN_KEYS"] == "", "Admin key must remain optional")
     require(subprocess.run(["git", "check-ignore", "--quiet", ".env"], cwd=root,
                            env=environment, check=False).returncode == 0, "Root .env must be gitignored")

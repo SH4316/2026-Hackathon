@@ -196,7 +196,10 @@ public class DashboardQueryService {
                   event.policyStateId(),
                   event.policyStateName(),
                   spans,
-                  spans.size());
+                  spans.size(),
+                  event.sendAction(),
+                  event.fileCount(),
+                  event.imageCount());
             })
         .toList();
   }

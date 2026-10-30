@@ -170,6 +170,7 @@ class DetectorEventNormalizer {
   private String fingerprint(CanonicalEvent event, ObjectNode envelope) {
     // Use normalized event fields in the replay fingerprint, retaining the raw response itself.
     ObjectNode fingerprint = envelope.deepCopy();
+    if (fingerprint.path("send_action").isNull()) fingerprint.remove("send_action");
     fingerprint.put("service", event.service());
     fingerprint.put("model", event.model());
     fingerprint.put(

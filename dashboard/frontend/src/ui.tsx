@@ -483,6 +483,27 @@ export function Pagination({
     </div>
   );
 }
+export function SendActionBadge({
+  action,
+}: {
+  action: SecurityEvent["sendAction"];
+}) {
+  const title =
+    action === "forced"
+      ? "강행 전송"
+      : action === "confirmed"
+        ? "확인 후 전송"
+        : action === "normal"
+          ? "일반 전송"
+          : "전송 정보 없음";
+  return (
+    <span
+      className={`send-action-badge${action === "forced" ? " forced" : ""}`}
+    >
+      {title}
+    </span>
+  );
+}
 export function EventTable({
   events,
   search = "",
@@ -529,11 +550,19 @@ export function EventTable({
                     to={"/events/" + e.id + (search ? "?" + search : "")}
                     state={returnTo ? { returnTo } : undefined}
                   >
-                    {e.prompt}
+                    {e.prompt ||
+                      (e.fileCount || e.imageCount
+                        ? "첨부 파일 전송"
+                        : "원문 없음")}
                   </Link>
                   <span className="cell-secondary">
                     {formatDateTime(e.occurredAt)}
                   </span>
+                  <div className="event-attachment-badges">
+                    {e.sendAction && <SendActionBadge action={e.sendAction} />}
+                    {e.fileCount > 0 && <span>파일 {e.fileCount}개</span>}
+                    {e.imageCount > 0 && <span>이미지 {e.imageCount}개</span>}
+                  </div>
                 </td>
                 <td>
                   <PersonName
