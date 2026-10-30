@@ -57,6 +57,7 @@ try {
   await page.goto('https://chatgpt.com/'); await fill('오늘 회의 안건을 정리해 주세요.');
   await eventually(async()=>!(await page.locator('.chip-w').textContent()).includes('검사 확인 중'),'completed check');
   assert.equal(await lamp(),'yellow');
+  assert.equal(await page.locator('.badge .retention-summary').isVisible(), true);
   assert.match(await page.locator('.badge [data-field=model]').textContent(),/GPT-6.1 Sol/);
   assert.match(await page.locator('.badge [data-field=training]').textContent(),/OFF/);
   assert.match(await page.locator('.badge [data-field=plan]').textContent(),/Plus/);
@@ -70,6 +71,17 @@ try {
   await page.setViewportSize({width:1100,height:900});
   await page.press('#prompt','Enter'); await modal.waitFor();
   assert.equal(await modal.locator('.head').getAttribute('data-tone'),'yellow'); assert.equal(await sent(),0);
+  assert.equal(await modal.locator('.retention-notice').count(), 1);
+  assert.match(await modal.locator('.retention-notice').innerText(), /학습 OFF·임시 대화·대화 삭제/);
+  assert.match(await modal.locator('.retention-notice').innerText(), /보관 기간·삭제 조건은 확인되지/);
+  if (process.env.PG_CONTEXT_SHOTS === '1') {
+    for (const [theme,width] of [['light',1100],['dark',1100],['light',390]]) {
+      await page.emulateMedia({colorScheme:theme}); await page.setViewportSize({width,height:844});
+      assert.equal(await modal.locator('.card').evaluate(e=>e.scrollWidth<=e.clientWidth),true);
+      await page.screenshot({path:path.join(shots,`retention-${theme}-${width}.png`)});
+    }
+    await page.setViewportSize({width:1100,height:900});
+  }
   assert.equal(await modal.getByRole('button',{name:'확인 후 전송',exact:true}).isDisabled(),true);
   await modal.locator('.ack input').check(); await modal.getByRole('button',{name:'확인 후 전송',exact:true}).click();
   await eventually(async()=>await sent()===1,'confirmed send');
@@ -92,6 +104,7 @@ try {
   await page.fill('#prompt','');
   const file={name:'meeting.txt',mimeType:'text/plain',buffer:Buffer.from('회의 주제를 정리합니다.')};
   await page.setInputFiles('#file',file); await modal.waitFor();
+  assert.equal(await modal.locator('.retention-notice').count(),1);
   assert.equal(await modal.locator('.head').getAttribute('data-tone'),'yellow'); assert.match(await modal.locator('.title').textContent(),/이용 환경/); assert.equal(await uploads(),0);
   await page.evaluate(()=>document.querySelector('#model').textContent='GPT-6.1 Sol');
   await eventually(async()=>!(await modal.isVisible()),'file approval invalidation'); assert.equal(await uploads(),0);
