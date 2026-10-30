@@ -17,7 +17,7 @@ from app.detection.base import Candidate
 from app.detection.validators import luhn_ok, parse_ip, parse_network, rrn_date_ok
 from app.schemas import Confidence
 
-RULESET_VERSION = "rules-0.2.0"
+RULESET_VERSION = "rules-0.2.1"
 
 # 검증 함수: 매치 값 → (타입 재지정 또는 None, 신뢰도) 또는 None(버림)
 Validator = Callable[[str], "tuple[str | None, Confidence] | None"]
@@ -65,8 +65,9 @@ def _has_digits(value: str):
     return (None, Confidence.MEDIUM) if sum(ch.isdigit() for ch in value) >= 4 else None
 
 
-def _not_date8(value: str):
-    # 8자리는 YYYYMMDD 날짜와 겹치므로 유효한 날짜(1900~2099)면 제외
+def _id_digits(value: str):
+    """구분자 없는 긴 숫자 중 식별번호가 아닐 가능성이 큰 것을 뺀다."""
+    # 8자리 YYYYMMDD 날짜(1900~2099)
     if len(value) == 8:
         try:
             y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
@@ -75,6 +76,19 @@ def _not_date8(value: str):
                 return None
         except ValueError:
             pass
+    digits = [int(ch) for ch in value]
+    # 같은 숫자 반복(11111111), 1씩 오르내리는 연속 숫자(123456789, 987654321) — 예시·자리 채움 값
+    steps = {b - a for a, b in zip(digits, digits[1:])}
+    if steps <= {0} or steps == {1} or steps == {-1}:
+        return None
+    # 끝이 0000 인 어림수(100000000, 25000000) — 금액·수량
+    if value.endswith("0000"):
+        return None
+    # 유닉스 시각(초 10자리·밀리초 13자리). 주문번호 등과 겹치지 않도록 2014~2033년 범위만 본다.
+    n = int(value)
+    if (len(value) == 10 and 1_400_000_000 <= n < 2_000_000_000) or \
+       (len(value) == 13 and 1_400_000_000_000 <= n < 2_000_000_000_000):
+        return None
     return (None, Confidence.LOW)
 
 
@@ -131,8 +145,15 @@ RULES: list[Rule] = [
             r"\s{0,10}[:：#]\s{0,10}([A-Z0-9][A-Z0-9-]{4,19})(?![A-Za-z0-9])", re.IGNORECASE),
          Confidence.MEDIUM, group=1, validate=_has_digits, reason="식별번호 키워드 뒤 값"),
     # 앞뒤가 영숫자·밑줄이거나 소수점·URL 파라미터(=, &, ?) 위치면 제외(타임스탬프·URL 속 숫자 오탐 방지)
-    Rule("long_digit_id", "id_number", _r(r"(?<![\w.,/=&?#-])\d{8,16}(?![\w.,/-])"),
-         Confidence.LOW, validate=_not_date8, reason="구분자 없는 8~16자리 숫자(식별번호 후보, 날짜 제외)"),
+    # 통화 기호 뒤($ ₩ € £ ¥)와 단위 앞(공백 + 원·명·개·% 등)도 제외한다. 단위가 바로 붙은 경우(1500원)는
+    # 한글이 단어 문자라 뒤 경계에서 이미 제외된다.
+    Rule("long_digit_id", "id_number",
+         _r(r"(?<![\w.,/=&?#$₩€£¥-])\d{8,16}(?![\w.,/-])"
+            r"(?!\s(?:원|달러|엔|위안|유로|억|만|천|명|개|건|회|배|점|%|퍼센트|원정|km|kg|mb|gb|kb|ms|bytes?|"
+            r"won|usd|krw|eur|jpy|dollars?|people|users?|times|views|rows|records)(?![A-Za-z]))",
+            re.IGNORECASE),
+         Confidence.LOW, validate=_id_digits,
+         reason="구분자 없는 8~16자리 숫자(식별번호 후보: 날짜·금액·수량·시각·반복/연속 숫자 제외)"),
     # 주소: 미국식(번지 + 거리명 + USPS 접미사 [+ 호수] [+ 도시, 주 우편번호]),
     #       한국 도로명(시·군·구 + 도로명 + 건물번호)
     Rule("us_street_address", "street_address",
