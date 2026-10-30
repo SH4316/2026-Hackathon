@@ -31,6 +31,7 @@ public class GuardProxyService {
           "org/settings",
           "org/status",
           "org/refresh",
+          "org/regex/check",
           "runtime",
           "enrollments",
           "clients",
@@ -93,6 +94,10 @@ public class GuardProxyService {
     } catch (RestClientException | IllegalArgumentException exception) {
       throw unavailable();
     }
+  }
+
+  public boolean isServerConfigured() {
+    return !serverUrl.isEmpty();
   }
 
   private static ApiException unavailable() {

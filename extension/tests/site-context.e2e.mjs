@@ -10,6 +10,7 @@ import vendor from '../vendor/prompt-guard-rules/data/policy.js';
 const ext = path.resolve(import.meta.dirname, '..'), guard = createGuard();
 const requests = [], reports = [], etags = [];
 let fail = false, failReport = false, delay = 0, decision = null, revision = 1;
+let reportStatus = 'recorded', fileReport = { recorded: true, reason: null }, fileReportDelay = 0;
 const bundle = () => ({ ...vendor.ruleset, ruleset_version: revision,
   destinations: { openai: { consumer: { tier: 'elevated', basis: '합성 제공사 정책', verified_at: '2026-10-30' } } },
   org_rules: { version_id: 'synthetic-v1', revision, tag_action: 'mask', regex: [
@@ -31,13 +32,17 @@ const api = createServer(async (req, res) => {
     const input = JSON.parse(raw);
     if (req.url === '/v1/files/report') {
       reports.push(input);
+      if (fileReportDelay) await new Promise(r => setTimeout(r, fileReportDelay));
       if (failReport) { res.writeHead(503).end('{}'); return; }
-      res.writeHead(202).end(JSON.stringify({ recorded: true, reason: null })); return;
+      res.writeHead(202).end(JSON.stringify(fileReport)); return;
     }
     requests.push(input);
     if (delay && input.context.stage === 'submit') await new Promise(r => setTimeout(r, delay));
     if (fail && input.context.stage === 'submit') { res.writeHead(503).end('{}'); return; }
     const result = req.url.endsWith('sanitize') ? guard.sanitizeRequest(input) : guard.inspectRequest(input);
+    if (req.url.endsWith('inspect') && (input.context.stage === 'draft' || reportStatus !== undefined)) {
+      result.report_status = input.context.stage === 'draft' ? 'skipped' : reportStatus;
+    }
     if (decision) Object.assign(result, { decision, signal: { allow: 'green', warn: 'yellow', block: 'red' }[decision],
       findings: decision === 'block' ? [{ finding_id: 'f1', type: 'synthetic', action: 'block', span: { start: 0, end: 2, start_utf16: 0, end_utf16: 2 } }] : [] });
     res.end(JSON.stringify(result));
@@ -99,6 +104,24 @@ try {
   await modal.waitFor(); await confirm('그래도 전송'); await eventually(async () => await sent() === 5, 'widget force recorded');
   assert.equal(submitRequests().at(-1).context.send_action, 'forced');
   console.log('PASS managed normal, confirmed and forced paths');
+  // HTTP 200이어도 기록 실패·상태 누락이면 일반/확인/강행 모두 회색으로 보류한다.
+  for (const failedStatus of ['failed', undefined]) {
+    for (const action of ['normal', 'confirmed', 'forced']) {
+      decision = { normal: 'allow', confirmed: 'warn', forced: 'block' }[action];
+      reportStatus = 'recorded';
+      await fill(`합성 기록 ${failedStatus ?? '누락'} ${action}`, { normal: 'green', confirmed: 'yellow', forced: 'red' }[action]);
+      if (action !== 'normal') { await page.press('#prompt', 'Enter'); await modal.waitFor(); }
+      reportStatus = failedStatus;
+      if (action === 'normal') await page.press('#prompt', 'Enter');
+      else await confirm(action === 'confirmed' ? '확인 후 전송' : '그래도 전송');
+      await eventually(async () => await lamp() === 'gray', `${action} ${failedStatus ?? 'missing'} record holds gray`);
+      assert.equal(await sent(), 5);
+      await modal.waitFor();
+      assert.match(await modal.innerText(), /대시보드 기록을 확인하지 못해/);
+      await page.keyboard.press('Escape');
+    }
+  }
+  reportStatus = 'recorded'; decision = 'block';
   // 강행 기록 실패: 전송하지 않고 회색 보류.
   await fill('기록 실패 합성 문장', 'red'); await page.locator('.badge').getByRole('button', { name: '그래도 전송', exact: true }).click();
   await modal.waitFor(); fail = true; await confirm('그래도 전송');
@@ -133,10 +156,33 @@ try {
   assert.equal(reports.at(-1).files[0].name, large.name);
   decision = 'block'; await page.setInputFiles('#file', clean); await modal.waitFor(); await confirm('그래도 진행');
   await eventually(async () => await uploads() === 4, 'sensitive attachment forced'); assert.equal(reports.at(-1).send_action, 'forced'); decision = null;
-  failReport = true; await page.setInputFiles('#file', []); await page.setInputFiles('#file', clean);
-  await eventually(async () => await uploads() === 5, 'report failure does not block attachment');
-  await eventually(async () => /기록 실패/.test(await page.locator('.badge').innerText()), 'report failure notice'); failReport = false;
-  console.log('PASS attachment file/image reports and nonblocking failure');
+  for (const failure of ['http', 'dashboard_unavailable', 'missing']) {
+    failReport = failure === 'http';
+    fileReport = failure === 'missing' ? {} : { recorded: false, reason: 'dashboard_unavailable' };
+    before = reports.length; await page.setInputFiles('#file', []); await page.setInputFiles('#file', clean);
+    await eventually(() => reports.length > before, `attachment ${failure} report attempted`);
+    await eventually(async () => await page.locator('#file').evaluate(el => !el.files.length), `attachment ${failure} held`);
+    assert.equal(await uploads(), 4);
+    assert.match(await page.locator('.badge').innerText(), /기록 실패.*첨부.*보류/);
+  }
+  failReport = false; fileReport = { recorded: false, reason: 'dashboard_unavailable' };
+  // 확인·강행 첨부도 기록 실패를 우회할 수 없다.
+  for (const sensitive of [false, true]) {
+    decision = sensitive ? 'block' : null;
+    before = reports.length; await page.setInputFiles('#file', sensitive ? clean : image); await modal.waitFor();
+    if (sensitive) await confirm('그래도 진행');
+    else await modal.getByRole('button', { name: '그래도 진행', exact: true }).click();
+    await eventually(() => reports.length > before, 'approved attachment record attempted');
+    await eventually(async () => await page.locator('#file').evaluate(el => !el.files.length), 'approved attachment held');
+    assert.equal(await uploads(), 4);
+    assert.equal(reports.at(-1).send_action, sensitive ? 'forced' : 'confirmed');
+  }
+  decision = null; fileReport = { recorded: true, reason: null }; fileReportDelay = 400;
+  before = reports.length; await page.setInputFiles('#file', clean);
+  await eventually(() => reports.length > before, 'file report started');
+  assert.equal(await uploads(), 4, 'attachment waits for recording acknowledgement');
+  await eventually(async () => await uploads() === 5, 'recorded attachment resumes'); fileReportDelay = 0;
+  console.log('PASS attachment records wait for acknowledgement and failures hold normal/confirmed/forced uploads');
   // 5분 알람은 ETag로 재검사하고, 수정된 번들은 content에 전달된다.
   await sw.evaluate(async () => {
     const alarm = await chrome.alarms.get('rules-bundle-refresh'); if (alarm.periodInMinutes !== 5) throw Error('alarm period');

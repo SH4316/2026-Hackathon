@@ -149,6 +149,7 @@ class InspectResponse(BaseModel):
     destination: DestinationOut
     detector_versions: dict[str, str]
     notices: list[str] = []
+    report_status: Literal["recorded", "failed", "skipped"] = "skipped"
 
 
 class Change(BaseModel):

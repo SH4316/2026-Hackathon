@@ -14,6 +14,7 @@ import {
   getDefaultDateRange,
   formatDateTime,
   formatNumber,
+  KNOWN_SERVICES,
   SERVICE_LABELS,
   flattenTree,
 } from "./format";
@@ -315,7 +316,7 @@ export function ServiceLabel({
     SERVICE_LABELS[service] || (service === "unspecified" ? "미지정" : service);
   return (
     <span className="service-cell">
-      <span className="service-monogram" aria-hidden="true">
+      <span className={"service-monogram service-" + service} aria-hidden="true">
         {name[0]}
       </span>
       <span>
@@ -912,9 +913,9 @@ export function SearchFilters({
             defaultValue={state.params.get("service") || ""}
           />
           <datalist id="services">
-            <option value="chatgpt" />
-            <option value="claude" />
-            <option value="gemini" />
+            {KNOWN_SERVICES.map(({ id, label }) => (
+              <option key={id} value={id} label={label} />
+            ))}
           </datalist>
         </label>
         {!hidePerson && (

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 
 from app.api.deps import get_pipeline, require_api_key, require_report_client
 from app.clients.store import Client
@@ -20,14 +20,12 @@ def _check_size(req: InspectRequest, request: Request) -> None:
 
 
 @router.post("/v1/inspect", response_model=InspectResponse)
-async def inspect(req: InspectRequest, request: Request, background: BackgroundTasks,
+async def inspect(req: InspectRequest, request: Request,
                   client: Client | None = Depends(require_api_key),
                   pipeline: Pipeline = Depends(get_pipeline)) -> InspectResponse:
     _check_size(req, request)
-    # 대시보드 기록은 응답을 보낸 뒤 보낸다(검사 지연·실패에 영향 없음).
     return await pipeline.inspect(req, client_id=client.client_id if client else None,
-                                  person_id=client.person_id if client else None,
-                                  schedule=background.add_task)
+                                  person_id=client.person_id if client else None)
 
 
 @router.post("/v1/sanitize", response_model=SanitizeResponse)

@@ -26,6 +26,46 @@ def chat(text="합성 입력", **extra):
     return {"model": "synthetic-model", "messages": [{"role": "user", "content": text}], **extra}
 
 
+@pytest.mark.parametrize("signal", ["green", "yellow", "red"])
+@pytest.mark.parametrize("path", [CHAT, RESPONSES, MESSAGES])
+def test_failed_dashboard_record_blocks_before_upstream(proxy, signal, path):
+    def inspector(handler, request):
+        reply(handler, verdict(signal, report_status="failed"))
+
+    with proxy(inspector=inspector) as (url, guard, upstream):
+        payload = {"input": "합성 입력"} if path == RESPONSES else chat()
+        response = httpx.post(url + path, json=payload)
+        assert response.status_code == 502
+        assert response.json()["error"]["message"] == "대시보드 기록에 실패해 전송을 차단했습니다."
+        assert len(guard.requests) == 1 and not upstream.requests
+
+
+@pytest.mark.parametrize("failed_at", ["sanitize", "reinspect"])
+def test_record_failure_during_sanitization_is_502(proxy, failed_at):
+    def inspector(handler, request):
+        if request["path"] == "/v1/sanitize":
+            result = verdict("green", sanitized_text="[SECRET_1]",
+                report_status="failed" if failed_at == "sanitize" else "skipped")
+        elif request["json"]["input_version"] == 2:
+            result = verdict("green", report_status="failed")
+        else:
+            result = verdict("red", report_status="recorded")
+        reply(handler, result)
+
+    with proxy(inspector=inspector) as (url, guard, upstream):
+        response = httpx.post(url + CHAT, json=chat())
+        assert response.status_code == 502 and not upstream.requests
+        assert response.json()["error"]["code"] == "report_failed"
+        assert len(guard.requests) == (2 if failed_at == "sanitize" else 3)
+
+
+@pytest.mark.parametrize("report_status", ["recorded", "skipped"])
+def test_successful_or_skipped_dashboard_report_preserves_forwarding(proxy, report_status):
+    with proxy(inspector=lambda handler, request: reply(handler, verdict(report_status=report_status))) as (url, guard, upstream):
+        assert httpx.post(url + CHAT, json=chat()).status_code == 200
+        assert len(upstream.requests) == 1
+
+
 @pytest.mark.parametrize("path,body,expected", [
     (CHAT, {"messages": [{"role": "system", "content": "지시"},
                          {"role": "user", "content": [{"type": "text", "text": "질문"},
@@ -382,4 +422,16 @@ def test_sanitize_server_failure_is_502_without_forwarding(proxy):
     with proxy(inspector=inspect) as (url, guard, upstream):
         assert httpx.post(url + CHAT, json=chat()).status_code == 502
         assert len(guard.requests) == 2
+        assert not upstream.requests
+
+
+def test_missing_report_status_blocks_before_upstream(proxy):
+    def inspector(handler, request):
+        result = verdict()
+        del result["report_status"]
+        reply(handler, result)
+
+    with proxy(inspector=inspector) as (url, guard, upstream):
+        response = httpx.post(url + CHAT, json=chat())
+        assert response.status_code == 502
         assert not upstream.requests

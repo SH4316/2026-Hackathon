@@ -227,6 +227,7 @@
         result?.ai_assessment?.decision !== "allow" && result?.ai_assessment
           ? "AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다." : "",
         result?.notices?.includes("server_unavailable_local_check") ? "서버 연결 실패 · 기기 내 AI와 캐시된 규칙으로 검사했습니다." : "",
+        result?.notices?.includes("report_failed") ? PG.errorLabel("report_failed") : "",
       ].filter(Boolean).join(" "),
       // 정제 오버레이가 입력창에 표시된 동안 위젯 미리보기는 중복하지 않는다.
       preview: prep && text !== prep.sanitized ? previewOf(prep, text) : null,

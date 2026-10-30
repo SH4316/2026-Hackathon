@@ -12,6 +12,42 @@ const run = (overrides = {}) => runInspection({ kind: "inspect", request,
   settings: { serverEnabled: true, localAiEnabled: true },
   server: async () => ({ ok: true, data: base }), ai: async () => prediction(), guard, ...overrides });
 
+test("managed submissions hold gray on failed or missing records in every inspection mode", async () => {
+  for (const localAiEnabled of [false, true]) {
+    for (const send_action of ["normal", "confirmed", "forced"]) {
+      for (const report_status of ["failed", undefined, null, "invalid"]) {
+        const r = await run({ settings: { serverEnabled: true, localAiEnabled, orgManaged: true },
+          request: { ...request, context: { stage: "submit", send_action } },
+          server: async () => ({ ok: true, data: { ...base, report_status } }) });
+        assert.equal(r.data.status, "incomplete");
+        assert.equal(r.data.signal, "gray");
+        assert.equal(r.data.decision, "warn");
+        assert.ok(r.data.notices.includes("report_failed"));
+      }
+    }
+  }
+});
+test("managed recorded/skipped submissions, drafts and sanitize keep their inspection result", async () => {
+  for (const report_status of ["recorded", "skipped"]) {
+    const r = await run({ settings: { serverEnabled: true, localAiEnabled: true, orgManaged: true },
+      server: async () => ({ ok: true, data: { ...base, report_status } }) });
+    assert.equal(r.data.status, "complete");
+    assert.equal(r.data.decision, "allow");
+  }
+  const draft = await run({ settings: { serverEnabled: true, localAiEnabled: false, orgManaged: true },
+    request: { ...request, context: { stage: "draft" } } });
+  assert.equal(draft.data.status, "complete");
+  const sanitized = await run({ kind: "sanitize", settings: { serverEnabled: true, localAiEnabled: false, orgManaged: true } });
+  assert.equal(sanitized.data.status, "complete");
+});
+test("managed linked clients still require server records when server switch is disabled", async () => {
+  const r = await run({ settings: { serverEnabled: false, localAiEnabled: true, linkedClient: { managed: true } },
+    server: async () => ({ ok: true, data: { ...base, report_status: "failed", decision: "block" } }) });
+  assert.equal(r.data.signal, "gray");
+  assert.equal(r.data.decision, "block");
+  assert.ok(r.data.notices.includes("report_failed"));
+});
+
 test("offline AI inspection never calls the server, preserves request IDs", async () => {
   const r = await run({ settings: { serverEnabled: false, localAiEnabled: true }, server: () => assert.fail("network call") });
   assert.equal(r.data.decision, "allow");
@@ -123,10 +159,10 @@ test("org-managed: server failure never falls back to the local check", async ()
 });
 test("org-managed: server (dashboard rules) and local AI are combined, stricter wins", async () => {
   const settings = { serverEnabled: true, localAiEnabled: true, orgManaged: true };
-  const strictAI = await run({ settings, ai: async () => prediction("block") });
+  const strictAI = await run({ settings, server: async () => ({ ok: true, data: { ...base, report_status: "recorded" } }), ai: async () => prediction("block") });
   assert.equal(strictAI.data.decision, "block");
   assert.equal(strictAI.data.inspection_source, "server_and_local_ai");
-  const strictServer = await run({ settings, server: async () => ({ ok: true, data: { ...base, decision: "warn" } }) });
+  const strictServer = await run({ settings, server: async () => ({ ok: true, data: { ...base, report_status: "recorded", decision: "warn" } }) });
   assert.equal(strictServer.data.decision, "warn");
 });
 

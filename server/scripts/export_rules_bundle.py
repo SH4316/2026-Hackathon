@@ -154,6 +154,8 @@ CASES: list[tuple[str, str, str | None]] = [
 def _strip(resp: dict) -> dict:
     resp.pop("request_id", None)
     resp.pop("input_version", None)
+    # 대시보드 기록 상태는 서버 전용이며 순수 JS 규칙 엔진의 비교 대상이 아니다.
+    resp.pop("report_status", None)
     return resp
 
 

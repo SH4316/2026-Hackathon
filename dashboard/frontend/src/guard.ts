@@ -20,6 +20,12 @@ export interface GuardModules {
   custom_rules: boolean;
   context_model: boolean;
 }
+export interface GuardOrgStatus {
+  managed: boolean;
+  version_id?: string | null;
+  revision?: number | null;
+  skipped_regex?: Record<string, string>;
+}
 export interface GuardType {
   id: string;
   label: string;
@@ -145,6 +151,8 @@ export const guardApi = {
     guardRequest<GuardRuleset>("ruleset", { signal }),
   org: (signal?: AbortSignal) =>
     guardRequest<GuardOrg>("org/settings", { signal }),
+  orgStatus: (signal?: AbortSignal) =>
+    guardRequest<GuardOrgStatus>("org/status", { signal }),
   clients: (signal?: AbortSignal) =>
     guardRequest<{ clients: GuardClient[] }>("clients", { signal }),
 };

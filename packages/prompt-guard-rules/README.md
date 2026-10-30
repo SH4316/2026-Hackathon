@@ -16,7 +16,7 @@ r.findings[0].type;  // "aws_access_key_id"
 guard.sanitize("담당자 kim@example.com").sanitized_text; // "담당자 [EMAIL_1]"
 ```
 
-응답은 서버의 `/v1/inspect`, `/v1/sanitize` 와 **같은 구조**입니다(`request_id`, `input_version` 제외).
+응답은 서버의 `/v1/inspect`, `/v1/sanitize`와 같은 판정 구조입니다(`request_id`, `input_version`, 서버 조직 기록용 `report_status` 제외).
 서버 요청 형식을 그대로 쓰려면 `guard.inspectRequest(req)`, `guard.sanitizeRequest(req)` 를 씁니다.
 
 ## API
@@ -34,7 +34,7 @@ guard.sanitize("담당자 kim@example.com").sanitized_text; // "담당자 [EMAIL
 
 ### 대시보드에서 바꾼 규칙 받기
 
-서버 `/v1/rules/bundle` 은 대시보드에서 추가한 사용자 규칙(키워드·정규식)과 유형 정책을 버전(ETag)과 함께 배포합니다.
+서버 `/v1/rules/bundle`은 배포 가능한 사용자 규칙과 Jev 유형 정책, 조직 `org_rules`의 활성 태그 정규식, 안내용 `destinations`를 ETag와 함께 배포합니다. 조직 버전·revision 변경도 ETag에 반영됩니다. 정규식 상한은 4,000자이며 내용 기준 판정에 목적지 등급을 사용하지 않습니다.
 
 ```js
 import { createGuard, fetchRuleBundle } from "@prompt-guard/rules";
@@ -45,7 +45,7 @@ if (r.status === "updated") state = { etag: r.etag, guard: createGuard({ ruleset
 state.guard.skippedRules; // JS 에서 컴파일하지 못한 규칙(정상이면 빈 배열)
 ```
 
-문맥 탐지기(로컬 모델)는 서버에서만 동작합니다. `distribute: false` 규칙은 묶음에 없으므로 서버에서만 탐지됩니다.
+Jev(로컬 모델)는 서버에서만 동작하며 내부 API 이름 `context_detectors`는 유지합니다. 기준·예문·프롬프트는 배포하지 않습니다. `distribute: false` 규칙은 묶음에 없으므로 서버에서만 탐지됩니다.
 자세한 내용: `server/docs/detection-modules.md`
 
 ## 서버와 같은 판정 유지
@@ -71,6 +71,6 @@ cd ../packages/prompt-guard-rules && npm test
 
 - **보안 경계가 아닙니다.** 브라우저·사용자 PC 에서 도는 코드는 우회할 수 있습니다. 최종 판정은 조직 검사 서버가 하고,
   이 라이브러리는 오프라인 사전 확인, 입력 중 빠른 피드백, CLI·다른 Node 서비스 연동에 씁니다.
-- 로컬 모델 문맥 탐지는 포함하지 않습니다. 정책이 `model_required: true` 이면 항상 `status: "incomplete"`(회색)입니다.
+- Jev 실행은 포함하지 않습니다. 정책이 `model_required: true` 이면 항상 `status: "incomplete"`(회색)입니다.
 - 감사 이벤트 기록은 하지 않습니다.
 - 공개 npm 레지스트리에 배포하지 않도록 `"private": true` 입니다. 팀 내부 레지스트리를 쓰기로 하면 해제합니다.

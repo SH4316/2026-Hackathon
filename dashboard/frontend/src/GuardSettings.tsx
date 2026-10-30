@@ -4,6 +4,7 @@ import { api } from "./api";
 import { EnabledSetting as UsageSetting } from "./EnabledSetting";
 import { formatDateTime } from "./format";
 import { ModelWarning } from "./GuardBanner";
+import { SkippedRegexWarning } from "./SkippedRegex";
 import {
   codePoints,
   guardApi,
@@ -242,6 +243,9 @@ export function GuardSettings() {
             className="guard-settings"
             aria-busy={busy}
           >
+            {tab === "status" && (
+              <SkippedRegexWarning refreshKey={resource.updatedAt} />
+            )}
             {tab === "status" && (
               <StatusTab
                 key={`${resource.data!.runtime.model_mode}-${rules.data.version}`}

@@ -117,6 +117,7 @@ beforeEach(() => {
       if (conflict && method === "PUT") return json({ detail: "stale" }, 412);
       if (method === "GET") {
         if (path === "runtime") return json(runtime);
+        if (path === "org/status") return json({ managed: true, version_id: "v1", skipped_regex: {} });
         if (path === "ruleset") return json(rules, 200, { ETag: '"7"' });
         if (path === "org/settings")
           return json({

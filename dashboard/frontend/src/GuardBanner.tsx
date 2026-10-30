@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { guardApi, type GuardRuntime } from "./guard";
 import { useResource } from "./hooks";
 import { ErrorState } from "./ui";
+import { SkippedRegexWarning } from "./SkippedRegex";
 
 export function ModelWarning({ runtime }: { runtime: GuardRuntime }) {
   const message =
@@ -20,11 +21,16 @@ export function ModelWarning({ runtime }: { runtime: GuardRuntime }) {
 }
 export function GuardBanner() {
   const resource = useResource((signal) => guardApi.runtime(signal), []);
-  return resource.error ? (
-    <div className="guard-banner">
-      <ErrorState message={resource.error} retry={resource.refresh} />
-    </div>
-  ) : resource.data ? (
-    <ModelWarning runtime={resource.data.data} />
-  ) : null;
+  return (
+    <>
+      <SkippedRegexWarning refreshKey={resource.updatedAt} />
+      {resource.error ? (
+        <div className="guard-banner">
+          <ErrorState message={resource.error} retry={resource.refresh} />
+        </div>
+      ) : resource.data ? (
+        <ModelWarning runtime={resource.data.data} />
+      ) : null}
+    </>
+  );
 }

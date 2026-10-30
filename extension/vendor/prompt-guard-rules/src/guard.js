@@ -30,7 +30,7 @@ export function createGuard({ policy = defaultBundle, ruleset, today = () => new
     }));
   }
 
-  function analyze(text, tier) {
+  function analyze(text) {
     const notices = [];
     let status = "complete";
     if (pol.modelRequired) {
@@ -38,7 +38,7 @@ export function createGuard({ policy = defaultBundle, ruleset, today = () => new
       notices.push("model_check_required_but_disabled");
     }
     const merged = merge(candidates(text), (c) => pol.priority(c));
-    let decision = decide(merged.map((m) => pol.actionFor(m.primary.type, tier)), tier.minDecision);
+    let decision = decide(merged.map((m) => pol.actionFor(m.primary.type)));
     if (status !== "complete") {
       if (decision === "allow") decision = "warn"; // 검사 미완료면 allow 로 내보내지 않는다
       return { status, decision, signal: "gray", merged, notices };
@@ -46,11 +46,11 @@ export function createGuard({ policy = defaultBundle, ruleset, today = () => new
     return { status, decision, signal: SIGNAL[decision], merged, notices };
   }
 
-  function toFindings(merged, tier) {
+  function toFindings(merged) {
     return merged.map((m, i) => {
       const c = m.primary;
       const tp = pol.forType(c.type);
-      const action = pol.actionFor(c.type, tier);
+      const action = pol.actionFor(c.type);
       return {
         finding_id: `f${i + 1}`,
         type: c.type,
@@ -78,12 +78,12 @@ export function createGuard({ policy = defaultBundle, ruleset, today = () => new
   /** 서버 /v1/inspect 응답과 같은 구조(request_id, input_version 제외) */
   function inspect(text, { destination } = {}) {
     const [dest, destNotices] = resolve(destination);
-    const a = analyze(text, dest.tier);
+    const a = analyze(text);
     return {
       status: a.status,
       decision: a.decision,
       signal: a.signal,
-      findings: toFindings(a.merged, dest.tier),
+      findings: toFindings(a.merged),
       policy_version: pol.version,
       destination: destOut(dest),
       detector_versions: { ...detectorVersions },
@@ -94,15 +94,15 @@ export function createGuard({ policy = defaultBundle, ruleset, today = () => new
   /** 서버 /v1/sanitize 응답과 같은 구조. 직접 검사 → mask/warn 구간 치환 → 재검사 */
   function sanitize(text, { destination } = {}) {
     const [dest, destNotices] = resolve(destination);
-    const first = analyze(text, dest.tier);
+    const first = analyze(text);
     const targets = first.merged
-      .filter((m) => ["mask", "warn"].includes(pol.actionFor(m.primary.type, dest.tier)))
+      .filter((m) => ["mask", "warn"].includes(pol.actionFor(m.primary.type)))
       .map((m) => ({ start: m.primary.start, end: m.primary.end, type: m.primary.type,
                      tokenPrefix: pol.forType(m.primary.type).token }));
     const tokens = assignTokens(text, targets);
     const sanitized = applyTokens(text, tokens);
 
-    const second = analyze(sanitized, dest.tier);
+    const second = analyze(sanitized);
     const status = [first.status, second.status].reduce((a, b) =>
       STATUS_ORDER.indexOf(b) > STATUS_ORDER.indexOf(a) ? b : a);
     let { decision, signal } = second;
@@ -122,7 +122,7 @@ export function createGuard({ policy = defaultBundle, ruleset, today = () => new
       decision,
       signal,
       changes: [...changes.values()],
-      remaining_findings: toFindings(second.merged, dest.tier),
+      remaining_findings: toFindings(second.merged),
       policy_version: pol.version,
       destination: destOut(dest),
       detector_versions: { ...detectorVersions },

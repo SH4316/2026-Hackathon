@@ -167,6 +167,10 @@ class ProxyApp:
                 result = _json(b"".join(chunks))
                 if not isinstance(result, dict):
                     raise ValueError()
+                # 기록 결과가 없으면 기록됐다고 볼 수 없다. sanitize 응답에는 이 필드가 없다.
+                status = result.get("report_status")
+                if status == "failed" or (endpoint == "inspect" and status not in ("recorded", "skipped")):
+                    raise ProxyError(502, "report_failed", "대시보드 기록에 실패해 전송을 차단했습니다.")
                 return result
         except (httpx.HTTPError, ValueError, RecursionError):
             raise ProxyError(502, "inspection_unavailable", "검사 서버 응답을 확인할 수 없어 전송을 차단했습니다.") from None

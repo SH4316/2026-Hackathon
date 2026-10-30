@@ -6,17 +6,17 @@ Prompt Guard 검사 서버(`server/`)와 JS 라이브러리(`packages/prompt-gua
 ## 1. 판정 흐름
 
 ```text
-입력 → [내장 규칙] + [사용자 규칙] + [문맥 탐지기(로컬 모델)] → 겹치는 구간 병합 → 유형별 정책(조치) → 전송 대상 등급으로 강화 → 판정
+입력 → [내장 규칙] + [사용자 규칙] + [Jev(로컬 모델)] + [조직 태그 정규식·Jev] → 겹치는 구간 병합 → 유형별 정책(조치) → 내용 기준 판정
 ```
 
 | 조치(action) | 의미 | 원문 판정 |
 |---|---|---|
-| `block` | 치환해도 전송 불가(핵심 의미 자체가 기밀) | 차단(빨강) |
-| `mask` | 원문 전송 불가, 토큰으로 치환 후 재검사 통과 시 전송 가능 | 차단(빨강) + 치환 제안 |
+| `block` | 자동 치환하지 않음. 검사 완료 후 사용자 확인으로 강행 전송 가능 | 차단(빨강) |
+| `mask` | 토큰으로 치환 후 재검사하거나, 확인 후 원문 강행 전송 가능 | 차단(빨강) + 치환 제안 |
 | `warn` | 사용자 확인 필요(치환 대상에도 포함) | 확인(노랑) |
 | `allow` | 탐지 사실만 알림, 치환하지 않음 | 통과(초록) |
 
-- **전송 대상 등급**은 조치를 강화만 합니다. 강화(`elevated`, 목적지 미상의 기본값)는 `warn → mask`, 제한(`restricted`)은 `allow → warn`, `warn → mask` 이고 탐지가 없어도 최소 `warn` 입니다. 자세한 근거는 `server/policies/destinations.yaml`.
+- **판정은 내용 기준**입니다. `mask`·`block` 대상이 하나라도 있으면 빨강, 그 외 `warn`이면 노랑, 모두 `allow`이면 초록입니다. 검사 미완료·오류는 회색입니다. **전송 대상 등급**(`standard`·`elevated`·`restricted`), 모델별 학습·opt-in 상태는 판정에 영향을 주지 않으며 접속·모델 변경 시 안내 모달로만 알립니다. 등급 근거는 `server/policies/destinations.yaml`.
 - 탐지 **신뢰도**(high·medium·low)는 형식 일치의 확실성이고, **위험도**(severity)와 **조치**는 정책이 정합니다. 서로 다른 값입니다.
 - 형식이 맞아도 실존·유효·소유를 보장하지 않습니다(카드번호 Luhn 통과, JWT 형식 등).
 
@@ -106,7 +106,7 @@ Prompt Guard 검사 서버(`server/`)와 JS 라이브러리(`packages/prompt-gua
 | `severity` | | critical·high·medium·low·info, 기본 high | |
 | `action` | | block·mask·warn·allow, 기본 mask | |
 | `keywords` | keywords 일 때 | 1~200개, 각 1~100자 | 대소문자 무시(기본). **영문·숫자로 시작/끝나는 키워드는 영단어 경계 적용**("Confidential" 은 "confidentially" 를 잡지 않음), 한글로 끝나면 조사가 붙어도 탐지("블루문은") |
-| `pattern` | regex 일 때 | 300자 이하 | 아래 제한 참고. 일치한 전체 구간이 탐지 구간 |
+| `pattern` | regex 일 때 | 4,000자 이하 | 아래 제한 참고. 일치한 전체 구간이 탐지 구간 |
 | `case_sensitive` | | 기본 false | |
 | `reason` | | 100자 이하 | 경고 화면에 표시 |
 | `enabled` | | 기본 true | |
@@ -118,14 +118,18 @@ Prompt Guard 검사 서버(`server/`)와 JS 라이브러리(`packages/prompt-gua
 - 중첩 수량자 검사는 보수적이라 `(?:[a-z]+\.)+corp` 같은 안전한 패턴도 거부합니다 → `[a-z.]+\.corp` 처럼 바꿔 씁니다.
 - 저장 전 `POST /v1/admin/custom-rules/test` 로 샘플 텍스트에 시험할 수 있습니다.
 
+위 항목은 대시보드 **검사 서버 관리 > 사용자 규칙**에서 편집합니다. 메트릭 설정의 조직 태그 `pythonRegex`는 별도 Python `re` 규칙이며 같은 4,000자 상한을 적용합니다. 검사 서버가 설정된 대시보드는 변경된 비어 있지 않은 패턴을 저장 전에 `POST /v1/admin/org/regex/check`로 검증합니다. `too_long`·`nested_quantifier`·`syntax_error`·`matches_empty`는 저장을 거부하며, 기존에 실행에서 건너뛴 규칙은 태그 이름·사유와 함께 화면에 표시합니다.
+
 ```json
 { "id": "project_codename", "kind": "keywords", "label": "프로젝트 코드명", "severity": "high",
   "action": "mask", "token": "PROJECT", "keywords": ["블루문", "Blue Moon"], "distribute": false }
 ```
 
-## 5. 문맥 탐지기 (로컬 모델, `PUT /v1/admin/context-detectors/{id}`)
+## 5. Jev (로컬 모델, `PUT /v1/admin/context-detectors/{id}`)
 
 정규식으로 판단할 수 없는 기준(예: 미공개 연구 결과, 학생 이름 vs 인용 저자)을 설명과 예문으로 정의합니다. 공통 필드(`id`·`label`·`token`·`category`·`severity`·`action`·`enabled`)에 더해:
+
+사용자 표시 이름은 Jev이며 내부 API 필드 `context_detectors`와 경로는 호환을 위해 유지합니다. 이 기준 목록은 조직 트리의 독립 Jev 프롬프트와 별개입니다.
 
 | 필드 | 형식 | 설명 |
 |---|---|---|
@@ -134,11 +138,13 @@ Prompt Guard 검사 서버(`server/`)와 JS 라이브러리(`packages/prompt-gua
 | `counter_examples` | 0~20개 | 탐지하면 안 되는 문장 |
 
 기본 5종: `unpublished_research`(block), `internal_project`(mask), `trade_secret`(block), `sensitive_personal`(mask), `third_party_record`(block) — `server/policies/detectors.yaml`.
-모델은 후보만 제안하고(원문에 실제로 있는 구간만 채택), 규칙 탐지를 취소할 수 없습니다. 모델 실패 시 판정은 회색(전송 보류)입니다.
+Decider는 입력 전체를 분류하며 기본 기준은 참일 확률 0.5 이상입니다. `ollama`·`openai`는 원문에 실제로 있는 후보 구간만 채택합니다. 모델은 규칙 탐지를 취소할 수 없으며 실패 시 회색(전송 보류)입니다. 엔드포인트(`PG_MODEL_BASE_URL` 또는 `PG_MODEL_NAME`) 미설정은 시작 시 경고 후 모델 기능을 비활성화하고 `model_endpoint_unset`을 알리며, 그 사유만으로 회색이 되지 않습니다.
 
 ## 6. 정확도 평가
 
-Kaggle "The Learning Agency Lab – PII Data Detection" 학습 데이터(6,807개 문서)로 측정했습니다. 방법·실행법은 `server/eval/README.md`.
+아래 수치는 **rules-0.2.0 측정값**이며, 현재 **rules-0.2.1로 재측정하지 않았습니다**. Kaggle "The Learning Agency Lab – PII Data Detection" 학습 데이터(6,807개 문서)는 저장소와 이 머신에 없어 현재 재측정할 수 없습니다. 방법·실행법과 기존 결과는 [server/eval/README.md](../server/eval/README.md)에 있습니다.
+
+측정은 문서 번호 `% 10 < 7`인 dev(4,744개)와 나머지 holdout(2,063개), 전체를 나눠 수행했습니다. `allow`가 아닌 예측을 대상으로 정답 구간과 겹치는 예측이 있으면 TP, 없으면 FN으로 셉니다. 표의 TP·FN은 EMAIL·PHONE_NUM·ID_NUM·STREET_ADDRESS에 한정합니다. FP는 어떤 정답 구간과도 겹치지 않는 모든 개인정보 예측을 세며, 개인정보가 아닌 기밀 표식(`confidential_marker`)은 제외합니다. 문서 오경고율은 개인정보가 전혀 없는 문서 중 경고한 비율입니다. 현재 규칙의 성능 보장이나 새 측정치로 해석하지 않습니다.
 
 | 형식 기반 유형(EMAIL·PHONE·ID_NUM·ADDRESS) | dev(조정용) | holdout | 전체 |
 |---|---|---|---|
@@ -148,7 +154,7 @@ Kaggle "The Learning Agency Lab – PII Data Detection" 학습 데이터(6,807�
 
 - 이메일·전화·주소는 전체 데이터에서 재현율 100%, 식별번호 90%(70/78).
 - holdout 은 5% 목표에 못 미칩니다. 남은 누락은 강의 케이스 번호(`UVA-IV-8322`), `ROLL VZ:775Y…`, `Sub Code : 06EYD876` 등 개별 표기라 일반 규칙으로 만들면 이 데이터에만 맞춰지므로 넣지 않았습니다.
-- 학생 이름(1,365건)·개인 URL(110건)·아이디(6건)는 형식만으로 구별되지 않아 **문맥 탐지기(로컬 모델) 대상**입니다. 규칙은 확실한 일부(프로필 URL)만 잡습니다(개인 URL 8/110).
+- 학생 이름(1,365건)·개인 URL(110건)·아이디(6건)는 형식만으로 구별되지 않아 **Jev(로컬 모델) 평가 대상**입니다. 위 규칙 평가에서는 확실한 일부(프로필 URL)만 잡았습니다(개인 URL 8/110). Jev 정확도 측정값은 아닙니다.
 
 ## 7. 규칙을 바꿀 때
 

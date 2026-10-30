@@ -139,8 +139,8 @@ SELECT CONCAT('demo-',DATE_FORMAT(s.local_date,'%Y%m%d'),'-',LPAD(s.n,2,'0')) ev
  IF(MOD(s.serial,3)=0,'demo-v2','demo-v1') config_id,
  CONCAT('데모 전용 가상 자료 · ',x.text_value,' 검토 요청. 가명 김하늘에게 전달하고 김하늘의 확인을 받으세요. 모든 값은 합성 예시입니다.') prompt_value,
  TIMESTAMP(s.local_date,MAKETIME(7+MOD(s.serial*5,16),MOD(s.serial*13,60),0))-INTERVAL 9 HOUR occurred,
- ELT(1+MOD(s.serial,4),'chatgpt','claude','gemini','internal-ai') service_value,
- ELT(1+MOD(s.serial,4),'demo-gpt','demo-sonnet','demo-flash','demo-local') model_value,
+ ELT(1+MOD(s.serial,12),'openai','anthropic','google','microsoft','deepseek','moonshot','mistral','perplexity','xai','alibaba','meta','internal-ai') service_value,
+ ELT(1+MOD(s.serial,12),'demo-gpt','demo-sonnet','demo-flash','demo-copilot','demo-deepseek','demo-kimi','demo-mistral','demo-sonar','demo-grok','demo-qwen','demo-llama','demo-local') model_value,
  ELT(1+MOD(s.serial,4),'training-disabled','training-allowed','unconfirmed',NULL) policy_id,
  MOD(s.serial,6)<>0 has_detection,MOD(s.serial,4)=0 repeated_name,x.tag_id,x.parent_id,x.text_value
 FROM samples s JOIN _demo_samples x ON x.sample_no=MOD(s.serial,32);

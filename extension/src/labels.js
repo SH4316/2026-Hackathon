@@ -80,6 +80,7 @@ PG.NOTICE_LABELS = {
   model_check_failed: "문맥 검사(로컬 모델)를 완료하지 못했습니다.",
   model_check_required_but_disabled: "정책상 필요한 문맥 검사(로컬 모델)가 꺼져 있습니다.",
   org_config_unavailable: "조직 대시보드 규칙을 받을 수 없어 검사를 끝내지 못했습니다.",
+  report_failed: "대시보드 기록을 확인하지 못해 전송을 보류했습니다. 다시 시도해 주세요.",
   org_jev_failed: "조직 Jev 판정(로컬 모델)을 완료하지 못했습니다.",
   org_jev_model_disabled: "조직 Jev 판정에 필요한 로컬 모델이 꺼져 있습니다.",
   org_jev_unlocated: "조직 Jev 판정에서 위치를 특정하지 못한 항목이 있습니다. 전체 내용을 확인하세요.",

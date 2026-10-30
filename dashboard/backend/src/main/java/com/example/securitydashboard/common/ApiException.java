@@ -20,8 +20,12 @@ public class ApiException extends RuntimeException {
   }
 
   public static ApiException invalid(String field, String message) {
+    return invalid(Map.of(field, message));
+  }
+
+  public static ApiException invalid(Map<String, String> fields) {
     return new ApiException(
-        HttpStatus.BAD_REQUEST, "INVALID_INPUT", "입력값을 확인해 주세요.", Map.of(field, message));
+        HttpStatus.BAD_REQUEST, "INVALID_INPUT", "입력값을 확인해 주세요.", Map.copyOf(fields));
   }
 
   public HttpStatus status() {

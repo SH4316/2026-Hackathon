@@ -217,9 +217,13 @@ PG.files = (() => {
     return report(files, "normal");
   }
 
-  // 보고용 원본은 메시지와 메모리에서만 사용한다. 보고 실패로 첨부를 취소하지 않는다.
+  // 보고용 원본은 메시지와 메모리에서만 사용한다. 관리 상태는 기록을 확인한 뒤 첨부한다.
   async function report(files, sendAction) {
     if (!settings.orgManaged && !settings.linkedClient?.managed) return true;
+    const failed = () => {
+      PG.hooks.notice("기록 실패 · 첨부 파일 정보를 기록하지 못해 첨부를 보류했습니다.", "warn");
+      return false;
+    };
     try {
       for (let start = 0; start < files.length; start += 100) {
         const batch = files.slice(start, start + 100), images = [];
@@ -235,9 +239,10 @@ PG.files = (() => {
         }
         const res = await chrome.runtime.sendMessage({ type: "files:report", inputVersion: `file:${batch[0].name}`,
           destination: PG.resolveDestination(), sendAction, files: batch.map(f => ({ name: f.name })), images });
-        if (!res?.ok || !res.data?.recorded) PG.hooks.notice("기록 실패 · 첨부 파일 정보를 기록하지 못했습니다. 첨부는 진행합니다.", "warn");
+        const skipped = res?.data?.recorded === false && ["report_off", "not_managed"].includes(res.data.reason);
+        if (!res?.ok || (res.data?.recorded !== true && !skipped)) return failed();
       }
-    } catch { PG.hooks.notice("기록 실패 · 첨부 파일 정보를 기록하지 못했습니다. 첨부는 진행합니다.", "warn"); }
+    } catch { return failed(); }
     return true;
   }
 

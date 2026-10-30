@@ -61,7 +61,7 @@ def reply(handler, body, status=200, headers=None):
 def verdict(signal="green", **extra):
     return {"status": "incomplete" if signal == "gray" else "complete", "signal": signal,
             "decision": {"green": "allow", "yellow": "warn", "red": "block", "gray": "warn"}[signal],
-            "findings": [], "remaining_findings": [], "notices": [], **extra}
+            "findings": [], "remaining_findings": [], "notices": [], "report_status": "skipped", **extra}
 
 
 @contextmanager

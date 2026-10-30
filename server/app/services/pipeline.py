@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 
@@ -53,9 +53,6 @@ class RequestRules:
     policy: Policy
     org: OrgRules | None = None
     org_unavailable: bool = False
-
-
-Schedule = Callable[[Callable[[], Awaitable[None]]], None]
 
 
 def utf16_index(text: str, idx: int) -> int:
@@ -247,9 +244,9 @@ class Pipeline:
         policy = policy or self.policy
         return [self.to_finding(text, i, m.primary, policy) for i, m in enumerate(merged, start=1)]
 
-    async def inspect(self, req: InspectRequest, client_id: str | None = None, person_id: str | None = None,
-                      schedule: Schedule | None = None) -> InspectResponse:
-        """person_id·schedule 이 있으면(대시보드 사람과 연결된 개인 토큰) 전송 시점 검사를 대시보드에 기록한다."""
+    async def inspect(self, req: InspectRequest, client_id: str | None = None,
+                      person_id: str | None = None) -> InspectResponse:
+        """대시보드 사람과 연결된 개인 토큰의 전송 시점 검사는 기록 결과까지 기다린다."""
         t0 = time.perf_counter()
         r = await self.request_rules()
         dest, dest_notices = self.resolve_destination(req)
@@ -262,13 +259,14 @@ class Pipeline:
             detector_versions=self.detector_versions(r), notices=dest_notices + a.notices,
         )
         self._record("inspect", req, a, dest, masked=0, t0=t0, client_id=client_id, policy=r.policy)
-        if (schedule and person_id and self.org is not None and req.context.stage != "draft"
+        if (person_id and self.org is not None and req.context.stage != "draft"
                 and self.org.settings.report_text != "off"):
-            schedule(self._report_job(req, resp, a, r.policy, person_id))
+            recorded = await self._report(req, resp, a, r.policy, person_id)
+            resp.report_status = "recorded" if recorded else "failed"
         return resp
 
-    def _report_job(self, req: InspectRequest, resp: InspectResponse, a: Analysis,
-                    policy: Policy, person_id: str) -> Callable[[], Awaitable[None]]:
+    async def _report(self, req: InspectRequest, resp: InspectResponse, a: Analysis,
+                      policy: Policy, person_id: str) -> bool:
         org = self.org
         assert org is not None
         response = resp.model_dump(mode="json")
@@ -281,9 +279,7 @@ class Pipeline:
                 send_action=req.context.send_action,
                 files=[f.model_dump() for f in req.context.files])
 
-        async def job() -> None:
-            await org.report(build, set(self.policy.types))
-        return job
+        return await org.report(build, set(self.policy.types))
 
     async def sanitize(self, req: InspectRequest, client_id: str | None = None) -> SanitizeResponse:
         """클라이언트가 보낸 구간을 믿지 않고 서버가 직접 검사 → 치환 → 재검사한다."""

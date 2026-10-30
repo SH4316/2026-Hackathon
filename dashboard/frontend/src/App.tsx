@@ -268,6 +268,7 @@ function Overview() {
             <Panel title="서비스별 탐지량" description="AI 서비스별 감지 영역">
               <ServiceChart
                 metrics={r.data}
+                serviceFilter={state.filters.service}
                 href={(service) => link({ service })}
               />
             </Panel>

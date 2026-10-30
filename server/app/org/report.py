@@ -62,8 +62,9 @@ def build_event(*, rules: OrgRules, settings: OrgSettings, person_id: str, text:
     present = {f["type"] for f in findings}
     tag_map = {t: tag for t, tag in settings.tag_map.items() if t in present and tag in rules.tag_names}
     tag_map.update({t: tag for tag, t in rules.type_of.items() if t != tag and t in present})
+    result = {k: v for k, v in response.items() if k != "report_status"}
     payload = {"source_id": settings.source_id, "person_id": person_id, "version_id": rules.version_id,
-               "text": out_text, "result": {**response, "findings": findings},
+               "text": out_text, "result": {**result, "findings": findings},
                "send_action": send_action, "files": files or [], "images": images or []}
     state = settings.policy_state_map.get(response["decision"])
     if state in rules.policy_state_ids:
