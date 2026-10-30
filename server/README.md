@@ -96,7 +96,7 @@ python -m prompt_guard inspect                                  # 대화형 입�
 
 내장 규칙 외에 대시보드에서 **사용자 규칙(키워드·정규식)**과 **문맥 탐지기(정규식으로 판단할 수 없는 기준을 로컬 모델로 판단)**를
 추가·조합하고, 바뀐 규칙은 `/v1/rules/bundle` 로 각 클라이언트에 배포합니다. 관리 API, 프롬프트 설정, 모델 env 는
-[docs/detection-modules.md](docs/detection-modules.md) 를 보세요.
+[docs/detection-modules.md](docs/detection-modules.md) 를 보세요. 전체 탐지 룰 형식은 [../docs/rule-formats.md](../docs/rule-formats.md), 정확도 평가는 [eval/README.md](eval/README.md).
 
 ## 전송 목적지 등급
 

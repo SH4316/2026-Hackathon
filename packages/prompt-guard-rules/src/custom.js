@@ -5,12 +5,23 @@ import { pyRegExp } from "./pyre.js";
 // u 모드에서 이스케이프가 허용되는 구문 문자만 이스케이프한다(Python re.escape 와 같은 리터럴 의미).
 const escapeLiteral = (s) => s.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&");
 const cpLength = (s) => [...s].length;
+const ASCII_WORD = /^[A-Za-z0-9]$/;
+
+// 영문·숫자로 시작/끝나는 키워드는 영단어 경계를 둔다("Confidential" 이 "confidentially" 를 잡지 않게).
+// 한글로 끝나는 키워드는 조사가 붙어도 잡도록 경계를 두지 않는다("블루문은"). (custom.py keyword_pattern)
+function keywordPattern(word) {
+  const chars = [...word];
+  let p = escapeLiteral(word);
+  if (ASCII_WORD.test(chars[0])) p = "(?<![A-Za-z0-9])" + p;
+  if (ASCII_WORD.test(chars[chars.length - 1])) p += "(?![A-Za-z0-9])";
+  return p;
+}
 
 export function compileCustomRule(rule) {
   if (rule.kind === "keywords") {
     // 긴 키워드 우선(Python sorted(key=len, reverse=True) 와 같은 안정 정렬)
     const words = [...rule.keywords].sort((a, b) => cpLength(b) - cpLength(a));
-    return new RegExp(words.map(escapeLiteral).join("|"), "gdu" + (rule.case_sensitive ? "" : "i"));
+    return new RegExp(words.map(keywordPattern).join("|"), "gdu" + (rule.case_sensitive ? "" : "i"));
   }
   return pyRegExp(rule.pattern, { ignoreCase: !rule.case_sensitive });
 }
