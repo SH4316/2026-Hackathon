@@ -105,6 +105,8 @@ describe("configuration version lifecycle", () => {
           description: "",
           examples: ["김가상"],
           guidance: "이름을 찾습니다.",
+          jevPrompt: "  이름이 포함되었는지 판단하세요.\n예시 😀: 김가상\n  ",
+          pythonRegex: String.raw`(?im)^\b(?P<label>internal|confidential)\b[ \t]*$`,
           order: 0,
         },
       ],
@@ -142,6 +144,58 @@ describe("configuration version lifecycle", () => {
       Accept: "application/json",
       "Content-Type": "application/json",
     });
+  });
+
+  it("reads each tag's verbatim Jev prompt and Python regex from version and active classifier configuration", async () => {
+    const config = {
+      id: "published_1",
+      name: "Jev 설정",
+      status: "PUBLISHED",
+      isActive: true,
+      revision: 2,
+      createdAt: "2026-10-29T15:00:00Z",
+      publishedAt: "2026-10-29T16:00:00Z",
+      tags: [
+        {
+          id: "parent",
+          name: "고객 정보",
+          description: "",
+          examples: [],
+          guidance: "분류에 참고할 맥락",
+          jevPrompt: "  판단 기준 😀\n두 번째 줄\n  ",
+          pythonRegex: String.raw`(?imx)^\b(?P<label>internal|confidential)\b[ \t]*$` + "\n# 합성 😀\n  ",
+          color: "#123456",
+          parentId: null,
+          order: 0,
+        },
+        {
+          id: "child",
+          name: "고객 이름",
+          description: "",
+          examples: [],
+          guidance: "",
+          jevPrompt: "",
+          pythonRegex: "",
+          color: "#123456",
+          parentId: "parent",
+          order: 0,
+        },
+      ],
+      policyStates: [],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(new Response(JSON.stringify(config))),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await api.version("published_1")).toEqual(config);
+    expect(await api.classifierConfig()).toEqual(config);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/v1/config-versions/published_1",
+      "/api/v1/classifier-config",
+    ]);
   });
 
   it("accepts empty 204 delete responses without attempting JSON parsing", async () => {

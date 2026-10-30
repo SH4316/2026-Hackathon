@@ -45,7 +45,9 @@ class ConfigurationController {
   @Tag(name = "설정 버전")
   @Operation(
       summary = "초안 저장",
-      description = "revision이 최신 값과 다르면 409 REVISION_CONFLICT입니다. 게시 버전은 수정할 수 없습니다.")
+      description =
+          "revision이 최신 값과 다르면 409 REVISION_CONFLICT입니다. 게시 버전은 수정할 수 없습니다."
+              + " 태그별 jevPrompt와 pythonRegex는 부모와 독립적이며 생략하거나 null이면 빈 문자열로 저장합니다.")
   @PutMapping("/config-versions/{id}")
   ApiModels.ConfigVersion updateVersion(
       @PathVariable String id, @Valid @RequestBody ApiModels.UpdateVersion input) {
@@ -76,7 +78,9 @@ class ConfigurationController {
   @Tag(name = "분류 연동")
   @Operation(
       summary = "활성 분류 설정",
-      description = "트리, 예시, 가이드, 정책 정의를 반환합니다. 최초 실행에는 404 NO_ACTIVE_VERSION입니다.")
+      description =
+          "트리, 예시, 가이드, 태그별 Jev 판단 프롬프트·Python 정규식과 정책 정의를 반환합니다."
+              + " 프롬프트와 정규식은 저장·조회만 하며 실행하지 않습니다. 최초 실행에는 404 NO_ACTIVE_VERSION입니다.")
   @GetMapping("/classifier-config")
   ApiModels.ConfigVersion classifier() {
     return configs.classifier();

@@ -65,7 +65,7 @@ docker compose -f compose-dev.yml up --build --force-recreate -d --wait backend
 docker compose -f compose-dev.yml logs --tail=100 backend
 ```
 
-로그에서 `Successfully validated 3 migrations`와 V2·V3 적용 또는 현재 스키마 버전 `3`을 확인합니다. V3는 탐지 결과 메타데이터·파일 이름·이미지 원본 바이트를 보관하는 테이블을 추가하고 기존 데이터를 보존합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
+로그에서 `Successfully validated 5 migrations`와 V2·V3·V4·V5 적용 또는 현재 스키마 버전 `5`를 확인합니다. V3는 탐지 결과 메타데이터·파일 이름·이미지 원본 바이트를 보관하는 테이블을 추가하고 기존 데이터를 보존합니다. V4는 태그별 Jev 판단 프롬프트, V5는 Python 정규식 저장 필드를 추가하며 기존 태그의 값은 각각 빈 문자열입니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
 
 SQL은 게시 버전 `demo-v1`, `demo-v2`, 14개 원본 분류와 개인정보 하위 태그, 사용자 정의 정책 3종, 이름에 `데모`가 붙은 가상 사람 6명, 서울 기준 최근 완료된 30일의 이벤트를 만듭니다. V2는 같은 태그 ID를 기술정보·업무정보 묶음으로 재구성합니다. 각 분류의 하위 예시와 판단 지침을 포함하며 초안으로 복제한 뒤 모두 편집할 수 있습니다. 프롬프트는 합성 자료로 표시되고 이름·전화번호·이메일도 가상 값입니다. 시간대·날짜별 이벤트 수, 서비스, 정책, 감지 0건, 여러 태그를 가진 동일 구간과 같은 텍스트의 서로 다른 구간을 포함합니다.
 
@@ -124,7 +124,13 @@ java -jar build/libs/ai-security-dashboard.jar
 
 ## 데이터와 조회 기준
 
-설정은 버전별 태그 트리와 정책 목록입니다. 태그에는 ID·이름·설명·예시·판단 지침·색·부모·순서가 있습니다. 초안만 편집·삭제할 수 있고 `revision`으로 동시 수정을 확인합니다. 게시는 내용을 고정하며 게시 버전 하나만 활성화할 수 있습니다. 태그와 정책의 ID는 복제한 버전에도 유지됩니다. 이름으로 코드나 의미를 추론하지 않습니다.
+설정은 버전별 태그 트리와 정책 목록입니다. 태그에는 ID·이름·설명·예시·판단 참고사항·Jev 판단 프롬프트·Python 정규식·색·부모·순서가 있습니다. 초안만 편집·삭제할 수 있고 `revision`으로 동시 수정을 확인합니다. 게시는 내용을 고정하며 게시 버전 하나만 활성화할 수 있습니다. 태그와 정책의 ID는 복제한 버전에도 유지됩니다. 이름으로 코드나 의미를 추론하지 않습니다.
+
+`/settings/metrics`에서 태그별 **Jev 판단 프롬프트**를 편집하면 API의 `tags[].jevPrompt`로 저장합니다. 최대 12,000 Unicode 코드 포인트이며 이모지 하나는 한 글자로 셉니다. 줄바꿈과 앞뒤 공백을 그대로 보존합니다. 새 태그와 기존 태그의 초기값은 빈 문자열이고, 상위 태그의 프롬프트를 자동으로 상속하지 않습니다. `guidance`에 해당하는 판단 참고사항은 별도 맥락 필드입니다. 복제 시 프롬프트를 함께 복사하고 게시 후에는 내용을 고정합니다.
+
+같은 화면의 **Python 정규식**은 태그별 `pythonRegex`로 저장하며 최대 4,000 Unicode 코드 포인트입니다. Python `re` 문법의 역슬래시·인라인 플래그·이름 있는 그룹·줄바꿈을 그대로 보존합니다. 예를 들어 `(?i)\b(?P<label>internal|confidential)\b`를 입력할 수 있습니다. JSON에서는 역슬래시를 `\\`로 인코딩합니다. 비워 두면 빈 문자열이며 상위 태그에서 자동으로 상속하지 않습니다. Jev 프롬프트와 독립적으로 편집·복제·게시합니다. 대시보드는 패턴을 실행하거나 Java·JavaScript 문법으로 검사하지 않고, Python 구문 검증과 실행은 연결된 탐지기에서 수행합니다.
+
+연결하는 쪽은 게시·활성화된 설정을 `GET /api/v1/classifier-config`로 읽어 각 태그의 `jevPrompt`와 `pythonRegex`를 사용합니다. 초안 저장만으로 활성 설정은 바뀌지 않습니다. 대시보드는 설정을 저장·제공하며 외부 Jev·탐지기 실행 요청, 배포, 자동 재로딩은 수행하지 않습니다. 일반 DB를 처음 만들 때 태그나 프롬프트·정규식 예시를 자동 생성하지 않습니다.
 
 이벤트는 원문 프롬프트와 감지 구간을 저장합니다. 구간은 Unicode 코드 포인트의 `[start,end)`이며 JavaScript 문자열 인덱스와 이모지에서 차이가 날 수 있습니다. 같은 범위의 입력은 태그 합집합을 가진 감지 한 건으로 합칩니다. 서로 다른 겹치는 범위는 별개입니다. 감지 없는 이벤트도 유효합니다. 등록된 사람과 현재 활성 버전이 필요합니다. `(sourceId,eventId)`가 같은 동일 요청은 `200`, 새 이벤트는 `201`, 다른 내용의 재사용은 `409`입니다. 같은 요청 재전송은 나중에 활성 버전이 바뀌어도 기존 이벤트를 반환합니다.
 
@@ -143,7 +149,7 @@ java -jar build/libs/ai-security-dashboard.jar
 | API 경로 (`/api/v1`) | 역할 |
 | --- | --- |
 | `/config-versions`·`/{id}`·`/{id}/publish`·`/{id}/activate` | 초안 생성·편집·게시·활성화 |
-| `/classifier-config` | 예시·지침을 포함한 활성 설정, 없으면 `404 NO_ACTIVE_VERSION` |
+| `/classifier-config` | 예시·참고사항·태그별 `jevPrompt`·`pythonRegex`를 포함한 활성 설정, 없으면 `404 NO_ACTIVE_VERSION` |
 | `/people`·`/{id}` | 사람 등록과 필터별 통계 |
 | `/events`·`/{id}` | 이벤트 등록·페이지·원문 상세 |
 | `/detector-events`·`/{id}`·`/{id}/images/{imageId}` | 탐지기 결과 수집·원본 결과 상세·이미지 바이트 다운로드 |
@@ -173,7 +179,7 @@ draft=$(curl --fail-with-body -sS "$api/config-versions" \
 version_id=$(jq -r '.id' <<<"$draft")
 updated=$(curl --fail-with-body -sS -X PUT "$api/config-versions/$version_id" \
   -H 'Content-Type: application/json' \
-  --data '{"revision":0,"name":"탐지기 연결 예제","tags":[{"id":"email","name":"이메일","description":"합성 예제 이메일","examples":["hong@example.com"],"guidance":"이메일 구간","color":"#2563EB","parentId":null,"order":0}],"policyStates":[{"id":"blocked","name":"차단 판정","description":"검사 서버의 차단 판정을 수집한 예제","color":"#DC2626","order":0}]}')
+  --data '{"revision":0,"name":"탐지기 연결 예제","tags":[{"id":"email","name":"이메일","description":"합성 예제 이메일","examples":["hong@example.com"],"guidance":"이메일 구간","jevPrompt":"원문에 이메일 주소가 포함되어 있는지 판단하세요.\n예시: hong@example.com","pythonRegex":"(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b","color":"#2563EB","parentId":null,"order":0}],"policyStates":[{"id":"blocked","name":"차단 판정","description":"검사 서버의 차단 판정을 수집한 예제","color":"#DC2626","order":0}]}')
 jq '{revision}' <<<"$updated" > /tmp/dashboard-detector-publish.json
 curl --fail-with-body -sS -X POST "$api/config-versions/$version_id/publish" \
   -H 'Content-Type: application/json' --data-binary @/tmp/dashboard-detector-publish.json
@@ -223,7 +229,7 @@ TEST_DB_URL='jdbc:mysql://127.0.0.1:3306/sending_test?connectionTimeZone=UTC&for
   TEST_DB_USERNAME=sending_test TEST_DB_PASSWORD=sending-test-local ./gradlew test
 ```
 
-`TEST_MIGRATION_DB_URL`은 비워도 되며, 지정하면 해당 폐기 가능한 `_test` DB를 초기화해 V1→V2의 일회성 초기화, V2→V3의 기존 데이터 보존과 새 일반 DB의 빈 상태를 검증합니다. HTTP 검증도 별도 테스트 DB를 연결한 JAR를 포트 `8083` 등으로 실행한 뒤 진행합니다. 다음 스크립트는 게시 버전·사람·이벤트를 생성하고 스냅샷의 불변성, 버전 재해석, 동시 재전송, 이모지 구간, 오류 응답을 확인합니다. `smoke_detector_api.py`는 합성 사람·설정·이벤트를 생성하고 새 설정을 게시·활성화하므로 시연 DB와 분리한 테스트 서버에서 실행합니다.
+`TEST_MIGRATION_DB_URL`은 비워도 되며, 지정하면 해당 폐기 가능한 `_test` DB를 초기화해 V1→V2의 일회성 초기화, V2→V3→V4→V5의 기존 데이터 보존과 새 일반 DB의 빈 상태를 검증합니다. HTTP 검증도 별도 테스트 DB를 연결한 JAR를 포트 `8083` 등으로 실행한 뒤 진행합니다. 다음 스크립트는 게시 버전·사람·이벤트를 생성하고 스냅샷의 불변성, 버전 재해석, 동시 재전송, 이모지 구간, 오류 응답을 확인합니다. `smoke_detector_api.py`는 합성 사람·설정·이벤트를 생성하고 새 설정을 게시·활성화하므로 시연 DB와 분리한 테스트 서버에서 실행합니다.
 
 ```bash
 python3 scripts/smoke_api.py --base-url http://127.0.0.1:8083 --report /tmp/api-smoke.json
@@ -240,6 +246,12 @@ npm install --prefix /tmp/dashboard-browser-tools playwright
 PLAYWRIGHT_MODULE=/tmp/dashboard-browser-tools/node_modules/playwright/index.mjs \
   DASHBOARD_URL=http://127.0.0.1:8083 BROWSER_REPORT=/tmp/browser-smoke.json \
   node scripts/smoke_browser.mjs
+```
+
+태그별 Jev·Python 정규식 전용 검증은 다음 스크립트를 사용합니다. 명시한 로컬 테스트 서버에 합성 설정을 생성·게시·활성화하고 복제본을 편집합니다. 두 필드의 원문 보존·독립성·읽기 전용 게시 상태를 확인하고, 다섯 화면 너비의 가로 넘침과 데스크톱·모바일 캡처를 기록합니다. 결과는 `validation/jev-browser.json`, 캡처는 `.impeccable/review/jev-*.png`입니다.
+
+```bash
+DASHBOARD_URL=http://127.0.0.1:8084 node scripts/smoke_jev_prompt.mjs
 ```
 
 자동 접근성·가로 넘침 검증은 `scripts/smoke_accessibility.mjs`로 실행할 수 있습니다. 별도 임시 경로에 `@axe-core/playwright`를 설치하고 `AXE_MODULE`을 해당 `dist/index.mjs` 경로로 지정합니다. 이 결과는 자동 검사 범위이며 수동 WCAG 전체 검증을 대신하지 않습니다.

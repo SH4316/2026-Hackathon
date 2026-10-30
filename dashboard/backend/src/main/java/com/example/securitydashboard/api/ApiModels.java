@@ -22,6 +22,8 @@ public final class ApiModels {
       String description,
       List<String> examples,
       String guidance,
+      String jevPrompt,
+      String pythonRegex,
       String color,
       String parentId,
       Integer order) {}

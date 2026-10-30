@@ -169,6 +169,8 @@ public class ConfigurationService {
                 rs.getString("description"),
                 readExamples(rs.getString("examples")),
                 rs.getString("guidance"),
+                rs.getString("jev_prompt"),
+                rs.getString("python_regex"),
                 rs.getString("color"),
                 rs.getString("parent_id"),
                 rs.getInt("sort_order")),
@@ -209,9 +211,9 @@ public class ConfigurationService {
     JdbcRows.insert(
         jdbc,
         "INSERT INTO"
-            + " config_version_tags(version_id,id,name,description,examples,guidance,color,parent_id,sort_order)"
+            + " config_version_tags(version_id,id,name,description,examples,guidance,jev_prompt,python_regex,color,parent_id,sort_order)"
             + " VALUES ",
-        9,
+        11,
         tags.stream()
             .map(
                 t ->
@@ -222,6 +224,8 @@ public class ConfigurationService {
                       t.description(),
                       encode(t.examples()),
                       t.guidance(),
+                      t.jevPrompt(),
+                      t.pythonRegex(),
                       t.color(),
                       t.parentId(),
                       t.order()
@@ -272,6 +276,8 @@ public class ConfigurationService {
               InputValidation.text(t.description(), 4000, "description"),
               List.copyOf(examples),
               InputValidation.text(t.guidance(), 4000, "guidance"),
+              InputValidation.text(t.jevPrompt(), 12000, "tags.jevPrompt"),
+              InputValidation.text(t.pythonRegex(), 4000, "tags.pythonRegex"),
               color(t.color()),
               t.parentId(),
               t.order() == null ? 0 : t.order());

@@ -33,6 +33,7 @@ class OpenApiConfiguration {
   OpenApiCustomizer examples() {
     return api -> {
       detectorSchemas(api);
+      configurationSchemas(api);
       var errorSchema =
           new ObjectSchema()
               .addProperty("code", new StringSchema().example("INVALID_INPUT"))
@@ -246,6 +247,10 @@ class OpenApiConfiguration {
                               List.of("김예시"),
                               "guidance",
                               "맥락과 범위를 함께 확인하세요.",
+                              "jevPrompt",
+                              "입력에 개인을 식별할 수 있는 정보가 포함되어 있는지 판단하세요.\n맥락을 함께 확인하세요.",
+                              "pythonRegex",
+                              "(?i)(?P<email>[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,})",
                               "color",
                               "#315EA8",
                               "order",
@@ -264,6 +269,33 @@ class OpenApiConfiguration {
                               "order",
                               0)))));
     };
+  }
+
+  private static void configurationSchemas(OpenAPI api) {
+    api.getComponents()
+        .getSchemas()
+        .get("Tag")
+        .addProperty(
+            "jevPrompt",
+            nullableString()
+                .maxLength(12000)
+                ._default("")
+                .description(
+                    "태그별 Jev 판단 프롬프트. 최대 12000 Unicode code point이며 공백과 줄바꿈을 그대로 보존합니다."
+                        + " 입력에서 생략하거나 null이면 빈 문자열로 저장하고 응답은 항상 문자열입니다."
+                        + " guidance와 별개이며 부모 프롬프트를 상속하지 않습니다. 저장·조회만 하며 Jev를 실행하지 않습니다."));
+    api.getComponents()
+        .getSchemas()
+        .get("Tag")
+        .addProperty(
+            "pythonRegex",
+            nullableString()
+                .maxLength(4000)
+                ._default("")
+                .description(
+                    "태그별 Python 정규식. 최대 4000 Unicode code point이며 공백·줄바꿈·백슬래시·인라인 플래그를 그대로 보존합니다."
+                        + " 입력에서 생략하거나 null이면 빈 문자열로 저장하고 응답은 항상 문자열입니다. 부모 패턴을 상속하지 않습니다. 대시보드에서는"
+                        + " 문법 검사나 실행을 하지 않으며 Python 문법의 유효성은 탐지기가 판단합니다."));
   }
 
   private static void detectorSchemas(OpenAPI api) {

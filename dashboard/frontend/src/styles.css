@@ -2680,6 +2680,38 @@ dd {
   grid-template-columns: minmax(0, 1fr) 145px;
   gap: 20px;
 }
+.jev-prompt-field {
+  padding-block: 19px;
+  border-block: 1px solid #e4e9f0;
+}
+.jev-prompt-hint,
+.jev-prompt-footer,
+.tag-rule-hint,
+.tag-rule-footer {
+  color: #5e6c82;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.jev-prompt-footer,
+.tag-rule-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+#jev-prompt-count,
+#python-regex-count {
+  font-variant-numeric: tabular-nums;
+}
+.python-regex-field {
+  padding-bottom: 19px;
+  border-bottom: 1px solid #e4e9f0;
+}
+.python-regex-field textarea {
+  font-family:
+    ui-monospace, SFMono-Regular, Consolas, "Noto Sans KR Variable", monospace;
+}
 textarea {
   font: inherit;
   width: 100%;

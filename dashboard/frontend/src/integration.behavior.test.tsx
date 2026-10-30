@@ -35,6 +35,8 @@ const draft = (id: string, name = id): ConfigVersion => ({
       description: "",
       examples: ["첫 예시", "둘째 예시"],
       guidance: "",
+      jevPrompt: "",
+      pythonRegex: "",
       color: "#123456",
       parentId: null,
       order: 0,
@@ -272,6 +274,198 @@ describe("configuration editing", () => {
       screen.getByRole<HTMLButtonElement>("button", { name: "초안 저장" })
         .disabled,
     ).toBe(true);
+  });
+
+  it("edits and saves the Jev judgment prompt verbatim without changing guidance", async () => {
+    const config = draft("draft_jev");
+    config.tags[0].guidance = "분류 참고 맥락";
+    config.tags[0].pythonRegex = String.raw`(?i)\bconfidential\b`;
+    vi.spyOn(api, "versions").mockResolvedValue([config]);
+    vi.spyOn(api, "version").mockResolvedValue(config);
+    const save = vi
+      .spyOn(api, "saveVersion")
+      .mockImplementation(async (_id, input) => ({
+        ...config,
+        ...input,
+        revision: 2,
+      }));
+    render(
+      <MemoryRouter initialEntries={["/settings/metrics?versionId=draft_jev"]}>
+        <WorkspaceProvider>
+          <MetricSettings />
+        </WorkspaceProvider>
+      </MemoryRouter>,
+    );
+    const prompt = await screen.findByRole<HTMLTextAreaElement>("textbox", {
+      name: "Jev 판단 프롬프트",
+    });
+    expect(prompt.value).toBe("");
+    const edited = "  고객 정보 포함 여부를 판단하세요.\n예시 😀: 김가상\n  ";
+    fireEvent.change(prompt, { target: { value: edited } });
+    fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0][0]).toBe("draft_jev");
+    expect(save.mock.calls[0][1].tags[0]).toMatchObject({
+      jevPrompt: edited,
+      guidance: "분류 참고 맥락",
+      pythonRegex: String.raw`(?i)\bconfidential\b`,
+    });
+    expect(config.tags[0].jevPrompt).toBe("");
+    await waitFor(() =>
+      expect(
+        screen.getByRole<HTMLButtonElement>("button", { name: "초안 저장" })
+          .disabled,
+      ).toBe(true),
+    );
+    expect(prompt.value).toBe(edited);
+  });
+
+  it("saves Python regex source with inline flags, named groups, backslashes and newlines without changing the Jev prompt", async () => {
+    const config = draft("draft_regex");
+    config.tags[0].jevPrompt = "별도로 유지할 Jev 판단 기준";
+    vi.spyOn(api, "versions").mockResolvedValue([config]);
+    vi.spyOn(api, "version").mockResolvedValue(config);
+    const save = vi
+      .spyOn(api, "saveVersion")
+      .mockImplementation(async (_id, input) => ({
+        ...config,
+        ...input,
+        revision: 2,
+      }));
+    render(
+      <MemoryRouter initialEntries={["/settings/metrics?versionId=draft_regex"]}>
+        <WorkspaceProvider>
+          <MetricSettings />
+        </WorkspaceProvider>
+      </MemoryRouter>,
+    );
+    const regex = await screen.findByRole<HTMLTextAreaElement>("textbox", {
+      name: "Python 정규식",
+    });
+    expect(regex.value).toBe("");
+    const edited = String.raw`(?imx)^\b(?P<label>internal|confidential)\b[ \t]*$` + "\n# 합성 😀\n  ";
+    fireEvent.change(regex, { target: { value: edited } });
+    fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0][1].tags[0]).toMatchObject({
+      pythonRegex: edited,
+      jevPrompt: "별도로 유지할 Jev 판단 기준",
+    });
+    expect(config.tags[0].pythonRegex).toBe("");
+    await waitFor(() =>
+      expect(
+        screen.getByRole<HTMLButtonElement>("button", { name: "초안 저장" })
+          .disabled,
+      ).toBe(true),
+    );
+    expect(regex.value).toBe(edited);
+  });
+
+  it("starts a child tag with empty Jev prompt and Python regex instead of inheriting its parent's values", async () => {
+    const config = draft("draft_child");
+    config.tags[0].jevPrompt = "상위 태그 전용 판단 프롬프트";
+    config.tags[0].pythonRegex = String.raw`(?i)\bconfidential\b`;
+    vi.spyOn(api, "versions").mockResolvedValue([config]);
+    vi.spyOn(api, "version").mockResolvedValue(config);
+    const save = vi
+      .spyOn(api, "saveVersion")
+      .mockImplementation(async (_id, input) => ({
+        ...config,
+        ...input,
+        revision: 2,
+      }));
+    render(
+      <MemoryRouter initialEntries={["/settings/metrics?versionId=draft_child"]}>
+        <WorkspaceProvider>
+          <MetricSettings />
+        </WorkspaceProvider>
+      </MemoryRouter>,
+    );
+    expect(
+      (await screen.findByRole<HTMLTextAreaElement>("textbox", {
+        name: "Jev 판단 프롬프트",
+      })).value,
+    ).toBe("상위 태그 전용 판단 프롬프트");
+    fireEvent.click(screen.getByRole("button", { name: "하위 태그" }));
+    expect(
+      screen.getByRole<HTMLTextAreaElement>("textbox", {
+        name: "Jev 판단 프롬프트",
+      }).value,
+    ).toBe("");
+    expect(
+      screen.getByRole<HTMLTextAreaElement>("textbox", {
+        name: "Python 정규식",
+      }).value,
+    ).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0][1].tags).toEqual([
+      config.tags[0],
+      expect.objectContaining({ parentId: "tag_1", jevPrompt: "", pythonRegex: "" }),
+    ]);
+  });
+
+  it.each([
+    ["Jev 판단 프롬프트", 12000],
+    ["Python 정규식", 4000],
+  ] as const)("counts code points and marks an oversized %s without truncating it", async (label, limit) => {
+    const config = draft("draft_limit");
+    vi.spyOn(api, "versions").mockResolvedValue([config]);
+    vi.spyOn(api, "version").mockResolvedValue(config);
+    render(
+      <MemoryRouter initialEntries={["/settings/metrics?versionId=draft_limit"]}>
+        <WorkspaceProvider>
+          <MetricSettings />
+        </WorkspaceProvider>
+      </MemoryRouter>,
+    );
+    const prompt = await screen.findByRole<HTMLTextAreaElement>("textbox", {
+      name: label,
+    });
+    const atLimit = "😀".repeat(limit);
+    fireEvent.change(prompt, { target: { value: atLimit } });
+    expect(prompt.value).toBe(atLimit);
+    expect(prompt.getAttribute("aria-invalid")).toBe("false");
+    const limitLabel = limit.toLocaleString("en-US");
+    expect(screen.getByText(`${limitLabel} / ${limitLabel}자`)).toBeTruthy();
+
+    fireEvent.change(prompt, { target: { value: atLimit + "가" } });
+    expect(prompt.value).toBe(atLimit + "가");
+    expect(prompt.getAttribute("aria-invalid")).toBe("true");
+    expect(
+      screen.getByText(`${(limit + 1).toLocaleString("en-US")} / ${limitLabel}자 · 길이를 줄여 주세요`),
+    ).toBeTruthy();
+  });
+
+  it("shows the published Jev prompt and Python regex inside disabled configuration fields", async () => {
+    const config = published("published_jev", true);
+    config.tags[0].jevPrompt = "게시한 판단 기준\n😀";
+    config.tags[0].pythonRegex = String.raw`(?i)\bconfidential\b`;
+    vi.spyOn(api, "versions").mockResolvedValue([config]);
+    vi.spyOn(api, "version").mockResolvedValue(config);
+    const save = vi.spyOn(api, "saveVersion");
+    render(
+      <MemoryRouter initialEntries={["/settings/metrics?versionId=published_jev"]}>
+        <WorkspaceProvider>
+          <MetricSettings />
+        </WorkspaceProvider>
+      </MemoryRouter>,
+    );
+    const prompt = await screen.findByRole<HTMLTextAreaElement>("textbox", {
+      name: "Jev 판단 프롬프트",
+    });
+    expect(prompt.value).toBe(config.tags[0].jevPrompt);
+    expect(prompt.matches(":disabled")).toBe(true);
+    const regex = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "Python 정규식",
+    });
+    expect(regex.value).toBe(config.tags[0].pythonRegex);
+    expect(regex.matches(":disabled")).toBe(true);
+    expect(screen.queryByRole("button", { name: "초안 저장" })).toBeNull();
+    expect(save).not.toHaveBeenCalled();
   });
 
   it("hides the previous editable version while the next version loads", async () => {

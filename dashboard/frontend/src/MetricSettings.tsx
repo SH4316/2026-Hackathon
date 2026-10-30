@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { useResource } from "./hooks";
-import { createId, descendantIds, flattenTree, formatDateTime } from "./format";
+import {
+  createId,
+  descendantIds,
+  flattenTree,
+  formatDateTime,
+  formatNumber,
+} from "./format";
 import type { ConfigVersion, PolicyDefinition, Tag } from "./types";
 import {
   Icon,
@@ -82,6 +88,8 @@ export function MetricSettings() {
   }, [dirty]);
   const editable = version?.status === "DRAFT";
   const tag = version?.tags.find((t) => t.id === selected);
+  const jevPromptLength = Array.from(tag?.jevPrompt || "").length;
+  const pythonRegexLength = Array.from(tag?.pythonRegex || "").length;
   const policy = version?.policyStates.find((p) => p.id === selected);
   const change = (value: ConfigVersion) => {
     setVersion(value);
@@ -156,6 +164,8 @@ export function MetricSettings() {
           description: "",
           examples: [],
           guidance: "",
+          jevPrompt: "",
+          pythonRegex: "",
           color: "#5776c6",
           parentId,
           order: version.tags.filter((t) => t.parentId === parentId).length,
@@ -689,6 +699,82 @@ export function MetricSettings() {
                           ))}
                       </select>
                     </label>
+                    <div className="jev-prompt-field">
+                      <label>
+                        <span>
+                          Jev 판단 프롬프트 <small>선택</small>
+                        </span>
+                        <span className="jev-prompt-hint" id="jev-prompt-help">
+                          이 태그로 분류할 조건과 제외할 조건을 작성하세요.
+                        </span>
+                        <textarea
+                          aria-label="Jev 판단 프롬프트"
+                          aria-describedby="jev-prompt-help jev-prompt-scope jev-prompt-count"
+                          aria-invalid={jevPromptLength > 12000}
+                          rows={6}
+                          value={tag.jevPrompt || ""}
+                          placeholder={
+                            "예: 입력에 비공개 기술 정보가 포함되어 있는지 문맥을 기준으로 판단하세요.\n공개된 예시나 인용 자료는 제외하고, 조건에 해당하는 구간을 찾아 주세요."
+                          }
+                          onChange={(e) =>
+                            patchTag({ jevPrompt: e.target.value })
+                          }
+                        />
+                      </label>
+                      <div className="jev-prompt-footer">
+                        <span id="jev-prompt-scope">
+                          하위 태그에는 자동 적용되지 않습니다.
+                        </span>
+                        <span
+                          id="jev-prompt-count"
+                          className={
+                            jevPromptLength > 12000 ? "danger-text" : ""
+                          }
+                        >
+                          {formatNumber(jevPromptLength)} / 12,000자
+                          {jevPromptLength > 12000 && " · 길이를 줄여 주세요"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="python-regex-field">
+                      <label>
+                        <span>
+                          Python 정규식 <small>선택</small>
+                        </span>
+                        <span className="tag-rule-hint" id="python-regex-help">
+                          Python re 문법으로 작성하세요. 구문 검증과 실행은
+                          연결된 탐지기에서 수행합니다.
+                        </span>
+                        <textarea
+                          aria-label="Python 정규식"
+                          aria-describedby="python-regex-help python-regex-scope python-regex-count"
+                          aria-invalid={pythonRegexLength > 4000}
+                          rows={3}
+                          spellCheck={false}
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          value={tag.pythonRegex || ""}
+                          placeholder={"(?i)\\b(?:internal|confidential)\\b"}
+                          onChange={(e) =>
+                            patchTag({ pythonRegex: e.target.value })
+                          }
+                        />
+                      </label>
+                      <div className="tag-rule-footer">
+                        <span id="python-regex-scope">
+                          각 태그의 정규식은 독립적으로 저장됩니다.
+                        </span>
+                        <span
+                          id="python-regex-count"
+                          className={
+                            pythonRegexLength > 4000 ? "danger-text" : ""
+                          }
+                        >
+                          {formatNumber(pythonRegexLength)} / 4,000자
+                          {pythonRegexLength > 4000 && " · 길이를 줄여 주세요"}
+                        </span>
+                      </div>
+                    </div>
                     <label>
                       <span>설명</span>
                       <textarea
@@ -855,7 +941,7 @@ export function MetricSettings() {
           </div>
           <Panel
             title="분류기 연동"
-            description="활성 설정의 태그 ID와 판단 참고사항을 읽고, 해당 버전으로 결과를 전송하세요."
+            description="활성 설정의 태그 ID·Jev 판단 프롬프트·Python 정규식을 읽고, 해당 버전으로 결과를 전송하세요."
             className="api-panel"
           >
             <div className="api-links">

@@ -1,0 +1,154 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T18:25:21.980Z",
+  "baseUrl": "http://127.0.0.1:8084",
+  "scope": "Synthetic configuration only on an isolated test DB. Publishes and activates one version; no people or events created. Automated axe and overflow checks do not establish full WCAG conformance.",
+  "fixtures": {
+    "versionId": "v_0dd0992f1bdf4f358b198a8843dde411",
+    "parentId": "jev-parent-mvvayjqd",
+    "childId": "jev-child-mvvayjqd",
+    "cloneId": "v_bd8d25cc07f9455891a673a355a08900"
+  },
+  "checks": [
+    "Parent and child values are independent; empty child does not inherit either field; UI save and reload preserve Jev Korean text, emoji, newlines and leading/trailing whitespace exactly; guidance stays separate.",
+    "Editing Jev leaves Python regex unchanged and editing regex leaves Jev unchanged; Python inline flags, named groups, backslashes and multiline source survive exactly, and the counter uses Unicode code points.",
+    "Published prompt and regex are disabled/read-only; activation serves the exact independent per-tag fields through GET /classifier-config.",
+    "Clone preserves tag IDs, prompts and regexes; editing its child leaves the published original and active configuration unchanged."
+  ],
+  "screenshots": [
+    {
+      "state": "draft",
+      "width": 390,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-compose-backend/dashboard/.impeccable/review/jev-draft-mobile.png"
+    },
+    {
+      "state": "draft",
+      "width": 1440,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-compose-backend/dashboard/.impeccable/review/jev-draft-desktop.png"
+    },
+    {
+      "state": "published",
+      "width": 390,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-compose-backend/dashboard/.impeccable/review/jev-published-mobile.png"
+    },
+    {
+      "state": "published",
+      "width": 1440,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-compose-backend/dashboard/.impeccable/review/jev-published-desktop.png"
+    }
+  ],
+  "responsive": [
+    {
+      "state": "draft",
+      "width": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "viewportWidth": 320,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "viewportWidth": 390,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "viewportWidth": 768,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "viewportWidth": 1280,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "viewportWidth": 1440,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "viewportWidth": 320,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "viewportWidth": 390,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "viewportWidth": 768,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "viewportWidth": 1280,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "viewportWidth": 1440,
+      "overflow": false
+    }
+  ],
+  "axe": [
+    {
+      "state": "draft",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 17
+    },
+    {
+      "state": "draft",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 17
+    },
+    {
+      "state": "published",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 17
+    },
+    {
+      "state": "published",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 17
+    }
+  ],
+  "uncaughtErrors": [],
+  "axeStatus": "PASS"
+}

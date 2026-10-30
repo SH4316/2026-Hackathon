@@ -25,6 +25,10 @@ export interface Tag {
   description: string;
   examples: string[];
   guidance: string;
+  /** Per-tag Jev judgment prompt; preserved verbatim, up to 12000 Unicode code points. */
+  jevPrompt: string;
+  /** Per-tag Python re source; stored verbatim, up to 4000 Unicode code points. */
+  pythonRegex: string;
   color: string;
   parentId: string | null;
   order: number;
