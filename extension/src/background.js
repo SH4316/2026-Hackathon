@@ -6,6 +6,7 @@ const DEFAULTS = {
   serverUrl: "http://127.0.0.1:8000",
   apiKey: "",
   enabled: true,
+  testMode: false, // 실제 사이트 점검용: 어떤 경우에도 전송하지 않음
   timeoutMs: 15000,
 };
 

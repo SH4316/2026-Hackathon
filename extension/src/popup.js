@@ -2,8 +2,13 @@ const statusEl = document.getElementById("status");
 const detailEl = document.getElementById("detail");
 const enabledEl = document.getElementById("enabled");
 
-chrome.storage.local.get({ enabled: true }).then(({ enabled }) => { enabledEl.checked = enabled; });
+const testModeEl = document.getElementById("testMode");
+chrome.storage.local.get({ enabled: true, testMode: false }).then(({ enabled, testMode }) => {
+  enabledEl.checked = enabled;
+  testModeEl.checked = testMode;
+});
 enabledEl.addEventListener("change", () => chrome.storage.local.set({ enabled: enabledEl.checked }));
+testModeEl.addEventListener("change", () => chrome.storage.local.set({ testMode: testModeEl.checked }));
 document.getElementById("options").addEventListener("click", () => chrome.runtime.openOptionsPage());
 
 chrome.runtime.sendMessage({ type: "health" }).then((res) => {

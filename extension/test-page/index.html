@@ -69,6 +69,15 @@
   </section>
 
   <section>
+    <h2>입력창 C · 비동기 상태 편집기 (ChatGPT ProseMirror+React 방식)</h2>
+    <p class="muted">화면(DOM)이 바뀐 뒤 잠시 후에 내부 상태를 갱신하고, 전송할 때는 내부 상태를 보냅니다.</p>
+    <div class="composer">
+      <div id="pm" class="ce" contenteditable="true" data-placeholder="메시지를 입력하세요"></div>
+      <button type="button" aria-label="Send prompt" data-target="pm">보내기</button>
+    </div>
+  </section>
+
+  <section>
     <h2>전송된 메시지</h2>
     <ol id="log"></ol>
   </section>
@@ -85,9 +94,16 @@
   };
   const ta = document.getElementById("ta");
   const ce = document.getElementById("ce");
+  const pm = document.getElementById("pm");
   const log = document.getElementById("log");
   let last = ta;
-  [ta, ce].forEach((el) => el.addEventListener("focus", () => { last = el; }));
+  [ta, ce, pm].forEach((el) => el.addEventListener("focus", () => { last = el; }));
+
+  // 입력창 C: DOM 변경을 관찰해 30ms 뒤 내부 상태(pmState)를 갱신한다(프레임워크 상태 동기화 지연 흉내).
+  let pmState = "";
+  new MutationObserver(() => {
+    setTimeout(() => { pmState = pm.innerText.trim(); }, 30);
+  }).observe(pm, { childList: true, characterData: true, subtree: true });
 
   document.getElementById("dest").addEventListener("change", (e) => {
     document.documentElement.dataset.pgTestDestination = e.target.value;
@@ -104,7 +120,7 @@
         ta.value = text;
         ta.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
-        document.getSelection().selectAllChildren(ce);
+        document.getSelection().selectAllChildren(last);
         document.execCommand("insertText", false, text);
       }
     });
@@ -112,17 +128,17 @@
   }
 
   function send(el) {
-    const text = el === ta ? ta.value : ce.innerText.trim();
+    const text = el === ta ? ta.value : el === pm ? pmState : ce.innerText.trim();
     if (!text.trim()) return;
     const li = document.createElement("li");
     li.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
     log.append(li);
-    if (el === ta) ta.value = ""; else ce.textContent = "";
+    if (el === ta) ta.value = ""; else el.textContent = "";
   }
 
   document.querySelectorAll("[data-target]").forEach((btn) =>
     btn.addEventListener("click", () => send(document.getElementById(btn.dataset.target))));
-  [ta, ce].forEach((el) => el.addEventListener("keydown", (e) => {
+  [ta, ce, pm].forEach((el) => el.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(el); }
   }));
 </script>

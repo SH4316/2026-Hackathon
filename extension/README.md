@@ -9,7 +9,7 @@ AI 사이트 입력창의 프롬프트를 조직 검사 서버(`server/`)로 검
 |---|---|
 | 입력 중 | 0.7초 쉬면 검사, 오른쪽 아래 배지로 상태 표시(통과·확인 필요·민감정보 있음·검사 불가) |
 | Enter·전송 버튼 | 전송 직전 텍스트가 **검사 완료 + 통과**일 때만 그대로 전송. 아니면 막고 경고 화면 |
-| 빨강(차단) | 탐지 항목·위치 표시, "민감정보 치환하기" → 서버가 치환·재검사 → 반영 또는 반영하고 전송 |
+| 빨강(차단) | 탐지 항목·위치 표시, "민감정보 치환하기" → 서버가 치환·재검사 → 입력창에 반영 → 사용자가 확인 후 직접 전송(그때 다시 검사) |
 | 노랑(확인) | 동의 체크 후에만 "확인 후 전송" 가능 |
 | 회색(검사 불가) | 서버 연결 실패·시간 초과·모델 미완료. **전송 보류**, 자동 폴백 없음 |
 
@@ -68,11 +68,60 @@ npm run e2e
 Playwright 의 Chromium 에 확장프로그램을 올려 위 시나리오 17개를 확인하고, 화면 캡처를 `tests/shots/` 에 저장합니다.
 (일반 Chrome 은 명령줄 확장 로드를 막아 두었기 때문에 Playwright Chromium 을 씁니다.)
 
+## 실제 사이트에서 확인하기
+
+실제 사이트는 감지에 실패하면 테스트 문장이 그대로 AI 에 전송됩니다. 그래서 **테스트 모드**로 확인합니다.
+
+- 테스트 모드에서는 검사를 통과해도, 사용자가 "확인 후 전송"을 눌러도 **어떤 사이트에도 보내지 않습니다**("테스트 모드: 실제로 전송하지 않았습니다" 알림).
+- 화면 오른쪽 위 진단 패널에 사이트 → 목적지, 감지한 입력창·전송 버튼(어떤 선택자로 찾았는지), 검사 서버 상태, 가로챈 횟수가 나옵니다.
+- 단, 확장프로그램이 **가로채지 못한** 전송은 테스트 모드도 막지 못합니다. 그래서 아래 순서를 지킵니다.
+
+### 직접 확인 (수동)
+
+1. 팝업에서 **테스트 모드** 켜기
+2. AI 사이트에 로그인 → 진단 패널에서 입력창 ✓ 확인
+3. 무해한 문장(예: "확장프로그램 점검 문장")을 입력 → 진단 패널에서 전송 버튼 ✓ 확인
+4. Enter → "가로챔: enter 1회"가 늘고 입력창 내용이 남아 있으면 성공. 내용이 사라지면 가로채기 실패(무해한 문장이 전송됨)
+5. 4가 성공한 사이트에서만 가짜 값(`AKIAIOSFODNN7EXAMPLE`)으로 경고 화면·치환을 확인
+6. 끝나면 테스트 모드 끄기
+
+### 자동 점검 스크립트
+
+검사 서버를 실행한 상태에서(`npm install`, `npx playwright install chromium` 은 처음 한 번):
+
+```powershell
+npm run real-sites:login          # 처음 한 번: 열린 창에서 각 사이트에 로그인(사람 확인 포함) 후 창 닫기
+npm run real-sites                # 입력창 감지만(키 입력·전송 없음)
+npm run real-sites -- --type      # + 무해한 문장을 입력만 해서 전송 버튼 감지 확인(Enter·클릭 없음)
+npm run real-sites:full           # + Enter·클릭 가로채기와 경고 화면 확인
+npm run real-sites:full -- --sites chatgpt,claude
+```
+
+- 별도 Playwright Chromium 프로필(`.real-sites-profile/`, git 제외)을 쓰므로 평소 Chrome 계정과 섞이지 않습니다.
+- 시작할 때 테스트 모드를 켜고 확인합니다. `--full` 은 무해한 문장의 Enter 가로채기가 성공한 사이트에서만 가짜 키 단계를 진행합니다.
+- 결과: `tests/real-sites-out/<시각>/report.md` 와 사이트별 화면 캡처(git 제외)
+- 기본은 창이 보이는 모드입니다. 봇 차단(Cloudflare 등) 때문에 `--headless` 는 일부 사이트에서 막힙니다.
+
+### 점검 현황 (2026-10-31, 로그인 없이 `--full --headless`)
+
+| 사이트 | 입력창 | 전송 버튼 | Enter 가로채기 | 경고(Enter) | 경고(클릭) | 비고 |
+|---|---|---|---|---|---|---|
+| Gemini | ✓ | ✓ `aria-label*="보내기"` | ✓ | ✓ | ✓ | |
+| Perplexity | ✓ | ✓ `aria-label*="제출"` | ✓ | ✓ | ✓ | |
+| Grok | ✓ | ✓ `aria-label*="제출"` | ✓ | ✓ | ✓ | |
+| Qwen Chat | ✓ | ✓ `aria-label*="보내기"` | ✓ | ✓ | ✓ | |
+| Kimi | ✓ | ✓ `.send-button-container`(div) | ✓ | ✓ | ✓ | 제한 등급이라 무해한 문장도 확인 화면 |
+| ChatGPT | - | - | - | - | - | Cloudflare 사람 확인에 막힘 → 로그인 후 재확인 필요 |
+| Claude, DeepSeek, Mistral, Meta AI | - | - | - | - | - | 로그인 필요 → 재확인 필요 |
+| Copilot | - | - | - | - | - | 로그인 페이지로 이동 → 재확인 필요 |
+
+사이트 화면 구조는 자주 바뀌므로 개편 후에는 다시 점검하세요. UI 언어(한국어·영어)에 따라 `aria-label` 이 달라집니다.
+
 ## 지원 사이트와 한계
 
 `manifest.json` 의 `content_scripts.matches`: ChatGPT, Claude, Gemini, Copilot, DeepSeek, Kimi, Mistral, Perplexity, Grok, Qwen, Meta AI, 그리고 테스트용 localhost.
 
-- 실제 사이트에서는 **아직 검증하지 않았습니다.** 입력창(textarea·contenteditable)과 전송 버튼(`data-testid="send-button"`, `aria-label` 의 Send·전송·보내기)을 넓게 찾지만, 사이트 개편 시 `src/sites.js` 의 선택자를 고쳐야 합니다.
+- 실제 사이트 검증 현황은 위 표를 참고하세요. 입력창(textarea·contenteditable)과 전송 버튼(`data-testid="send-button"`, `aria-label` 의 Send·전송·보내기)을 넓게 찾지만, 사이트 개편 시 `src/sites.js` 의 선택자를 고쳐야 합니다.
 - 사이트가 isTrusted 이벤트만 받거나 별도 단축키·음성 입력·파일 첨부로 보내는 경로는 막지 못합니다.
 - 서버 판정은 "검사 결과"이고, 실제 전송·차단 이벤트를 서버로 보내는 계약은 아직 없습니다(`server/docs/api-contract.md`).
 - 기본 서버 권한은 `127.0.0.1`, `localhost` 입니다. 다른 서버 주소는 설정에서 저장할 때 권한을 요청합니다. 원격 서버는 HTTPS 를 쓰세요.

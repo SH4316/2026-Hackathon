@@ -1,0 +1,15 @@
+{
+  "sites": [
+    { "id": "chatgpt", "name": "ChatGPT", "url": "https://chatgpt.com/" },
+    { "id": "claude", "name": "Claude", "url": "https://claude.ai/new" },
+    { "id": "gemini", "name": "Gemini", "url": "https://gemini.google.com/app" },
+    { "id": "copilot", "name": "Microsoft Copilot", "url": "https://copilot.microsoft.com/" },
+    { "id": "deepseek", "name": "DeepSeek", "url": "https://chat.deepseek.com/" },
+    { "id": "kimi", "name": "Kimi", "url": "https://www.kimi.com/" },
+    { "id": "mistral", "name": "Mistral Le Chat", "url": "https://chat.mistral.ai/chat" },
+    { "id": "perplexity", "name": "Perplexity", "url": "https://www.perplexity.ai/" },
+    { "id": "grok", "name": "Grok", "url": "https://grok.com/" },
+    { "id": "qwen", "name": "Qwen Chat", "url": "https://chat.qwen.ai/" },
+    { "id": "meta", "name": "Meta AI", "url": "https://www.meta.ai/" }
+  ]
+}
