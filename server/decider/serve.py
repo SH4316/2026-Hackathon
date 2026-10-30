@@ -62,8 +62,24 @@ def load_model():
     gpu_layers = int(os.environ.get("DECIDER_GPU_LAYERS", "0"))
     if threads < 1 or gpu_layers < -1:
         raise ValueError("DECIDER_THREADS must be positive and DECIDER_GPU_LAYERS must be -1 or nonnegative")
+    require_gpu = os.environ.get("DECIDER_REQUIRE_GPU", "false").lower() == "true"
+    if require_gpu and gpu_layers == 0:
+        raise ValueError("DECIDER_REQUIRE_GPU=true requires DECIDER_GPU_LAYERS=-1 or a positive count")
+    if gpu_layers != 0:
+        # GGUF executes in llama.cpp, not Torch. This API discovers available
+        # backend devices; a CUDA build alone does not prove GPU access works.
+        from llama_cpp import llama_cpp
+
+        if not llama_cpp.llama_supports_gpu_offload():
+            raise RuntimeError(
+                "GPU offload requested but llama.cpp has no GPU backend available. "
+                "Check the CUDA image, NVIDIA driver, Container Toolkit and Compose GPU access."
+            )
+    # device is used only for Torch-side bookkeeping in the SDK's GGUF path.
+    # n_gpu_layers controls inference; verbose exposes actual layer offload logs.
     model = Decider(str(MODEL_DIR), device="cpu", gguf_file=GGUF_FILE,
-                    gguf_options={"n_ctx": 40960, "n_seq_max": 1, "n_gpu_layers": gpu_layers, "n_threads": threads})
+                    gguf_options={"n_ctx": 40960, "n_seq_max": 1, "n_gpu_layers": gpu_layers,
+                                  "n_threads": threads, "verbose": True})
     # The upstream v3 config retains a v2.1 version label; report the actual model ID.
     model.name = MODEL_ID
     return model

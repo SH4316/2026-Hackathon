@@ -1,9 +1,9 @@
-# NVIDIA GPU: docker compose -f compose.yml -f compose.gpu.yml up -d --build
+# Compatibility overlay; compose.yml now uses NVIDIA GPU by default.
 services:
   decider:
     build:
       target: cuda
-    gpus: all
     environment:
       # -1 offloads all layers; use a smaller positive count if VRAM is limited.
       DECIDER_GPU_LAYERS: ${DECIDER_GPU_LAYERS:--1}
+      DECIDER_REQUIRE_GPU: "true"

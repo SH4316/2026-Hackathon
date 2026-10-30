@@ -114,8 +114,8 @@ def test_inference_failures_do_not_echo_or_log_prompt(model, error, expected, ca
     assert "private prompt" not in response.text + caplog.text
 
 
-@pytest.mark.parametrize("layers", ["0", "-1", "12"])
-def test_loader_selects_local_pinned_gguf_and_cpu_or_gpu_layers(monkeypatch, model, layers):
+@pytest.fixture
+def loader_modules(monkeypatch, model):
     infer = ModuleType("decider.infer")
     captured = {}
 
@@ -125,13 +125,51 @@ def test_loader_selects_local_pinned_gguf_and_cpu_or_gpu_layers(monkeypatch, mod
 
     infer.Decider = constructor
     monkeypatch.setitem(sys.modules, "decider.infer", infer)
+    llama = ModuleType("llama_cpp")
+    llama.llama_cpp = SimpleNamespace(llama_supports_gpu_offload=lambda: True)
+    monkeypatch.setitem(sys.modules, "llama_cpp", llama)
     monkeypatch.setattr(serve, "verify", lambda: None)
     monkeypatch.setenv("DECIDER_THREADS", "3")
+    monkeypatch.setenv("DECIDER_REQUIRE_GPU", "false")
+    return captured, llama.llama_cpp
+
+
+@pytest.mark.parametrize("layers", ["0", "-1", "12"])
+def test_loader_selects_local_pinned_gguf_and_cpu_or_gpu_layers(monkeypatch, model, loader_modules, layers):
+    captured, _ = loader_modules
     monkeypatch.setenv("DECIDER_GPU_LAYERS", layers)
+    monkeypatch.setenv("DECIDER_REQUIRE_GPU", "false" if layers == "0" else "true")
     assert serve.load_model() is model
     assert captured["path"] == str(model_files.MODEL_DIR)
     assert captured["gguf_file"] == "decider-4b-v3-Q4_K_M.gguf"
-    assert captured["gguf_options"] == {"n_ctx": 40960, "n_seq_max": 1, "n_gpu_layers": int(layers), "n_threads": 3}
+    assert captured["gguf_options"] == {"n_ctx": 40960, "n_seq_max": 1, "n_gpu_layers": int(layers),
+                                        "n_threads": 3, "verbose": True}
+
+
+@pytest.mark.parametrize("layers", ["-1", "12"])
+def test_gpu_request_without_backend_fails_before_model_load(monkeypatch, loader_modules, layers):
+    captured, llama = loader_modules
+    monkeypatch.setenv("DECIDER_GPU_LAYERS", layers)
+    monkeypatch.setattr(llama, "llama_supports_gpu_offload", lambda: False)
+    with pytest.raises(RuntimeError, match="no GPU backend available"):
+        serve.load_model()
+    assert captured == {}
+
+
+def test_gpu_deployment_rejects_zero_layers(monkeypatch, loader_modules):
+    captured, _ = loader_modules
+    monkeypatch.setenv("DECIDER_REQUIRE_GPU", "true")
+    monkeypatch.setenv("DECIDER_GPU_LAYERS", "0")
+    with pytest.raises(ValueError, match="requires DECIDER_GPU_LAYERS"):
+        serve.load_model()
+    assert captured == {}
+
+
+def test_explicit_cpu_does_not_require_gpu_backend(monkeypatch, model, loader_modules):
+    _, llama = loader_modules
+    monkeypatch.setenv("DECIDER_GPU_LAYERS", "0")
+    monkeypatch.setattr(llama, "llama_supports_gpu_offload", lambda: pytest.fail("CPU probed GPU"))
+    assert serve.load_model() is model
 
 
 @pytest.fixture

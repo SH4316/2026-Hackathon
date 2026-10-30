@@ -1,0 +1,9 @@
+# Explicit CPU opt-in: docker compose -f compose.yml -f compose.cpu.yml up -d --build
+services:
+  decider:
+    build:
+      target: cpu
+    gpus: !reset []
+    environment:
+      DECIDER_GPU_LAYERS: "0"
+      DECIDER_REQUIRE_GPU: "false"

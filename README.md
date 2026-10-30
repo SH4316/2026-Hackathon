@@ -7,7 +7,7 @@
 
 ## 대시보드 + 검사 서버 실행
 
-저장소 루트의 `compose.yml`은 대시보드·검사 서버와 실제 **Decider 4B**를 함께 실행합니다. Docker Engine와 Compose v2, 최초 비밀값 생성에 Python 3이 필요합니다. Java·Node.js·Python 서버 의존성은 이미지 안에서 빌드합니다.
+저장소 루트의 `compose.yml`은 대시보드·검사 서버와 실제 **Decider 4B**를 함께 실행합니다. Docker Engine, Compose 2.30.0 이상, NVIDIA GPU·호환 드라이버·NVIDIA Container Toolkit, 최초 비밀값 생성에 Python 3이 필요합니다. Java·Node.js·Python 서버 의존성은 이미지 안에서 빌드합니다.
 
 | 서비스 | 역할 |
 | --- | --- |
@@ -42,19 +42,29 @@ docker compose up -d --build
 docker compose ps
 ```
 
-기본 실행은 CPU를 사용하며 `DECIDER_THREADS`의 기본값은 `4`입니다. 처음에는 이미지 빌드와 약 2.7GB 모델 다운로드가 필요합니다. 이후에는 `decider-data`의 모델 캐시를 재사용합니다. 사용하는 파일은 공식 [Mapika/decider-4b-GGUF](https://huggingface.co/Mapika/decider-4b-GGUF)의 `decider-4b-v3-Q4_K_M.gguf`이며 revision과 파일 해시는 [model_files.py](./server/decider/model_files.py)에 고정합니다.
+기본 실행은 CUDA 이미지와 NVIDIA GPU를 사용하며 모든 모델 레이어를 오프로딩합니다(`DECIDER_GPU_LAYERS=-1`). CPU 보조 작업의 `DECIDER_THREADS` 기본값은 `4`입니다. 처음에는 이미지 빌드와 약 2.7GB 모델 다운로드가 필요합니다. 이후에는 `decider-data`의 모델 캐시를 재사용합니다. 사용하는 파일은 공식 [Mapika/decider-4b-GGUF](https://huggingface.co/Mapika/decider-4b-GGUF)의 `decider-4b-v3-Q4_K_M.gguf`이며 revision과 파일 해시는 [model_files.py](./server/decider/model_files.py)에 고정합니다.
 
 Decider 이미지 빌드는 BuildKit의 pip 캐시 마운트로 다운로드 파일과 빌드한 wheel을 재사용합니다. Torch 설치, [네이티브 의존성](./server/decider/requirements-native.txt)의 llama.cpp 컴파일, 일반 의존성 설치를 별도 레이어로 나눠 일반 의존성이나 서버 코드만 바뀌면 컴파일 레이어를 재사용합니다. CPU·CUDA, 아키텍처, Python·배포판별로 캐시를 구분하며 캐시 파일은 최종 이미지에 포함하지 않습니다. 첫 빌드와 캐시가 삭제된 빌드에서는 컴파일이 필요합니다. 캐시는 같은 BuildKit 빌더에 보관되고 `decider-data` 모델 볼륨과는 별개입니다.
 
 컴파일 옵션·베이스 이미지·툴체인·Python ABI를 바꾸면 [Dockerfile](./server/decider/Dockerfile)의 `DECIDER_WHEEL_CACHE_VERSION` 기본값을 올리거나 `docker compose build --build-arg DECIDER_WHEEL_CACHE_VERSION=2 decider`처럼 새 값을 지정합니다. pip의 wheel 캐시는 같은 패키지 버전의 컴파일 옵션 차이를 구분하지 않습니다. Docker 레이어가 재실행돼도 캐시 마운트는 남을 수 있으므로, 네이티브 wheel을 다시 컴파일할 때는 `--no-cache`만 쓰지 말고 캐시 버전도 바꿉니다.
 
-NVIDIA GPU를 쓰려면 GPU·호환 드라이버와 Docker용 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)을 준비하고 다음 명령을 사용합니다. GPU 구성의 `gpus: all`은 [Compose 2.30.0 이상](https://docs.docker.com/reference/compose-file/services/#gpus)이 필요합니다.
+GPU 호스트에는 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)이 필요합니다. `gpus: all`은 [Compose 2.30.0 이상](https://docs.docker.com/reference/compose-file/services/#gpus)에서 지원합니다. 기존 CPU 컨테이너도 루트에서 아래 명령으로 CUDA 이미지로 다시 빌드하고 교체합니다. 기존 `.env`와 데이터·모델 볼륨은 그대로 사용합니다.
 
 ```bash
-docker compose -f compose.yml -f compose.gpu.yml up -d --build
+docker compose up -d --build --wait
+docker compose exec decider nvidia-smi
+docker compose logs --tail=200 decider
 ```
 
-GPU 구성은 CUDA 이미지와 전체 레이어 오프로딩(`DECIDER_GPU_LAYERS=-1`)을 사용합니다. VRAM에 맞게 `.env`에서 양수 레이어 수로 줄일 수 있습니다. 기본 CPU 구성은 이 값을 무시하고 항상 `0`을 사용합니다. GPU 구성의 상태·로그·정지에도 같은 두 `-f` 옵션을 지정합니다.
+시작 로그에서 `offloaded .../... layers to GPU`와 CUDA 모델 버퍼 할당을 확인합니다. `nvidia-smi`는 컨테이너의 GPU 접근 확인이고, 실제 모델 배치는 llama.cpp 로그로 확인합니다. `/health`의 `gpu_layers`는 요청한 설정값입니다. SDK의 `device=cpu` 로그나 CPU Torch 패키지는 GGUF 추론 장치를 나타내지 않습니다. 이 경로의 추론은 CUDA로 빌드한 llama.cpp의 `n_gpu_layers`가 제어합니다.
+
+VRAM이 부족하면 `.env`의 `DECIDER_GPU_LAYERS`를 양수로 줄여 일부 레이어만 GPU에 올릴 수 있습니다. GPU 배포는 `DECIDER_REQUIRE_GPU=true`로 실행하여 `0` 레이어 설정이나 GPU 백엔드 탐지 실패 시 시작을 중단합니다. 기존 `-f compose.yml -f compose.gpu.yml` 명령도 호환되지만 이제 기본 실행과 같습니다.
+
+GPU가 없는 장비에서 CPU 실행을 명시적으로 선택하려면 다음 명령을 사용합니다. 이 구성은 GPU 장치 요청을 제거하고 CPU 이미지와 `0` 레이어를 사용합니다. 상태·로그·정지에도 같은 두 `-f` 옵션을 지정합니다.
+
+```bash
+docker compose -f compose.yml -f compose.cpu.yml up -d --build --wait
+```
 
 `.env`는 Git에서 제외됩니다. `PG_API_KEYS`는 검사 API 인증에, 별도의 `PG_ADMIN_KEYS`는 사용자 등록·조직 설정 등 관리 API에 사용합니다. 초기 설정 명령을 다시 실행하면 키·비밀번호가 새로 생성됩니다. 이미 초기화한 MySQL 계정은 `.env` 변경만으로 갱신되지 않습니다.
 루트 Compose는 `GUARD_SERVER_URL=http://server:8000`과 `GUARD_ADMIN_KEY=${PG_ADMIN_KEYS}`를 대시보드 백엔드에 전달하고 백엔드는 첫 관리 키를 사용합니다. 루트 `.env.example`의 `GUARD_*` 값으로 이 고정 매핑을 덮어쓰지는 않습니다. 관리 키는 브라우저에 전달하지 않습니다.
@@ -85,8 +95,8 @@ MySQL의 상태 확인이 통과하면 대시보드가 시작하고, `dashboard-
 
 ```bash
 docker compose -f compose-dev.yml up -d --build --wait
-# NVIDIA GPU 구성:
-docker compose -f compose-dev.yml -f compose.gpu.yml up -d --build --wait
+# GPU가 없는 개발 장비:
+docker compose -f compose-dev.yml -f compose.cpu.yml up -d --build --wait
 ```
 
 개발 구성은 `safeprompt-dev` 프로젝트의 별도 DB·서버·모델 볼륨을 사용합니다. 기본 구성과 같은 포트를 쓰므로 함께 실행하려면 `.env`의 포트를 조정합니다. 상태·로그·정지에도 같은 `-f` 옵션을 지정합니다. 기존 `dashboard/compose-dev.yml`은 데모 대시보드만 실행하는 별도 구성입니다.

@@ -23,7 +23,7 @@ def main():
     compose = shlex.split(args.compose_command)
     require(bool(compose), "Compose command must not be empty")
     # A service env_file/include could read real secrets independently of --env-file.
-    for file in ("compose.yml", "compose-dev.yml", "compose.gpu.yml"):
+    for file in ("compose.yml", "compose-dev.yml", "compose.gpu.yml", "compose.cpu.yml"):
         blocked = "env_file|include" if file == "compose-dev.yml" else "env_file|include|extends"
         require(not re.search(rf"^\s*({blocked})\s*:",
                               (root / file).read_text(), re.MULTILINE),
@@ -54,11 +54,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix="safeprompt-compose-") as temporary:
         env_file = Path(temporary) / "check.env"
 
-        def config(values, *, template="", gpu=False, dev=False, valid=True):
+        def config(values, *, template="", gpu=False, cpu=False, dev=False, valid=True):
             env_file.write_text(template + "\n" + "\n".join(f"{k}={v}" for k, v in values.items()) + "\n")
             files = ["-f", str(root / ("compose-dev.yml" if dev else "compose.yml"))]
             if gpu:
                 files += ["-f", str(root / "compose.gpu.yml")]
+            if cpu:
+                files += ["-f", str(root / "compose.cpu.yml")]
             result = subprocess.run(
                 compose + ["--env-file", str(env_file)] + files + ["config", "--format", "json"],
                 cwd=root, env=environment, capture_output=True, text=True, check=False)
@@ -77,13 +79,16 @@ def main():
         gpu_custom = config({**credentials, "DECIDER_GPU_LAYERS": "8"}, gpu=True)
         dev = config(credentials, dev=True)
         dev_gpu = config(credentials, dev=True, gpu=True)
+        cpu = config(credentials, cpu=True)
+        cpu_custom = config({**credentials, "DECIDER_GPU_LAYERS": "8"}, cpu=True)
+        dev_cpu = config(credentials, dev=True, cpu=True)
         multiple_admin = config({**credentials, "PG_ADMIN_KEYS": "synthetic-first,synthetic-second"})
         without_admin = config({k: v for k, v in credentials.items() if k != "PG_ADMIN_KEYS"})
         for key in ("MYSQL_ROOT_PASSWORD", "PG_API_KEYS"):
             config({k: v for k, v in credentials.items() if k != key}, valid=False)
             config({k: v for k, v in credentials.items() if k != key}, dev=True, valid=False)
 
-    for cfg in (base, custom, example, gpu, gpu_custom, dev, dev_gpu):
+    for cfg in (base, custom, example, gpu, gpu_custom, dev, dev_gpu, cpu, cpu_custom, dev_cpu):
         services = cfg["services"]
         require(set(services) == {"dashboard", "dashboard-init", "mysql", "server", "decider-pull", "decider"}, "Expected app, filter initializer, DB and Decider services")
         require(set(cfg["volumes"]) == {"mysql-data", "server-data", "decider-data"}, "Unexpected data volumes")
@@ -105,7 +110,7 @@ def main():
         require(initializer["depends_on"]["dashboard"]["condition"] == "service_healthy"
                 and "server" not in initializer["depends_on"], "Filter registration must avoid a server dependency cycle")
         require(initializer["environment"] == {"DASHBOARD_URL": "http://dashboard:8080",
-                                             "SEED_JEV_FILTERS": "true" if cfg in (dev, dev_gpu) else "false"},
+                                             "SEED_JEV_FILTERS": "true" if cfg in (dev, dev_gpu, dev_cpu) else "false"},
                 "Filter initializer must receive only its internal URL and the correct Jev preset flag")
         require(not initializer.get("ports") and not initializer.get("profiles")
                 and set(initializer["networks"]) == {"default"}, "Filter initializer must use only the dashboard network")
@@ -182,17 +187,21 @@ def main():
     for cfg in (base, example, dev, dev_gpu):
         require(cfg["services"]["server"]["environment"]["PG_MODEL_MODE"] == "required"
                 and cfg["services"]["server"]["environment"]["PG_MODEL_TIMEOUT_S"] == "120", "Default model must be required with 120s timeout")
-    for cfg in (base, custom, example, dev):
+    for cfg in (cpu, cpu_custom, dev_cpu):
         decider = cfg["services"]["decider"]
         require(decider["build"]["target"] == "cpu" and not decider.get("gpus")
-                and decider["environment"]["DECIDER_GPU_LAYERS"] == "0", "Base must use CPU regardless of GPU env")
-    for cfg, layers in ((gpu, "-1"), (gpu_custom, "8"), (dev_gpu, "-1")):
+                and decider["environment"]["DECIDER_GPU_LAYERS"] == "0"
+                and decider["environment"]["DECIDER_REQUIRE_GPU"] == "false", "CPU opt-in must remove GPU access and requirements")
+    for cfg, layers in ((base, "-1"), (custom, "8"), (example, "-1"), (dev, "-1"),
+                        (gpu, "-1"), (gpu_custom, "8"), (dev_gpu, "-1")):
         decider = cfg["services"]["decider"]
         require(decider["build"]["target"] == "cuda"
-                and decider["environment"]["DECIDER_GPU_LAYERS"] == layers, "GPU override must select CUDA and requested layers")
+                and decider["environment"]["DECIDER_GPU_LAYERS"] == layers
+                and decider["environment"]["DECIDER_REQUIRE_GPU"] == "true", "GPU deployment must require CUDA and requested layers")
         # Compose normalizes `gpus: all` to count=-1; gpu capability is implicit.
         require(len(decider["gpus"]) == 1 and decider["gpus"][0]["count"] == -1,
-                "GPU override must request host GPU access")
+                "GPU deployment must request host GPU access")
+    require(base == gpu and dev == dev_gpu, "Legacy GPU overlay must preserve the GPU default")
     require(dev["name"] == dev_gpu["name"] == "safeprompt-dev" and base["name"] != dev["name"],
             "Development must use a separate Compose project")
     for name in ("mysql-data", "server-data", "decider-data"):
@@ -211,7 +220,7 @@ def main():
     require(without_admin["services"]["server"]["environment"]["PG_ADMIN_KEYS"] == "", "Admin key must remain optional")
     require(subprocess.run(["git", "check-ignore", "--quiet", ".env"], cwd=root,
                            env=environment, check=False).returncode == 0, "Root .env must be gitignored")
-    print("PASS: root/default and development Compose, extension filter initialization, development Jev preset, CPU/CUDA overlay, isolated model download/inference, scoped environments, internal URLs, health dependencies, private MySQL, separate persistent volumes, required secrets, and ignored .env")
+    print("PASS: root/default and development Compose, extension filter initialization, development Jev preset, GPU default and CPU opt-in, isolated model download/inference, scoped environments, internal URLs, health dependencies, private MySQL, separate persistent volumes, required secrets, and ignored .env")
     print("Scope: Compose config parsing only; no images built or containers executed. Real .env was not read.")
 
 

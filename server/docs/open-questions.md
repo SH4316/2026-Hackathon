@@ -2,7 +2,7 @@
 
 ## 현재 구현으로 확정된 사항
 
-- 루트 Compose는 Mapika Decider 4B v3 Q4_K_M(약 2.7GB 파일)을 공식 typed API로 연결합니다. 기본 CPU 실행이며 GPU 구성은 `compose.gpu.yml`입니다. `server/compose.local.yaml`의 Ollama Qwen3 4B는 별도 실행 경로입니다.
+- 루트 Compose는 Mapika Decider 4B v3 Q4_K_M(약 2.7GB 파일)을 공식 typed API로 연결합니다. 기본 NVIDIA GPU 실행이며 CPU 실행은 `compose.cpu.yml`을 추가합니다. `server/compose.local.yaml`의 Ollama Qwen3 4B는 별도 실행 경로입니다.
 - 모델 모드 초기값은 루트 Compose에서 `required`, 이후 대시보드 **검사 서버 관리**(`/settings/guard`)에 저장한 값이 우선합니다. 엔드포인트 미설정은 경고·비활성 표시 후 모델 호출을 생략하며 내용 검사만으로 판정합니다.
 - 내용의 `mask`·`block`은 빨강, `warn`은 노랑입니다. 목적지 등급·모델 학습 설정은 안내 모달용입니다. 검사 완료된 빨강도 확인 후 강행 전송할 수 있고 조직 관리 전송은 기록 결과를 확인합니다(`report_text=off`는 기록 제외).
 - 기밀 표식 사전은 `policies/detectors.yaml`의 초기 사용자 키워드 규칙(`confidential_marker`)에 있습니다. 이후 저장된 ruleset을 대시보드에서 관리합니다. 프로젝트명도 사용자 키워드·정규식으로 추가할 수 있고 `distribute=false`로 서버 전용으로 둘 수 있습니다.

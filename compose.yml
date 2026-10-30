@@ -138,12 +138,14 @@ services:
     build:
       context: ./server/decider
       dockerfile: Dockerfile
-      target: cpu
+      target: cuda
     pull_policy: build
+    gpus: all
     environment:
       DECIDER_THREADS: ${DECIDER_THREADS:-4}
-      # CPU remains the default even when the host has a GPU.
-      DECIDER_GPU_LAYERS: "0"
+      DECIDER_GPU_LAYERS: ${DECIDER_GPU_LAYERS:--1}
+      # Fail startup instead of silently serving CPU inference in a GPU deployment.
+      DECIDER_REQUIRE_GPU: "true"
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
       HF_HUB_DISABLE_TELEMETRY: "1"
