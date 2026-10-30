@@ -1,0 +1,52 @@
+# 기본 정책(초안). 팀·조직 합의 후 버전을 올린다.
+# - severity: 정보 자체의 위험도(탐지 신뢰도와 별개)
+# - action:
+#     block = 원문·정제문 모두 전송 불가(치환으로 해소되지 않음)
+#     mask  = 원문 전송 불가, 해당 구간 치환 후 재검사 통과 시 전송 가능
+#     warn  = 사용자 확인 필요(정제 시 치환 대상)
+#     allow = 탐지 사실만 알림, 치환하지 않음
+# - token: 정제 시 대체어 접두어. 예) EMAIL → [EMAIL_1]
+version: "2026-10-30.draft1"
+
+# true 이면 모델 검사가 끝나지 않은 결과는 status=complete 가 될 수 없다.
+model_required: false
+
+default:
+  category: uncategorized
+  severity: medium
+  action: warn
+
+types:
+  # 개인정보
+  rrn:                 { category: personal_id,  severity: critical, action: mask, token: RRN }
+  passport:            { category: personal_id,  severity: critical, action: mask, token: PASSPORT }
+  driver_license:      { category: personal_id,  severity: critical, action: mask, token: DRIVER_LICENSE }
+  phone:               { category: personal,     severity: medium,   action: mask, token: PHONE }
+  email:               { category: personal,     severity: medium,   action: mask, token: EMAIL }
+  # 금융정보
+  credit_card:         { category: financial,    severity: critical, action: mask, token: CARD }
+  bank_account:        { category: financial,    severity: high,     action: mask, token: ACCOUNT }
+  # 인증정보
+  aws_access_key_id:   { category: credential,   severity: critical, action: mask, token: AWS_KEY }
+  github_token:        { category: credential,   severity: critical, action: mask, token: GITHUB_TOKEN }
+  jwt:                 { category: credential,   severity: critical, action: mask, token: JWT }
+  private_key:         { category: credential,   severity: critical, action: mask, token: PRIVATE_KEY }
+  password:            { category: credential,   severity: critical, action: mask, token: PASSWORD }
+  secret_config_value: { category: credential,   severity: high,     action: mask, token: SECRET }
+  url_with_credentials: { category: credential,  severity: critical, action: mask, token: URL }
+  # 인프라 정보 — 공개 값은 발견만으로 차단하지 않는다.
+  internal_ip:         { category: infrastructure, severity: medium, action: warn,  token: INTERNAL_IP }
+  internal_cidr:       { category: infrastructure, severity: medium, action: warn,  token: INTERNAL_CIDR }
+  internal_domain:     { category: infrastructure, severity: medium, action: warn,  token: INTERNAL_HOST }
+  ip_address:          { category: infrastructure, severity: low,    action: allow, token: IP }
+  cidr:                { category: infrastructure, severity: low,    action: allow, token: CIDR }
+  mac_address:         { category: infrastructure, severity: low,    action: warn,  token: MAC }
+  url:                 { category: infrastructure, severity: info,   action: allow, token: URL }
+  # 보안정보
+  cve:                 { category: security,     severity: info,     action: allow, token: CVE }
+  # 모델 문맥 탐지(후보) — 핵심 의미가 기밀이면 치환으로 해소되지 않으므로 block
+  unpublished_research: { category: confidential, severity: high,    action: block, token: RESEARCH }
+  trade_secret:        { category: confidential, severity: high,     action: block, token: SECRET_DOC }
+  internal_project:    { category: confidential, severity: medium,   action: mask,  token: PROJECT }
+  sensitive_personal:  { category: sensitive_personal, severity: high, action: mask, token: SENSITIVE }
+  third_party_record:  { category: third_party,  severity: high,     action: block, token: RECORD }
