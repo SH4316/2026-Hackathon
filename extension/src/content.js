@@ -222,12 +222,16 @@
     openWarning(ed, entry);
   }
 
+  const lastScheduled = new WeakMap(); // 입력창 → 마지막으로 검사를 예약한 텍스트
+  const observed = new WeakSet();
+
   function scheduleInspect(ed) {
     clearTimeout(timer);
     latest = null; // 입력이 바뀌면 이전 결과와 전송 승인은 무효
     bypass = null;
     version++;
     const text = getText(ed);
+    lastScheduled.set(ed, text);
     localEntry = text.trim() ? localInspect(text) : null;
     refresh();
     if (!enabled || !text.trim()) return;
@@ -238,17 +242,48 @@
     }, DEBOUNCE_MS);
   }
 
+  // 텍스트가 실제로 바뀐 경우에만 다시 예약한다(사이트가 같은 내용을 다시 그려도 깜빡이지 않게).
+  function checkIfChanged(ed) {
+    if (!ed.isConnected || lastScheduled.get(ed) === getText(ed)) return;
+    editor = ed;
+    scheduleInspect(ed);
+  }
+
+  // Gemini·Claude 같은 편집기는 붙여넣기를 직접 처리해 'input' 이벤트를 내지 않는 경우가 있다.
+  // 그러면 다음 입력이 올 때까지 위젯이 "검사 중"에 머물므로, 편집기 DOM 변화를 직접 지켜본다.
+  function observeEditor(ed) {
+    if (observed.has(ed)) return;
+    observed.add(ed);
+    new MutationObserver(() => checkIfChanged(ed))
+      .observe(ed, { childList: true, subtree: true, characterData: true });
+  }
+
+  function trackEditor(ed) {
+    editor = ed;
+    if (ed.tagName !== "TEXTAREA") observeEditor(ed);
+  }
+
   window.addEventListener("input", (e) => {
     const ed = editorFrom(e.target);
     if (!ed) return;
-    editor = ed;
+    trackEditor(ed);
     scheduleInspect(ed);
   }, true);
 
   window.addEventListener("focusin", (e) => {
     const ed = editorFrom(e.target);
-    if (ed) editor = ed;
+    if (ed) trackEditor(ed);
   }, true);
+
+  // 붙여넣기·잘라내기·끌어놓기·조합 입력이 끝난 직후 편집기가 내용을 바꾸는 시점이 사이트마다 달라서 여러 번 확인한다.
+  for (const type of ["paste", "cut", "drop", "compositionend"]) {
+    window.addEventListener(type, (e) => {
+      const ed = editorFrom(e.target);
+      if (!ed) return;
+      trackEditor(ed);
+      for (const delay of [0, 80, 250, 700]) setTimeout(() => checkIfChanged(ed), delay);
+    }, true);
+  }
 
   // ── 전송 가로채기 ──
   // 승인된 전송은 짧은 시간 동안 같은 텍스트에 한해 유효하다.
