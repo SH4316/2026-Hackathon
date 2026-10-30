@@ -2,11 +2,12 @@ const $ = (id) => document.getElementById(id);
 const msg = $("msg");
 
 chrome.storage.local
-  .get({ serverUrl: "http://127.0.0.1:8000", apiKey: "", enabled: true })
+  .get({ serverUrl: "http://127.0.0.1:8000", apiKey: "", enabled: true, blockUnscannableFiles: false })
   .then((s) => {
     $("serverUrl").value = s.serverUrl;
     $("apiKey").value = s.apiKey;
     $("enabled").checked = s.enabled;
+    $("blockUnscannableFiles").checked = s.blockUnscannableFiles;
   });
 
 // 기본 권한(127.0.0.1, localhost) 밖의 서버는 저장할 때 접근 권한을 요청한다.
@@ -23,7 +24,8 @@ $("form").addEventListener("submit", async (e) => {
     msg.textContent = "서버 접근 권한이 없어 저장하지 않았습니다.";
     return;
   }
-  await chrome.storage.local.set({ serverUrl, apiKey: $("apiKey").value.trim(), enabled: $("enabled").checked });
+  await chrome.storage.local.set({ serverUrl, apiKey: $("apiKey").value.trim(), enabled: $("enabled").checked,
+    blockUnscannableFiles: $("blockUnscannableFiles").checked });
   msg.textContent = "저장했습니다.";
 });
 

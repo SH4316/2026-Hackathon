@@ -22,19 +22,68 @@ var PG = (globalThis.PG = globalThis.PG || {});
     --primary: #8ab4f8; --primary-fg: #10131a;
   }
 }
+/* ── SafePrompt 위젯: 입력창 위에 붙는 신호등. 색은 BRAND_GUIDELINES.md 의 토큰을 따른다. ── */
 .badge {
-  position: fixed; right: 16px; bottom: 16px; z-index: 2147483646;
-  display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px;
-  background: var(--bg); color: var(--fg); border: 1px solid var(--line);
-  box-shadow: 0 4px 16px rgba(0,0,0,.15); font-size: 13px; cursor: pointer; user-select: none;
+  /* 다크(기본): Deep Navy */
+  --w-bg: #0F172A; --w-fg: #E2E8F0; --w-mut: #94A3B8; --w-line: #1E293B; --w-line2: #334155; --w-soft: #131D33;
+  --w-blue: #3B82F6; --w-blue-fg: #FFFFFF;
+  --w-red: #EF4444; --w-red-fg: #FCA5A5; --w-red-bg: rgba(239,68,68,.14);
+  --w-amber: #F59E0B; --w-amber-fg: #FCD34D; --w-amber-bg: rgba(245,158,11,.14);
+  --w-green: #10B981; --w-green-fg: #6EE7B7; --w-green-bg: rgba(16,185,129,.14);
+  --w-cyan: #06B6D4; --w-cyan-fg: #67E8F9; --w-cyan-bg: rgba(6,182,212,.14);
+  --w-send: #059669; --w-dim: .22;
+  position: fixed; z-index: 2147483646; display: grid; gap: 8px; padding: 10px 12px;
+  background: var(--w-bg); color: var(--w-fg); border: 1px solid var(--w-line2); border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(15,23,42,.35); font-size: 13px; line-height: 1.45;
 }
-.badge[hidden] { display: none; }
-.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gray); flex: none; }
-.badge[data-state="green"] .dot { background: var(--green); }
-.badge[data-state="yellow"] .dot { background: #f2a600; }
-.badge[data-state="red"] .dot { background: var(--red); }
-.badge[data-state="checking"] .dot { animation: pulse 1s infinite ease-in-out; }
-@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-color-scheme: light) {
+  .badge {
+    /* 라이트: Light Alabaster */
+    --w-bg: #F8FAFC; --w-fg: #0F172A; --w-mut: #475569; --w-line: #E2E8F0; --w-line2: #CBD5E1; --w-soft: #FFFFFF;
+    --w-blue: #2563EB;
+    --w-red-fg: #B91C1C; --w-amber-fg: #92400E; --w-green-fg: #047857; --w-cyan-fg: #0E7490;
+    --w-dim: .28;
+  }
+}
+.badge[hidden], .badge [hidden] { display: none !important; }
+.badge[data-state="red"] { border-color: var(--w-red); }
+.badge[data-state="yellow"] { border-color: var(--w-amber); }
+.badge[data-state="green"] { border-color: var(--w-green); }
+.badge .reason { font-size: 11px; color: var(--w-mut); }
+.badge .reason:empty { display: none; }
+.badge .wrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.badge .brand { display: inline-flex; align-items: center; gap: 8px; background: var(--w-soft); border: 1px solid var(--w-line2); border-radius: 999px; padding: 4px 10px; font-weight: 700; }
+.badge .lamps { display: inline-flex; gap: 5px; padding-left: 8px; border-left: 1px solid var(--w-line2); }
+.badge .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--w-mut); opacity: var(--w-dim); transition: opacity .15s, box-shadow .15s; }
+.badge .dot.r { background: var(--w-red); } .badge .dot.y { background: var(--w-amber); } .badge .dot.g { background: var(--w-green); }
+.badge[data-state="red"] .dot.r { opacity: 1; box-shadow: 0 0 8px var(--w-red); }
+.badge[data-state="yellow"] .dot.y { opacity: 1; box-shadow: 0 0 8px var(--w-amber); }
+.badge[data-state="green"] .dot.g { opacity: 1; box-shadow: 0 0 8px var(--w-green); }
+.badge[data-state="gray"] .dot { background: var(--w-mut); opacity: .6; }
+.badge[data-state="checking"] .dot { background: var(--w-mut); opacity: .7; animation: pulse 1s infinite ease-in-out; }
+@keyframes pulse { 50% { opacity: .25; } }
+.badge .chip-w { margin-left: auto; border: 1px solid var(--w-line2); border-radius: 8px; padding: 3px 9px; font-weight: 600; font-size: 12.5px; background: transparent; color: var(--w-fg); cursor: default; font-family: inherit; }
+.badge .chip-w[data-clickable] { cursor: pointer; }
+.badge[data-state="red"] .chip-w { border-color: var(--w-red); color: var(--w-red-fg); background: var(--w-red-bg); }
+.badge[data-state="yellow"] .chip-w { border-color: var(--w-amber); color: var(--w-amber-fg); background: var(--w-amber-bg); }
+.badge[data-state="green"] .chip-w { border-color: var(--w-green); color: var(--w-green-fg); background: var(--w-green-bg); }
+.badge .pbox { display: grid; gap: 4px; }
+.badge .phead { font-size: 11.5px; color: var(--w-green-fg); }
+.badge .pbody { border: 1px solid var(--w-line2); border-radius: 10px; padding: 8px 10px; background: var(--w-soft); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; max-height: 120px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.badge .tk { background: var(--w-cyan-bg); border: 1px solid var(--w-cyan); color: var(--w-cyan-fg); border-radius: 5px; padding: 0 3px; }
+.badge .pnote { font-size: 11.5px; color: var(--w-mut); }
+.badge .wnotice { font-size: 12px; border-radius: 8px; padding: 5px 9px; background: var(--w-soft); border: 1px solid var(--w-line2); color: var(--w-fg); }
+.badge .wnotice[data-tone="warn"] { background: var(--w-amber-bg); border-color: var(--w-amber); color: var(--w-amber-fg); }
+.badge .acts { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
+.badge button { border: 0; border-radius: 9px; padding: 7px 13px; font-weight: 700; color: #fff; background: var(--w-line2); }
+.badge button:disabled { opacity: .45; cursor: not-allowed; }
+.badge button.b-san { background: var(--w-blue); color: var(--w-blue-fg); }
+.badge button.b-send { background: var(--w-send); }
+.badge button.linkbtn { background: none; color: var(--w-mut); font-weight: 500; padding: 4px 6px; text-decoration: underline; font-size: 12px; }
+.badge button:focus-visible { outline: 2px solid var(--w-blue); outline-offset: 2px; }
+.badge.shake { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .badge .dot, .badge.shake { animation: none; transition: none; } }
 
 .overlay {
   position: fixed; inset: 0; z-index: 2147483647; background: rgba(0,0,0,.45);
@@ -130,32 +179,110 @@ button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
     return el;
   }
 
-  // ── 배지 ──
-  const BADGE_TEXT = {
-    checking: "Prompt Guard · 검사 중",
-    green: "Prompt Guard · 통과",
-    yellow: "Prompt Guard · 확인 필요",
-    red: "Prompt Guard · 민감정보 있음",
-    gray: "Prompt Guard · 검사 불가",
-  };
+  // ── 위젯 ──
+  // vm: { visible, lamp, chip, reason, preview:{parts:[{text,token}],label,note}|null, busy,
+  //       canSanitize, canSend, canApply, canRevert, canForce, notice, noticeTone, chipClickable }
+  let W = null; // 위젯 요소 참조
+  let handlers = {};
+  let anchor = null;
+  let ro = null;
 
-  function setBadge(state, onClick) {
+  function buildWidget() {
     ensureRoot();
-    if (!badgeEl) {
-      badgeEl = h("div", { class: "badge", role: "status", "aria-live": "polite" },
-        h("span", { class: "dot" }), h("span", { class: "label" }));
-      rootEl.append(badgeEl);
-    }
-    badgeEl.hidden = false;
-    badgeEl.dataset.state = state;
-    badgeEl.querySelector(".label").textContent = BADGE_TEXT[state];
-    badgeEl.onclick = onClick || null;
-    badgeEl.title = onClick ? "자세히 보기" : "";
+    const refs = {};
+    const dots = ["r", "y", "g"].map((c) => h("i", { class: `dot ${c}` }));
+    refs.reason = h("div", { class: "reason" });
+    refs.chip = h("button", { class: "chip-w", type: "button", tabindex: "-1" });
+    refs.phead = h("div", { class: "phead" });
+    refs.pbody = h("div", { class: "pbody" });
+    refs.pnote = h("div", { class: "pnote" });
+    refs.pbox = h("div", { class: "pbox" }, refs.phead, refs.pbody, refs.pnote);
+    refs.notice = h("div", { class: "wnotice", role: "status" });
+    const btn = (cls, text, key) =>
+      h("button", { type: "button", class: cls, onclick: (e) => { e.stopPropagation(); handlers[key]?.(); },
+                    onmousedown: (e) => e.preventDefault() }, text);
+    refs.force = btn("linkbtn", "그래도 전송", "force");
+    refs.revert = btn("linkbtn", "원문으로 되돌리기", "revert");
+    refs.apply = btn("linkbtn", "입력창에 적용", "apply");
+    refs.san = btn("b-san", "안전 다듬기", "sanitize");
+    refs.send = btn("b-send", "AI로 안전 전송", "send");
+    refs.chip.addEventListener("click", () => handlers.details?.());
+    refs.chip.addEventListener("mousedown", (e) => e.preventDefault());
+    refs.root = h("div", { class: "badge", hidden: true },
+      refs.reason,
+      h("div", { class: "wrow" },
+        h("div", { class: "brand" }, h("span", null, "SafePrompt"), h("span", { class: "lamps" }, dots)),
+        refs.chip),
+      refs.pbox, refs.notice,
+      h("div", { class: "acts" }, refs.force, refs.revert, refs.apply, refs.san, refs.send));
+    rootEl.append(refs.root);
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return refs;
   }
 
-  function hideBadge() {
-    if (badgeEl) badgeEl.hidden = true;
+  function setHandlers(next) { handlers = next; }
+
+  function renderWidget(vm, editor) {
+    if (!W || !W.root.isConnected) W = buildWidget();
+    if (editor !== anchor) {
+      ro?.disconnect();
+      anchor = editor || null;
+      if (anchor && typeof ResizeObserver !== "undefined") { ro = new ResizeObserver(reposition); ro.observe(anchor); }
+    }
+    W.root.hidden = !vm.visible;
+    W.root.dataset.state = vm.lamp;
+    W.reason.textContent = vm.reason || "";
+    W.chip.textContent = vm.chip || "";
+    if (vm.chipClickable) { W.chip.dataset.clickable = ""; W.chip.title = "자세히 보기"; }
+    else { delete W.chip.dataset.clickable; W.chip.title = ""; }
+
+    W.pbox.hidden = !vm.preview;
+    if (vm.preview) {
+      W.phead.textContent = vm.preview.label;
+      W.pbody.replaceChildren(...vm.preview.parts.map((p) =>
+        h("span", { class: p.token ? "tk" : null }, p.text)));
+      W.pnote.textContent = vm.preview.note || "";
+      W.pnote.hidden = !vm.preview.note;
+    }
+    W.notice.hidden = !vm.notice;
+    W.notice.textContent = vm.notice || "";
+    W.notice.dataset.tone = vm.noticeTone || "info";
+
+    W.san.hidden = !vm.canSanitize && !vm.busy;
+    W.san.disabled = !!vm.busy;
+    W.san.textContent = vm.busy ? "다듬는 중…" : "안전 다듬기";
+    W.send.hidden = !vm.canSend;
+    W.apply.hidden = !vm.canApply;
+    W.revert.hidden = !vm.canRevert;
+    W.force.hidden = !vm.canForce;
+    reposition();
   }
+
+  // 입력창 바로 위에 붙이고, 위쪽 공간이 모자라면 아래에 둔다.
+  function reposition() {
+    if (!W || !anchor || !anchor.isConnected || W.root.hidden) return;
+    const r = anchor.getBoundingClientRect();
+    const width = Math.min(Math.max(r.width, 340), 640, window.innerWidth - 16);
+    W.root.style.width = `${width}px`;
+    W.root.style.left = `${Math.min(Math.max(8, r.left), window.innerWidth - width - 8)}px`;
+    if (r.top > 200) {
+      W.root.style.top = "";
+      W.root.style.bottom = `${window.innerHeight - r.top + 8}px`;
+    } else {
+      W.root.style.bottom = "";
+      W.root.style.top = `${Math.min(r.bottom + 8, window.innerHeight - 140)}px`;
+    }
+  }
+
+  function shakeWidget() {
+    if (!W) return;
+    W.root.classList.remove("shake");
+    void W.root.offsetWidth;
+    W.root.classList.add("shake");
+  }
+
+  function hideWidget() { if (W) W.root.hidden = true; }
 
   // ── 모달 공통 ──
   function openModal(card) {
@@ -329,6 +456,23 @@ button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
           "반영하고 전송") : null)));
   }
 
-  PG.ui = { setBadge, hideBadge, showWarning, showSanitized, showLoading, closeModal,
-            isOpen: () => !!overlayEl };
+  // ── 그래도 전송 확인 ──
+  // opts: { findings, onConfirm }
+  function showForce(opts) {
+    const confirmBtn = h("button", { class: "danger", disabled: true, onclick: () => { closeModal(); opts.onConfirm(); } },
+      "그래도 전송");
+    openModal(h("div", { class: "card" },
+      header("red", "!", "민감정보를 그대로 외부 AI에 보냅니다", "이 선택은 이 전송 한 번에만 적용됩니다."),
+      h("div", { class: "body" },
+        opts.findings?.length ? h("div", null, h("p", { class: "section-title" }, "보내지는 민감정보"), findingList(opts.findings)) : null,
+        h("label", { class: "ack" },
+          h("input", { type: "checkbox", onchange: (e) => { confirmBtn.disabled = !e.target.checked; } }),
+          "민감정보가 외부 AI 서비스에 전송되는 것을 이해했고, 그래도 보내겠습니다.")),
+      h("div", { class: "foot" },
+        h("button", { class: "primary", onclick: closeModal }, "돌아가서 수정"),
+        confirmBtn)));
+  }
+
+  PG.ui = { setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showSanitized, showForce,
+            showLoading, closeModal, isOpen: () => !!overlayEl };
 })();

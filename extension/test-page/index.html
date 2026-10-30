@@ -69,8 +69,22 @@
   </section>
 
   <section>
+    <h2>파일 첨부</h2>
+    <label>
+      <input id="file" type="file" multiple>
+      <span class="muted">텍스트 파일은 내용을 검사하고, 이미지·음성은 경고만 합니다. 첨부한 파일 이름은 아래 로그에 남습니다.</span>
+    </label>
+  </section>
+
+  <section>
     <h2>전송된 메시지</h2>
     <ol id="log"></ol>
+  </section>
+
+  <section>
+    <h2>AI 답변(시뮬레이션)</h2>
+    <p class="muted">받은 문장의 토큰을 그대로 되풀이하며 한 글자씩 보여 줍니다. 정제해서 보냈다면 토큰이 원래 값으로 복원되어 보여야 합니다.</p>
+    <div id="replies" style="display:grid;gap:8px"></div>
   </section>
 </main>
 <script>
@@ -118,7 +132,27 @@
     li.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
     log.append(li);
     if (el === ta) ta.value = ""; else ce.textContent = "";
+    reply(text);
   }
+
+  // 모델 흉내: 받은 토큰을 그대로 되풀이한다. 토큰이 없으면 받은 문장을 요약하는 척한다.
+  function reply(text) {
+    const toks = [...new Set(text.match(/\[[A-Z][A-Z0-9_]*_\d+\]/g) || [])];
+    const out = "요청을 확인했습니다. " +
+      (toks.length ? "말씀하신 " + toks.join(", ") + " 항목을 기준으로 분석했습니다." : "내용을 분석했습니다.");
+    const d = document.createElement("div");
+    d.setAttribute("data-pg-assistant", "");
+    d.style.cssText = "white-space:pre-wrap;word-break:break-word;border:1px solid var(--line);border-radius:10px;padding:8px 12px";
+    document.getElementById("replies").append(d);
+    let i = 0;
+    const t = setInterval(() => { d.textContent = out.slice(0, ++i); if (i >= out.length) clearInterval(t); }, 12);
+  }
+
+  document.getElementById("file").addEventListener("change", (e) => {
+    const li = document.createElement("li");
+    li.textContent = `[첨부] ${[...e.target.files].map((f) => f.name).join(", ")}`;
+    log.append(li);
+  });
 
   document.querySelectorAll("[data-target]").forEach((btn) =>
     btn.addEventListener("click", () => send(document.getElementById(btn.dataset.target))));
