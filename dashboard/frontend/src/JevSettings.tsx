@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "./api";
+import { EnabledSetting } from "./EnabledSetting";
 import { flattenTree, formatNumber } from "./format";
 import { useResource } from "./hooks";
 import { parseJevThreshold, jevThresholdError } from "./jev";
@@ -20,6 +21,7 @@ interface PromptDraft {
   id: string | null;
   name: string;
   prompt: string;
+  enabled: boolean;
   tagIds: string[];
   thresholds: Record<string, string>;
 }
@@ -29,6 +31,7 @@ function editPrompt(version: ConfigVersion, prompt?: JevPrompt): PromptDraft {
     id: prompt?.id ?? null,
     name: prompt?.name ?? "새 Jev 판단",
     prompt: prompt?.prompt ?? "",
+    enabled: prompt?.enabled ?? true,
     tagIds: [...(prompt?.tagIds ?? [])],
     thresholds: Object.fromEntries(
       version.tags.map((tag) => [
@@ -43,6 +46,7 @@ function draftContent(draft: PromptDraft) {
   return JSON.stringify({
     name: draft.name,
     prompt: draft.prompt,
+    enabled: draft.enabled,
     outputs: draft.tagIds.map((tagId) => ({
       tagId,
       threshold: draft.thresholds[tagId] ?? "",
@@ -178,6 +182,7 @@ export function JevSettings() {
         revision: version.revision,
         name: draft.name,
         prompt: draft.prompt,
+        enabled: draft.enabled,
         outputs: draft.tagIds.map((tagId) => ({
           tagId,
           threshold: parseJevThreshold(draft.thresholds[tagId] ?? "") as
@@ -381,6 +386,9 @@ export function JevSettings() {
                 >
                   <strong>{prompt.name}</strong>
                   <span>결과 태그 {prompt.tagIds.length}개</span>
+                  {!prompt.enabled && (
+                    <small className="usage-badge">사용 안 함</small>
+                  )}
                 </button>
               ))}
               {draft && !draft.id && (
@@ -430,6 +438,13 @@ export function JevSettings() {
                     </button>
                   </div>
                   <fieldset className="tag-fields" disabled={pending}>
+                    <EnabledSetting
+                      label="Jev 판단 사용"
+                      checked={draft.enabled}
+                      disabled={pending}
+                      onChange={(enabled) => setDraft({ ...draft, enabled })}
+                      description="이 판단의 사용 여부입니다. 꺼도 프롬프트와 결과 태그 연결은 유지됩니다. 사용 중인 결과 태그가 있어야 실행 대상이 됩니다."
+                    />
                     <label>
                       <span>판단 이름</span>
                       <input
@@ -534,6 +549,11 @@ export function JevSettings() {
                                   />
                                   <span>
                                     <strong>{tag.name}</strong>
+                                    {!tag.enabled && (
+                                      <small className="usage-badge">
+                                        사용 안 함
+                                      </small>
+                                    )}
                                     <small>
                                       {tag.depth ? "하위 태그 · " : ""}
                                       {tag.id}

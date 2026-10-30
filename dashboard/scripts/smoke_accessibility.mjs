@@ -9,7 +9,7 @@ const baseUrl = (process.env.DASHBOARD_URL || 'http://127.0.0.1:8083').replace(/
 const api = async path => (await fetch(baseUrl + '/api/v1' + path)).json();
 const events = await api('/events?size=1');
 const saved = await api('/saved-searches');
-const routes = ['/', '/events', '/people', '/settings/metrics', '/settings/monitoring', '/saved-searches'];
+const routes = ['/', '/events', '/people', '/settings/metrics', '/settings/jev', '/saved-searches'];
 if (events.items?.[0]) { routes.push('/events/' + events.items[0].id); routes.push('/people/' + events.items[0].personId); }
 if (saved[0]) routes.push('/saved-searches/' + saved[0].id);
 const browser = await chromium.launch({ headless: true });

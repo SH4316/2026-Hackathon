@@ -147,11 +147,12 @@ try {
   await page.getByRole('region', { name: '사람 목록' }).waitFor();
   await page.waitForFunction(id => { const rows = document.querySelectorAll('.data-table tbody tr'); return rows.length === 1 && rows[0].textContent.includes(id); }, registeredId);
   assert.equal(await page.locator('.data-table tbody tr').count(), 1);
-  await page.goto(baseUrl + '/settings/monitoring'); await ready('감시 연동');
-  assert.equal(await page.locator('fieldset input').count(), 2);
-  assert(await page.getByRole('button', { name: '연동 설정 저장', exact: true }).isDisabled());
-  for (const input of await page.locator('fieldset input').all()) assert(await input.isDisabled());
-  checks.push('person registration/personQuery and dynamic readonly monitoring view of active custom tags');
+  await page.goto(baseUrl + '/settings/monitoring?versionId=' + editedId + '&tagId=' + parent.id);
+  await ready('메트릭 설정');
+  await page.waitForURL(url => url.pathname === '/settings/metrics' && url.searchParams.get('versionId') === editedId && url.searchParams.get('tagId') === parent.id);
+  assert.equal(await page.getByRole('link', { name: '감시 연동', exact: true }).count(), 0);
+  assert(await page.getByRole('switch', { name: '태그 사용', exact: true }).isEnabled());
+  checks.push('person registration/personQuery, removed monitoring navigation and old route redirect preserving version/tag query');
 
   await page.goto(baseUrl + '/'); await ready('전체 현황');
   await page.locator('.stat-strip').waitFor();

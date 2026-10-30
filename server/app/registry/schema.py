@@ -60,7 +60,7 @@ class CustomRule(TypePolicyFields):
 
 
 class ContextDetector(TypePolicyFields):
-    """정규식으로 판단할 수 없는 기준. 로컬 모델이 기준·예문을 보고 후보 구간을 찾는다."""
+    """정규식으로 판단할 수 없는 기준. Decider 는 입력 전체 분류, 생성형 모델은 후보 구간 추출."""
 
     criteria: str = Field(min_length=5, max_length=1000)          # 판단 기준 설명
     examples: list[str] = Field(min_length=1, max_length=20)      # 탐지해야 하는 문장

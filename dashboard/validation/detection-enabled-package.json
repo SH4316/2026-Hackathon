@@ -1,0 +1,85 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T20:59:07.054118+00:00",
+  "baseUrl": "http://127.0.0.1:8086",
+  "spaRoutes": [
+    "/",
+    "/events",
+    "/events/1",
+    "/people",
+    "/people/demo-person",
+    "/settings/metrics",
+    "/settings/jev",
+    "/settings/monitoring",
+    "/saved-searches",
+    "/saved-searches/demo-snapshot"
+  ],
+  "assets": [
+    "/assets/index-BqV-mSTQ.js",
+    "/assets/index-BYg2pXso.css"
+  ],
+  "missingResourcesReturn404": true,
+  "apiReturnsJson": true,
+  "swaggerUiServed": true,
+  "openApiRelativeServer": true,
+  "devSqlExcludedFromJar": true,
+  "jarSha256": "e12e836d8351814c06423ce148feb79e3549898a3bd8f46cb05d4f8f560ebc61",
+  "runtime": "native packaged Spring Boot JAR on Java21 / MySQL8.4.7",
+  "migrations": {
+    "latest": 8,
+    "appliedSuccessfully": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "V8IncludedInJar": true,
+    "enabledColumnsNotNullDefaultTrue": true
+  },
+  "freshDatabaseBootstrap": {
+    "configVersionsStatus": 200,
+    "configVersionsInitiallyEmpty": true,
+    "classifierStatus": 404,
+    "classifierCode": "NO_ACTIVE_VERSION"
+  },
+  "openApi": {
+    "status": 200,
+    "requiredBooleanResponseFlags": [
+      "Tag",
+      "JevPrompt"
+    ],
+    "nullableOptionalBooleanInputFlags": [
+      "TagInput",
+      "UpdateTagDetails",
+      "SaveJevPrompt"
+    ]
+  },
+  "javaFormatting": {
+    "status": "PASS",
+    "formatter": "google-java-format1.24.0",
+    "javaVersion": 21,
+    "changedOrNewFilesChecked": 13
+  },
+  "enabledContract": {
+    "requiredBooleanResponses": [
+      "Tag",
+      "JevPrompt"
+    ],
+    "optionalNullableBooleanInputs": [
+      "TagInput",
+      "UpdateTagDetails",
+      "SaveJevPrompt"
+    ],
+    "V8IncludedInJar": true
+  },
+  "finalBuild": {
+    "frontend": "npm run build (TypeScript and Vite production build)",
+    "jar": "JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew bootJar -x frontendBuild --no-daemon",
+    "runtimeRestartedWithFinalAssets": true,
+    "backendTestsReused": "No backend code changed after the passing 79-test run."
+  }
+}

@@ -39,7 +39,7 @@ public class JevPromptService {
     if (repository.count(versionId) >= MAX_PROMPTS)
       throw ApiException.invalid("jevPrompts", "한 버전에 Jev 프롬프트는 최대 100개까지 추가할 수 있습니다.");
     String id = "j_" + UUID.randomUUID().toString().replace("-", "");
-    repository.insert(versionId, id, name, prompt);
+    repository.insert(versionId, id, name, prompt, input.enabled() == null || input.enabled());
     repository.saveOutputs(versionId, id, outputs);
     repository.incrementRevision(versionId);
     return configs.get(versionId);
@@ -52,7 +52,7 @@ public class JevPromptService {
     String name = InputValidation.name(input.name(), "name");
     String prompt = InputValidation.text(input.prompt(), 12000, "prompt");
     var outputs = normalizeOutputs(versionId, input.outputs());
-    repository.update(versionId, promptId, name, prompt);
+    repository.update(versionId, promptId, name, prompt, input.enabled());
     repository.saveOutputs(versionId, promptId, outputs);
     repository.incrementRevision(versionId);
     return configs.get(versionId);

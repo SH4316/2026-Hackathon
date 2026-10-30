@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!requirements.txt
+!model_files.py
+!download.py
+!serve.py

@@ -115,6 +115,71 @@ class TagHistoryIntegrationTest {
   }
 
   @Test
+  void disablingTagsAndPromptsPreservesHistoryMetricsAndSnapshotsAndStillAcceptsIngestion()
+      throws Exception {
+    String version = ready();
+    var legacyRequest = event(version, "before-disable");
+    var legacy = call(post("/api/v1/events"), legacyRequest, 201);
+    var detectorRequest = detector(version);
+    var detector = call(post("/api/v1/detector-events"), detectorRequest, 201);
+    var saved =
+        call(
+            post("/api/v1/saved-searches"),
+            Map.of("name", "비활성 전 이력", "filters", Map.of("from", FROM, "to", TO, "tagId", "root")),
+            201);
+    String savedPath = "/api/v1/saved-searches/" + saved.path("id").asText();
+    var snapshot = call(get(savedPath + "/events"), null, 200);
+    var beforeMetrics = call(range(get("/api/v1/metrics")), null, 200);
+    var captured = jdbc.queryForList("SELECT * FROM detection_tags ORDER BY detection_id,tag_id");
+    var envelopes = jdbc.queryForList("SELECT * FROM detector_events ORDER BY event_id");
+    var closure = jdbc.queryForList("SELECT * FROM config_tag_closure ORDER BY 1,2,3");
+
+    var current = call(get("/api/v1/config-versions/" + version), null, 200);
+    for (String tag : List.of("root", "email")) {
+      current =
+          call(
+              put("/api/v1/config-versions/" + version + "/tags/" + tag),
+              Map.of(
+                  "revision", current.path("revision").asLong(),
+                  "name", tag.equals("email") ? "원래 이메일" : "부모",
+                  "color", tag.equals("email") ? "#123456" : "#64748B",
+                  "enabled", false),
+              200);
+    }
+    call(
+        post("/api/v1/config-versions/" + version + "/jev-prompts"),
+        Map.of(
+            "revision", current.path("revision").asLong(), "name", "비활성 판단",
+            "prompt", "보존할 판단", "enabled", false,
+            "outputs", List.of(Map.of("tagId", "email", "threshold", 0.5))),
+        201);
+
+    assertThat(call(get("/api/v1/events/" + legacy.path("id").asLong()), null, 200)).isEqualTo(legacy);
+    assertThat(call(post("/api/v1/events"), legacyRequest, 200)).isEqualTo(legacy);
+    assertThat(call(get("/api/v1/detector-events/" + detector.path("id").asLong()), null, 200))
+        .isEqualTo(detector);
+    assertThat(call(post("/api/v1/detector-events"), detectorRequest, 200)).isEqualTo(detector);
+    assertThat(call(get(savedPath + "/events"), null, 200)).isEqualTo(snapshot);
+    assertThat(call(range(get("/api/v1/metrics")), null, 200)).isEqualTo(beforeMetrics);
+    assertThat(jdbc.queryForList("SELECT * FROM detection_tags ORDER BY detection_id,tag_id"))
+        .isEqualTo(captured);
+    assertThat(jdbc.queryForList("SELECT * FROM detector_events ORDER BY event_id"))
+        .isEqualTo(envelopes);
+    assertThat(jdbc.queryForList("SELECT * FROM config_tag_closure ORDER BY 1,2,3"))
+        .isEqualTo(closure);
+
+    var after = call(post("/api/v1/events"), event(version, "after-disable"), 201);
+    assertCapturedTag(after, "원래 이메일", "#123456");
+    ((ObjectNode) detectorRequest.path("result")).put("request_id", "after-disable");
+    var afterDetector = call(post("/api/v1/detector-events"), detectorRequest, 201);
+    assertCapturedTag(afterDetector.path("event"), "원래 이메일", "#123456");
+    assertThat(call(get(savedPath + "/events"), null, 200)).isEqualTo(snapshot);
+    var afterMetrics = call(range(get("/api/v1/metrics")), null, 200);
+    assertThat(afterMetrics.at("/summary/eventCount").asInt()).isEqualTo(4);
+    assertThat(afterMetrics.at("/summary/findingCount").asInt()).isEqualTo(6);
+  }
+
+  @Test
   void ingestionWaitingForMetadataCommitCapturesTheNewNameAndColorTogether() throws Exception {
     String version = ready();
     var attempted = new CountDownLatch(1);
