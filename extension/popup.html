@@ -2,27 +2,73 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <title>Prompt Guard</title>
+  <title>SafePrompt</title>
   <link rel="stylesheet" href="src/pages.css">
 </head>
 <body class="popup">
-  <h1>Prompt Guard</h1>
-  <div class="row">
-    <span>검사 서버</span>
-    <span id="status" class="pill" data-state="checking">확인 중…</span>
+
+  <!-- Header: Logo + Wordmark -->
+  <header class="sp-header">
+    <div class="sp-logo-box">
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z"
+              fill="#0F172A" stroke="#3B82F6" stroke-width="3.2" stroke-linejoin="round"/>
+        <circle cx="24" cy="15" r="3.5" fill="#EF4444"/>
+        <circle cx="24" cy="24" r="3.5" fill="#F59E0B"/>
+        <circle cx="24" cy="33" r="3.5" fill="#10B981"/>
+      </svg>
+    </div>
+    <h1 class="sp-wordmark">Safe<span>Prompt</span></h1>
+    <span class="sp-version-badge">v1.2</span>
+  </header>
+
+  <!-- Server Status Card -->
+  <div class="sp-card">
+    <div class="sp-card-row">
+      <span class="sp-label">검사 서버</span>
+      <span id="status" class="sp-pill" data-state="checking">
+        <span class="sp-pill-dot"></span>
+        확인 중…
+      </span>
+    </div>
+    <p id="detail" class="sp-detail"></p>
   </div>
-  <p id="detail" class="muted"></p>
-  <label class="row toggle">
-    <span>이 브라우저에서 검사 사용</span>
-    <input id="enabled" type="checkbox">
-  </label>
-  <p class="muted small">끄면 프롬프트를 검사하지 않고 전송합니다. 조직 정책을 확인하세요.</p>
-  <p id="stats" class="muted small"></p>
-  <label class="row toggle">
-    <span>테스트 모드(실제 전송 안 함)</span>
-    <input id="testMode" type="checkbox">
-  </label>
-  <button id="options" type="button">설정 열기</button>
+
+
+  <!-- Toggle Card -->
+  <div class="sp-card">
+    <label class="sp-toggle-row">
+      <div>
+        <span class="sp-label">프롬프트 검사</span>
+        <p class="sp-detail" style="margin:2px 0 0;">이 브라우저에서 검사 사용</p>
+      </div>
+      <div class="sp-switch">
+        <input id="enabled" type="checkbox">
+        <span class="sp-switch-track"></span>
+      </div>
+    </label>
+    <div class="sp-divider"></div>
+    <label class="sp-toggle-row">
+      <div>
+        <span class="sp-label">테스트 모드</span>
+        <p class="sp-detail" style="margin:2px 0 0;">실제 전송 안 함</p>
+      </div>
+      <div class="sp-switch">
+        <input id="testMode" type="checkbox">
+        <span class="sp-switch-track"></span>
+      </div>
+    </label>
+    <p class="sp-hint">끄면 프롬프트를 검사하지 않고 전송합니다. 조직 정책을 확인하세요.</p>
+    <p id="stats" class="sp-hint"></p>
+  </div>
+
+  <!-- Action Button -->
+  <button id="options" type="button" class="sp-btn-primary">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    설정 열기
+  </button>
   <script src="src/popup.js"></script>
 </body>
 </html>

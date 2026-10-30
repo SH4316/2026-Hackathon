@@ -1,37 +1,346 @@
+/* ============================================================
+   SafePrompt Design System — pages.css
+   Brand System v1.2 | Deep Navy Dark + Light Mode Support
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+
 :root {
-  --bg: #ffffff; --fg: #1d1d1f; --muted: #5f6368; --line: #e3e3e8;
-  --ok: #1b7f3b; --ok-bg: #e7f5ec; --err: #c62828; --err-bg: #fdecea; --primary: #1a5fd0;
-  color-scheme: light dark;
+  /* Base */
+  --sp-bg-main:   #0B0F19;
+  --sp-bg-card:   #0F172A;
+  --sp-bg-sub:    #1E293B;
+  --sp-border:    #334155;
+  --sp-border-faint: #1E293B;
+
+  /* Text */
+  --sp-text-primary:   #F1F5F9;
+  --sp-text-secondary: #94A3B8;
+  --sp-text-hint:      #64748B;
+
+  /* Brand */
+  --sp-blue:  #3B82F6;
+  --sp-cyan:  #06B6D4;
+
+  /* Signal traffic lights */
+  --sp-red:         #EF4444;
+  --sp-red-bg:      rgba(239, 68, 68, 0.12);
+  --sp-red-border:  rgba(239, 68, 68, 0.35);
+
+  --sp-yellow:        #F59E0B;
+  --sp-yellow-bg:     rgba(245, 158, 11, 0.12);
+  --sp-yellow-border: rgba(245, 158, 11, 0.35);
+
+  --sp-green:        #10B981;
+  --sp-green-bg:     rgba(16, 185, 129, 0.12);
+  --sp-green-border: rgba(16, 185, 129, 0.35);
+
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) {
+
+/* Light mode overrides */
+@media (prefers-color-scheme: light) {
   :root {
-    --bg: #1f2023; --fg: #ececf1; --muted: #a0a4ab; --line: #34363b;
-    --ok: #81c995; --ok-bg: #1e3326; --err: #ff8a80; --err-bg: #3a1f1e; --primary: #8ab4f8;
+    --sp-bg-main:   #F8FAFC;
+    --sp-bg-card:   #FFFFFF;
+    --sp-bg-sub:    #F1F5F9;
+    --sp-border:    #E2E8F0;
+    --sp-border-faint: #E2E8F0;
+    --sp-text-primary:   #0F172A;
+    --sp-text-secondary: #475569;
+    --sp-text-hint:      #94A3B8;
+    --sp-blue: #2563EB;
+    color-scheme: light;
   }
 }
-* { box-sizing: border-box; }
+
+/* ============================================================
+   Base Reset
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
 body {
-  margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
-  font: 14px/1.5 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: var(--sp-bg-main);
+  color: var(--sp-text-primary);
+  font: 13px/1.5 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
-body.popup { width: 300px; }
-body.options { max-width: 520px; margin: 0 auto; padding: 24px 16px; }
-h1 { font-size: 16px; margin: 0 0 12px; }
+
+body.popup {
+  width: 320px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+body.options {
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 28px 20px;
+}
+
+/* ============================================================
+   Popup — Header
+   ============================================================ */
+.sp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--sp-border-faint);
+}
+
+.sp-logo-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+
+@media (prefers-color-scheme: light) {
+  .sp-logo-box {
+    background: #0F172A;
+    border-color: #334155;
+  }
+}
+
+.sp-wordmark {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.3px;
+  color: var(--sp-text-primary);
+  flex: 1;
+}
+
+.sp-wordmark span {
+  color: var(--sp-blue);
+}
+
+.sp-version-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #10B981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Popup — Cards
+   ============================================================ */
+.sp-card {
+  background: var(--sp-bg-card);
+  border: 1px solid var(--sp-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.sp-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sp-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.sp-detail {
+  font-size: 11px;
+  color: var(--sp-text-hint);
+  margin: 6px 0 0;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.4;
+}
+
+/* ============================================================
+   Status Pill — Signal Traffic Light Style
+   ============================================================ */
+.sp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--sp-border);
+  background: var(--sp-bg-sub);
+  color: var(--sp-text-secondary);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.sp-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sp-text-hint);
+  flex-shrink: 0;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+/* Checking */
+.sp-pill[data-state="checking"] .sp-pill-dot {
+  background: var(--sp-yellow);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+  animation: sp-pulse 1.2s ease-in-out infinite;
+}
+
+/* OK / Connected */
+.sp-pill[data-state="ok"] {
+  background: var(--sp-green-bg);
+  border-color: var(--sp-green-border);
+  color: var(--sp-green);
+}
+.sp-pill[data-state="ok"] .sp-pill-dot {
+  background: var(--sp-green);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.55);
+}
+
+/* Error */
+.sp-pill[data-state="error"] {
+  background: var(--sp-red-bg);
+  border-color: var(--sp-red-border);
+  color: var(--sp-red);
+}
+.sp-pill[data-state="error"] .sp-pill-dot {
+  background: var(--sp-red);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.55);
+}
+
+@keyframes sp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ============================================================
+   Toggle Switch
+   ============================================================ */
+.sp-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.sp-switch {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sp-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sp-switch-track {
+  display: block;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--sp-border);
+  transition: background 0.2s;
+  position: relative;
+}
+
+.sp-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+.sp-switch input:checked + .sp-switch-track {
+  background: var(--sp-blue);
+}
+
+.sp-switch input:checked + .sp-switch-track::after {
+  transform: translateX(16px);
+}
+
+.sp-divider {
+  border: none;
+  border-top: 1px solid var(--sp-border-faint);
+  margin: 10px 0;
+}
+
+.sp-hint {
+  font-size: 11px;
+  color: var(--sp-text-hint);
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.sp-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: none;
+  background: var(--sp-blue);
+  color: #fff;
+  font: 600 13px/1 "Pretendard", system-ui, sans-serif;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+}
+
+.sp-btn-primary:hover { opacity: 0.88; }
+.sp-btn-primary:active { transform: scale(0.98); }
+
+/* ============================================================
+   Options Page — Legacy support
+   ============================================================ */
+h1 { font-size: 18px; font-weight: 800; margin: 0 0 20px; color: var(--sp-text-primary); }
 .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0; }
-.muted { color: var(--muted); margin: 4px 0 8px; }
-.small { font-size: 12px; }
-.pill { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--line); }
-.pill[data-state="ok"] { background: var(--ok-bg); color: var(--ok); }
-.pill[data-state="error"] { background: var(--err-bg); color: var(--err); }
+.muted { color: var(--sp-text-secondary); margin: 4px 0 8px; font-size: 12px; }
+.small { font-size: 11px; }
 label { display: block; margin-top: 12px; font-weight: 600; }
 label.toggle { font-weight: 400; }
 input[type="url"], input[type="password"] {
   display: block; width: 100%; margin-top: 4px; padding: 8px 10px; font: inherit;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg);
+  border: 1px solid var(--sp-border); border-radius: 8px;
+  background: var(--sp-bg-card); color: var(--sp-text-primary);
 }
 button {
   font: inherit; padding: 7px 14px; border-radius: 8px; cursor: pointer;
-  border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+  border: 1px solid var(--sp-border); background: var(--sp-bg-card); color: var(--sp-text-primary);
 }
-button[type="submit"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+button[type="submit"] { background: var(--sp-blue); border-color: var(--sp-blue); color: #fff; }
 .actions { display: flex; gap: 8px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--sp-bg-sub); }
+.pill[data-state="ok"] { background: var(--sp-green-bg); color: var(--sp-green); }
+.pill[data-state="error"] { background: var(--sp-red-bg); color: var(--sp-red); }
