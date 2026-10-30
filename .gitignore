@@ -1,3 +1,5 @@
 .worktree
 .env
 !.env.example
+PROMPT_SECURITY_PROJECT_CONTEXT.md
+
