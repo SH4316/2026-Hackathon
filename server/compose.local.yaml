@@ -1,0 +1,101 @@
+# 로컬 버전: API + 4B 판단 모델(decider, Ollama)을 이 PC/서버에서 함께 띄운다.
+#   cp .env.example .env   # PG_API_KEYS 등 설정
+#   docker compose -f compose.local.yaml up -d
+#   curl http://127.0.0.1:8000/readyz   # model_ready: true 가 되면 준비 완료
+#
+# 흐름: decider-pull(인터넷 O, 모델 내려받기 후 종료) → decider(인터넷 X) → api
+# - 모델은 model-data 볼륨에 한 번만 받는다. 이미 있으면 내려받지 않는다.
+# - 폐쇄망: DECIDER_OFFLINE=true 로 두고 모델을 볼륨에 미리 반입한다(README 참고).
+# - 모델 바꾸기: .env 의 DECIDER_MODEL (기본 qwen3:4b-instruct-2507-q4_K_M, 약 2.5GB)
+services:
+  api:
+    build: .
+    env_file: .env
+    environment:
+      # 모델 연결은 이 파일이 정한다(.env 의 PG_MODEL_API·BASE_URL·NAME 보다 우선).
+      PG_MODEL_MODE: ${PG_MODEL_MODE:-optional}
+      PG_MODEL_API: ollama
+      PG_MODEL_BASE_URL: http://decider:11434
+      PG_MODEL_NAME: ${DECIDER_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
+      # CPU 만 쓰면 4B 모델 응답이 수십 초 걸릴 수 있다.
+      PG_MODEL_TIMEOUT_S: ${PG_MODEL_TIMEOUT_S:-60}
+    ports:
+      - "${PG_BIND:-127.0.0.1:8000}:8000"
+    volumes:
+      - audit-data:/srv/data
+      - ./policies:/srv/policies:ro
+    networks: [edge, internal]
+    depends_on:
+      decider:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # 모델 내려받기 전용. 원문은 이 컨테이너를 지나지 않는다(api 와 네트워크를 공유하지 않음).
+  decider-pull:
+    image: ollama/ollama:0.40.13
+    networks: [edge]
+    volumes:
+      - model-data:/root/.ollama
+    environment:
+      DECIDER_MODEL: ${DECIDER_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
+      DECIDER_OFFLINE: ${DECIDER_OFFLINE:-false}
+      OLLAMA_HOST: 127.0.0.1:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama serve >/dev/null 2>&1 &
+        until ollama list >/dev/null 2>&1; do sleep 1; done
+        if ollama show "$$DECIDER_MODEL" >/dev/null 2>&1; then
+          echo "decider: $$DECIDER_MODEL 이미 있음"
+        elif [ "$$DECIDER_OFFLINE" = "true" ]; then
+          echo "decider: $$DECIDER_MODEL 이 볼륨에 없습니다(DECIDER_OFFLINE=true). 모델을 미리 반입하세요." >&2
+          exit 1
+        else
+          echo "decider: $$DECIDER_MODEL 내려받는 중"
+          ollama pull "$$DECIDER_MODEL" || exit 1
+        fi
+    restart: "no"
+
+  decider:
+    image: ollama/ollama:0.40.13
+    # 포트를 호스트에 공개하지 않는다. api 만 internal 네트워크로 접근.
+    networks: [internal]
+    volumes:
+      - model-data:/root/.ollama
+    environment:
+      DECIDER_MODEL: ${DECIDER_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
+      # 판단 모델은 계속 쓰므로 메모리에 올려 둔다(첫 요청 지연 방지).
+      OLLAMA_KEEP_ALIVE: "-1"
+    depends_on:
+      decider-pull:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      # 컨테이너 기동이 아니라 지정 모델이 있는지 확인한다.
+      test: ["CMD-SHELL", "ollama show \"$$DECIDER_MODEL\" >/dev/null"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    # GPU 사용 시 주석 해제(NVIDIA Container Toolkit 필요)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+networks:
+  edge: {}
+  internal:
+    internal: true   # 외부(인터넷) 경로 없음 → decider 에서 원문이 나갈 수 없다
+
+volumes:
+  audit-data: {}
+  model-data: {}
