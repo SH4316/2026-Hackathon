@@ -112,9 +112,15 @@ PG.files = (() => {
       if (PG.pdf.isPdf(f)) {
         let r;
         try {
-          r = await PG.pdf.extractText(f);
-        } catch {
-          if (!unreadable(f, "PDF 를 읽지 못했습니다(암호가 걸렸거나 손상된 파일일 수 있습니다).")) return false;
+          // 쪽이 많으면 오래 걸리므로 진행 상황을 보여 준다(멈춘 것처럼 보이지 않게).
+          r = await PG.pdf.extractText(f, (done, total) => {
+            if (total > 5 && (done === total || done % 5 === 0)) PG.hooks.notice(`${f.name}: PDF 글자를 읽는 중… (${done}/${total}쪽)`, "info");
+          });
+        } catch (e) {
+          const why = e?.message === "too_large" ? "파일이 너무 커서(30MB 초과) 읽지 못했습니다."
+            : e?.message === "timeout" ? "읽는 데 시간이 너무 오래 걸려 중단했습니다."
+            : "PDF 를 읽지 못했습니다(암호가 걸렸거나 손상된 파일일 수 있습니다).";
+          if (!unreadable(f, why)) return false;
           continue;
         }
         if (!r.text.trim()) {

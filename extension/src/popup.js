@@ -29,3 +29,5 @@ chrome.storage.local.get({ stats: {} }).then(({ stats }) => {
   document.getElementById("stats").textContent =
     `이 브라우저에서 막은 전송·첨부 ${stats.blocked || 0}회 · 안전하게 다듬은 횟수 ${stats.sanitized || 0}회 · 그래도 전송 ${stats.forced || 0}회`;
 });
+
+document.getElementById("ver").textContent = `확장 버전 ${chrome.runtime.getManifest().version_name}`;

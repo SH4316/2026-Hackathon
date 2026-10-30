@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Prompt Guard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "외부 생성형 AI에 보내기 전에 조직 검사 서버로 프롬프트의 민감정보를 확인하고 정제합니다.",
   "permissions": [
     "storage"
@@ -63,7 +63,8 @@
       "resources": [
         "vendor/prompt-guard-rules/src/*.js",
         "vendor/prompt-guard-rules/data/*.js",
-        "vendor/pdfjs/*.mjs"
+        "vendor/pdfjs/*.mjs",
+        "vendor/pdfjs/cmaps/*"
       ],
       "matches": [
         "https://chatgpt.com/*",
@@ -83,5 +84,6 @@
         "http://127.0.0.1/*"
       ]
     }
-  ]
+  ],
+  "version_name": "0.2.0 (SafePrompt 위젯·PDF·붙여넣기)"
 }

@@ -87,6 +87,16 @@
   </section>
 
   <section>
+    <h2>입력창 E · 숨은 편집 영역을 거치는 편집기 (실제 Gemini·Quill 방식)</h2>
+    <p class="muted">붙여넣기를 가로채 화면 밖의 .ql-clipboard 에 잠깐 넣었다가 본 입력창으로 옮기고 비웁니다. 이 숨은 영역을 입력창으로 잘못 잡으면 신호등이 사라집니다.</p>
+    <div class="composer">
+      <div id="qe" class="ce" contenteditable="true" data-placeholder="여기에 붙여넣어 보세요"></div>
+      <button type="button" aria-label="Send message E" data-target="qe">보내기</button>
+    </div>
+    <div class="ql-clipboard" id="qclip" contenteditable="true" tabindex="-1" style="position:absolute;left:-100000px;top:50%;height:1px;overflow-y:hidden"></div>
+  </section>
+
+  <section>
     <h2>파일 첨부</h2>
     <label>
       <input id="file" type="file" multiple>
@@ -118,10 +128,26 @@
   const ta = document.getElementById("ta");
   const ce = document.getElementById("ce");
   const pm = document.getElementById("pm");
+  const qe = document.getElementById("qe");
+  const qclip = document.getElementById("qclip");
+
+  // 입력창 E: Quill 의 붙여넣기 흐름 — 숨은 .ql-clipboard 로 포커스를 옮겨 붙여넣고, 잠시 뒤 본 입력창으로 옮긴 다음 비운다.
+  qe.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    qclip.focus();
+    document.execCommand("insertText", false, text);
+    setTimeout(() => {
+      const moved = qclip.textContent;
+      qclip.textContent = "";
+      qe.append(document.createTextNode(moved));
+      qe.focus();
+    }, 15);
+  });
   const cq = document.getElementById("cq");
   const log = document.getElementById("log");
   let last = ta;
-  [ta, ce, pm, cq].forEach((el) => el.addEventListener("focus", () => { last = el; }));
+  [ta, ce, pm, cq, qe].forEach((el) => el.addEventListener("focus", () => { last = el; }));
 
   // 입력창 C: DOM 변경을 관찰해 30ms 뒤 내부 상태(pmState)를 갱신한다(프레임워크 상태 동기화 지연 흉내).
   let pmState = "";
@@ -189,7 +215,7 @@
 
   document.querySelectorAll("[data-target]").forEach((btn) =>
     btn.addEventListener("click", () => send(document.getElementById(btn.dataset.target))));
-  [ta, ce, pm, cq].forEach((el) => el.addEventListener("keydown", (e) => {
+  [ta, ce, pm, cq, qe].forEach((el) => el.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(el); }
   }));
 </script>

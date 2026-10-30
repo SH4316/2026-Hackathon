@@ -60,17 +60,25 @@
   // ── 입력창 ──
   const EDITOR_SEL = 'textarea, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]';
 
+  // 사용자가 실제로 보고 입력하는 입력창인가. 편집기가 내부적으로 쓰는 숨은 편집 영역은 제외한다.
+  // 예) Gemini(Quill)는 붙여넣기를 처리하려고 화면 밖의 .ql-clipboard 에 잠깐 내용을 넣었다가 지운다.
+  //     이 영역을 입력창으로 잘못 잡으면, 붙여넣은 직후 "빈 입력창"으로 보여 신호등이 사라진다.
+  function isUserEditor(el) {
+    if (el.closest('.ql-clipboard, [aria-hidden="true"], [hidden]')) return false;
+    const r = el.getBoundingClientRect();
+    return r.width >= 20 && r.height >= 8 && r.right > 0;
+  }
+
   function editorFrom(target) {
     if (!(target instanceof Element) || target.closest("#pg-root-host")) return null;
     const el = target.closest(EDITOR_SEL);
     if (!el || el.disabled || el.readOnly) return null;
     // 가장 바깥 contenteditable 을 입력창으로 본다
+    let found = el;
     if (el.isContentEditable) {
-      let top = el;
-      while (top.parentElement?.isContentEditable) top = top.parentElement;
-      return top;
+      while (found.parentElement?.isContentEditable) found = found.parentElement;
     }
-    return el;
+    return isUserEditor(found) ? found : null;
   }
 
   function getText(el) {

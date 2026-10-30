@@ -286,6 +286,20 @@ await page.screenshot({ path: `${OUT}/11-paste-updated.png` });
 await page.locator("#cq").evaluate((el) => { el.textContent = ""; });
 await page.waitForTimeout(500);
 
+// 14-2. Quill 방식: 붙여넣기를 숨은 편집 영역(.ql-clipboard)을 거쳐 처리한다(실제 Gemini 에서 신호등이 사라지던 원인)
+await page.click("#qe");
+await page.evaluate(() => {
+  const dt = new DataTransfer();
+  dt.setData("text/plain", "연락처 lee@example.com 입니다");
+  document.getElementById("qe").dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+});
+await page.waitForFunction(() => document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge[data-state='red']"), null, { timeout: 5000 }).catch(() => {});
+const qChip = await badge.locator(".chip-w").textContent().catch(() => "");
+check("hidden-helper editor paste keeps the light on", qChip.includes("Tier 1") && qChip.includes("이메일"), qChip);
+await page.screenshot({ path: `${OUT}/11b-paste-quill.png` });
+await page.locator("#qe").evaluate((el) => { el.textContent = ""; });
+await page.waitForTimeout(500);
+
 // 15. PDF: 글자를 뽑아 검사한다. 민감한 쪽을 알려 주고 묻는다, 깨끗하면 통과, 글자 없는 스캔본·음성은 '읽을 수 없는 파일' 질문
 function makePdf(pages) {
   // pages: 쪽마다 줄 배열. 빈 배열이면 글자 없는(스캔본 같은) 쪽
@@ -350,6 +364,20 @@ await page.keyboard.press("Escape");
 await page.waitForTimeout(800);
 check("closing the question (Esc) means cancel", !(await modal.isVisible()) && (await logCount()) === base15 + 2);
 
+// 한글 PDF(글꼴이 들어 있는 일반 PDF): 쪽 번호와 함께 한글 민감정보를 찾는다
+const kp = await ctx.newPage();
+await kp.setContent('<html><body style="font-family:sans-serif"><h1>인사 기록</h1><p>고객 홍길동 주민등록번호 900101-1234567</p></body></html>');
+const korPdf = path.join(tmp, "korean.pdf");
+await kp.pdf({ path: korPdf });
+await kp.close();
+await page.bringToFront();
+await page.setInputFiles("#file", korPdf);
+await modal.waitFor({ timeout: 20000 });
+const korModal = await modal.innerText();
+check("Korean PDF: finds the resident number with its page", korModal.includes("korean.pdf") && korModal.includes("1쪽") && korModal.includes("주민등록번호"), korModal.replace(/\s+/g, " ").slice(0, 100));
+await page.getByRole("button", { name: "첨부 취소" }).click();
+await page.waitForTimeout(500);
+
 // 옵션을 켜면 읽을 수 없는 파일은 묻지 않고 바로 막는다
 await sw0.evaluate(() => chrome.storage.local.set({ blockUnscannableFiles: true }));
 await page.waitForTimeout(400);
@@ -370,6 +398,7 @@ await popup.goto(`chrome-extension://${extId}/popup.html`);
 await popup.waitForTimeout(800);
 await popup.screenshot({ path: `${OUT}/6-popup.png` });
 check("popup shows server down", (await popup.locator("#status").textContent()).includes("연결 안 됨"));
+check("popup shows the extension version", (await popup.locator("#ver").textContent()).includes("0.2.0"));
 } catch (e) {
   results.push("ERROR " + e.message.split("\n")[0]);
   await page.screenshot({ path: `${OUT}/error.png` });
