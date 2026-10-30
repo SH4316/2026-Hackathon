@@ -98,7 +98,7 @@ describe("configuration version lifecycle", () => {
       description: "설명",
       examples: ["첫 예시", "둘째 😀 예시"],
       guidance: "판단 맥락",
-      jevPrompt: "  판단 기준 😀\n다음 줄\n  ",
+      jevThreshold: 0,
       pythonRegex: String.raw`(?im)^\b(?P<label>private)\b[ \t]*$`,
       color: "#123456",
     };
@@ -134,7 +134,7 @@ describe("configuration version lifecycle", () => {
           description: "",
           examples: ["김가상"],
           guidance: "이름을 찾습니다.",
-          jevPrompt: "  이름이 포함되었는지 판단하세요.\n예시 😀: 김가상\n  ",
+          jevThreshold: 0.123456,
           pythonRegex: String.raw`(?im)^\b(?P<label>internal|confidential)\b[ \t]*$`,
           order: 0,
         },
@@ -175,7 +175,7 @@ describe("configuration version lifecycle", () => {
     });
   });
 
-  it("reads each tag's verbatim Jev prompt and Python regex from version and active classifier configuration", async () => {
+  it("reads independent Jev prompts and shared tag thresholds from version and active classifier configuration", async () => {
     const config = {
       id: "published_1",
       name: "Jev 설정",
@@ -191,7 +191,7 @@ describe("configuration version lifecycle", () => {
           description: "",
           examples: [],
           guidance: "분류에 참고할 맥락",
-          jevPrompt: "  판단 기준 😀\n두 번째 줄\n  ",
+          jevThreshold: 0.75,
           pythonRegex: String.raw`(?imx)^\b(?P<label>internal|confidential)\b[ \t]*$` + "\n# 합성 😀\n  ",
           color: "#123456",
           parentId: null,
@@ -203,13 +203,14 @@ describe("configuration version lifecycle", () => {
           description: "",
           examples: [],
           guidance: "",
-          jevPrompt: "",
+          jevThreshold: null,
           pythonRegex: "",
           color: "#123456",
           parentId: "parent",
           order: 0,
         },
       ],
+      jevPrompts: [{ id: "jev_1", name: "고객 정보 검사", prompt: "  판단 기준 😀\n두 번째 줄\n  ", tagIds: ["parent", "child"] }],
       policyStates: [],
     };
     const fetchMock = vi
@@ -224,6 +225,40 @@ describe("configuration version lifecycle", () => {
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       "/api/v1/config-versions/published_1",
       "/api/v1/classifier-config",
+    ]);
+  });
+
+  it("creates, updates and deletes version-scoped Jev prompts with atomic output thresholds", async () => {
+    const config = { id: "published/a", revision: 8, jevPrompts: [] };
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(config))),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const input = {
+      revision: 7,
+      name: "연락처 검사",
+      prompt: "  원문을 판단하세요. 😀\n다음 줄\n  ",
+      outputs: [{ tagId: "tag/a", threshold: 0 }, { tagId: "tag_b", threshold: null }],
+    };
+    expect(await api.createJevPrompt("published/a", input)).toEqual(config);
+    expect(await api.saveJevPrompt("published/a", "jev/b", input)).toEqual(config);
+    expect(await api.deleteJevPrompt("published/a", "jev/b", 8)).toEqual(config);
+    expect(fetchMock.mock.calls).toEqual([
+      ["/api/v1/config-versions/published%2Fa/jev-prompts", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }],
+      ["/api/v1/config-versions/published%2Fa/jev-prompts/jev%2Fb", {
+        method: "PUT",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }],
+      ["/api/v1/config-versions/published%2Fa/jev-prompts/jev%2Fb", {
+        method: "DELETE",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ revision: 8 }),
+      }],
     ]);
   });
 

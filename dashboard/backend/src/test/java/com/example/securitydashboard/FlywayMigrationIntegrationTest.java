@@ -392,10 +392,9 @@ class FlywayMigrationIntegrationTest {
     jdbc.update(
         "INSERT INTO"
             + " config_version_tags(version_id,id,name,description,examples,guidance,jev_prompt,python_regex,color,parent_id,sort_order)"
-            + " VALUES('v1','email','이전 이메일 😀','기존 설명',JSON_ARRAY('예시'),'가이드','  판단\\n',"
-            + " '(?P<email>.+)','#123456',NULL,5),"
-            + " ('v2','email','변경된 이메일','다른 설명',JSON_ARRAY(),'다른 가이드','새 판단','[',"
-            + " '#ABCDEF',NULL,2)");
+            + " VALUES('v1','email','이전 이메일 😀','기존 설명',JSON_ARRAY('예시'),'가이드','  판단\\n"
+            + "', '(?P<email>.+)','#123456',NULL,5), ('v2','email','변경된 이메일','다른"
+            + " 설명',JSON_ARRAY(),'다른 가이드','새 판단','[', '#ABCDEF',NULL,2)");
     jdbc.update(
         "INSERT INTO config_tag_closure(version_id,ancestor_id,descendant_id)"
             + " VALUES('v1','email','email'),('v2','email','email')");
@@ -409,8 +408,8 @@ class FlywayMigrationIntegrationTest {
             + " VALUES(991,'demo-sql-v2','demo-existing','preserved','v1','😀"
             + " user@example.com','2026-10-20 01:02:03.123456','2026-10-20"
             + " 01:02:04.654321','existing-service','기존 모델','review'),"
-            + " (993,'detector','existing','preserved','v2','user@example.com',"
-            + " '2026-10-21 01:02:03.123456','2026-10-21 01:02:04.654321','detector',NULL,NULL)");
+            + " (993,'detector','existing','preserved','v2','user@example.com', '2026-10-21"
+            + " 01:02:03.123456','2026-10-21 01:02:04.654321','detector',NULL,NULL)");
     jdbc.update(
         "INSERT INTO detections(id,event_id,start_offset,end_offset,text)"
             + " VALUES(992,991,2,18,'user@example.com'),(994,993,0,16,'user@example.com')");
@@ -418,7 +417,8 @@ class FlywayMigrationIntegrationTest {
         "INSERT INTO detection_tags(detection_id,version_id,tag_id)"
             + " VALUES(992,'v1','email'),(994,'v2','email')");
     jdbc.update(
-        "INSERT INTO saved_searches(id,name,version_id,created_at,filters,event_count,finding_count)"
+        "INSERT INTO"
+            + " saved_searches(id,name,version_id,created_at,filters,event_count,finding_count)"
             + " VALUES('snapshot','저장 검색','v1','2026-10-22 04:05:06.123456',"
             + " JSON_OBJECT('tagId','email'),2,2)");
     jdbc.update(
@@ -475,7 +475,171 @@ class FlywayMigrationIntegrationTest {
   }
 
   @Test
-  void freshLatestSchemaLeavesPeopleConfigurationAndDetectorEventsEmpty() {
+  void v7SeparatesEveryNonemptyLegacyPromptWithoutChangingArchivedTagsOrCapturedHistory() {
+    var source = migrationSource();
+    var jdbc = new JdbcTemplate(source);
+    var v6 =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .cleanDisabled(false)
+            .target("6")
+            .load();
+    v6.clean();
+    v6.migrate();
+    jdbc.update("INSERT INTO people(id,name) VALUES('preserved','기존 사용자 😀')");
+    jdbc.update(
+        "INSERT INTO config_versions(id,name,status,revision,created_at,published_at)"
+            + " VALUES('published','게시 버전','PUBLISHED',7,'2026-10-20 01:02:03.123456','2026-10-20"
+            + " 02:03:04.123456'), ('draft','작성 버전','DRAFT',3,'2026-10-21 01:02:03.123456',NULL)");
+    String publishedPrompt = "  기존 판단 😀\r\n\t원문 유지\n ";
+    String draftPrompt = "다른 버전의 같은 ID 판단\n";
+    String spacesOnlyPrompt = "  \r\n\t  ";
+    jdbc.update(
+        "INSERT INTO"
+            + " config_version_tags(version_id,id,name,description,examples,guidance,jev_prompt,python_regex,color,parent_id,sort_order)"
+            + " VALUES('published','email','게시 이메일','기존 설명',JSON_ARRAY('sample@example.com'),'기존"
+            + " 가이드',?,'(?P<email>[','#123456',NULL,5), ('draft','email','초안 이메일','초안"
+            + " 설명',JSON_ARRAY(),'초안 가이드',?,'(?im)raw','#ABCDEF',NULL,2), ('published','spaces','공백"
+            + " 판단','',JSON_ARRAY(),'',?,'','#654321','email',6), ('draft','empty','빈"
+            + " 판단','',JSON_ARRAY(),'','','','#111111','email',3)",
+        publishedPrompt,
+        draftPrompt,
+        spacesOnlyPrompt);
+    jdbc.update(
+        "INSERT INTO config_tag_closure(version_id,ancestor_id,descendant_id)"
+            + " VALUES('published','email','email'),('published','email','spaces'),('published','spaces','spaces'),"
+            + " ('draft','email','email'),('draft','email','empty'),('draft','empty','empty')");
+    jdbc.update(
+        "INSERT INTO config_version_policies(version_id,id,name,description,color,sort_order)"
+            + " VALUES('published','review','검토','정책 메타데이터','#987654',7)");
+    jdbc.update("UPDATE active_config SET version_id='published' WHERE singleton_id=1");
+    jdbc.update(
+        "INSERT INTO"
+            + " security_events(id,source_id,event_id,person_id,version_id,prompt,occurred_at,received_at,service,model,policy_state_id)"
+            + " VALUES(991,'legacy-v6','existing','preserved','published','😀 user@example.com',"
+            + " '2026-10-20 01:02:03.123456','2026-10-20 01:02:04.654321','existing-service','기존"
+            + " 모델','review')");
+    jdbc.update(
+        "INSERT INTO detections(id,event_id,start_offset,end_offset,text)"
+            + " VALUES(992,991,2,18,'user@example.com')");
+    jdbc.update(
+        "INSERT INTO detection_tags(detection_id,version_id,tag_id,captured_name,captured_color)"
+            + " VALUES(992,'published','email','편집 전 캡처 이름','#FEDCBA')");
+    jdbc.update(
+        "INSERT INTO"
+            + " saved_searches(id,name,version_id,created_at,filters,event_count,finding_count)"
+            + " VALUES('snapshot','기존 저장 검색','published','2026-10-20"
+            + " 04:05:06.123456',JSON_OBJECT('tagId','email'),1,1)");
+    jdbc.update("INSERT INTO saved_search_events(saved_search_id,event_id) VALUES('snapshot',991)");
+    String envelope =
+        "{\"input_version\":123456789012345678901234567890,\"metadata\":\"  원문 😀\\n  \"}";
+    jdbc.update(
+        "INSERT INTO detector_events(event_id,envelope,content_hash) VALUES(991,?,?)",
+        envelope,
+        "f".repeat(64));
+    jdbc.update(
+        "INSERT INTO detector_event_images(id,event_id,name,media_type,data) VALUES(993,991,?,?,?)",
+        "원본 😀.png",
+        "image/png",
+        new byte[] {0, 1, 2, -1});
+    var before = snapshotVersionedData(jdbc);
+    var v7 =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .target("7")
+            .load();
+    assertThat(v7.migrate().migrationsExecuted).isEqualTo(1);
+    var after = snapshotVersionedData(jdbc);
+    for (var tag : after.get("config_version_tags")) {
+      assertThat(tag).containsKey("jev_threshold");
+      assertThat(tag.remove("jev_threshold")).isNull();
+    }
+    assertThat(after).usingRecursiveComparison().isEqualTo(before);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM config_version_jev_prompts", Long.class))
+        .isEqualTo(3);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM config_version_jev_outputs", Long.class))
+        .isEqualTo(3);
+    var migrated =
+        jdbc.queryForList(
+            "SELECT o.version_id,o.tag_id,p.name,p.prompt FROM config_version_jev_outputs o JOIN"
+                + " config_version_jev_prompts p ON p.version_id=o.version_id AND p.id=o.prompt_id"
+                + " ORDER BY o.version_id,o.tag_id");
+    assertThat(migrated)
+        .containsExactly(
+            Map.of(
+                "version_id", "draft", "tag_id", "email", "name", "초안 이메일", "prompt", draftPrompt),
+            Map.of(
+                "version_id",
+                "published",
+                "tag_id",
+                "email",
+                "name",
+                "게시 이메일",
+                "prompt",
+                publishedPrompt),
+            Map.of(
+                "version_id",
+                "published",
+                "tag_id",
+                "spaces",
+                "name",
+                "공백 판단",
+                "prompt",
+                spacesOnlyPrompt));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT id) FROM config_version_jev_prompts", Long.class))
+        .isEqualTo(3);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT envelope FROM detector_events WHERE event_id=991", String.class))
+        .isEqualTo(envelope);
+    assertThat(v7.migrate().migrationsExecuted).isZero();
+  }
+
+  @Test
+  void freshV7SchemaDoesNotSeedPromptsOutputsOrConfiguration() {
+    var source = migrationSource();
+    var latest =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .cleanDisabled(false)
+            .target("7")
+            .load();
+    latest.clean();
+    assertThat(latest.migrate().migrationsExecuted).isEqualTo(7);
+    var jdbc = new JdbcTemplate(source);
+    for (String table :
+        List.of(
+            "config_versions",
+            "config_version_tags",
+            "config_version_jev_prompts",
+            "config_version_jev_outputs",
+            "security_events",
+            "detections",
+            "detector_events"))
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class))
+          .as(table)
+          .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT version_id FROM active_config WHERE singleton_id=1", String.class))
+        .isNull();
+  }
+
+  private DriverManagerDataSource migrationSource() {
+    String url = System.getenv("TEST_MIGRATION_DB_URL");
+    if (!url.matches("jdbc:mysql://[^/]+/[A-Za-z0-9_]+_test(?:\\?.*)?"))
+      throw new IllegalStateException("Disposable migration database must end in _test");
+    return new DriverManagerDataSource(
+        url, System.getenv("TEST_DB_USERNAME"), System.getenv("TEST_DB_PASSWORD"));
+  }
+
+  @Test
+  void freshV6SchemaLeavesPeopleConfigurationAndDetectorEventsEmpty() {
     String url = System.getenv("TEST_MIGRATION_DB_URL");
     if (!url.matches("jdbc:mysql://[^/]+/[A-Za-z0-9_]+_test(?:\\?.*)?"))
       throw new IllegalStateException("Disposable migration database must end in _test");
@@ -487,6 +651,7 @@ class FlywayMigrationIntegrationTest {
             .dataSource(source)
             .locations("classpath:db/migration")
             .cleanDisabled(false)
+            .target("6")
             .load();
     latest.clean();
     latest.migrate();

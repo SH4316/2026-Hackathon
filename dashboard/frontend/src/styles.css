@@ -3257,3 +3257,214 @@ textarea::placeholder {
   border: 0;
   border-radius: 0;
 }
+
+/* Jev definitions and their version-scoped output tags. */
+.jev-version-note,
+.jev-threshold-note {
+  color: var(--muted);
+  margin-bottom: 20px;
+  max-width: 85ch;
+}
+.jev-settings-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  overflow: hidden;
+}
+.jev-prompt-list {
+  padding: 20px 12px;
+  background: var(--subtle);
+  border-right: 1px solid var(--border);
+  min-width: 0;
+}
+.jev-list-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  padding: 0 12px 16px;
+}
+.jev-list-heading > span,
+.jev-prompt-option > span,
+.jev-list-empty,
+.jev-output-heading p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.jev-prompt-option {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  text-align: left;
+  padding: 13px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.jev-prompt-option + .jev-prompt-option {
+  margin-top: 4px;
+}
+.jev-prompt-option strong {
+  font-weight: 600;
+}
+.jev-prompt-option:hover {
+  background: #f0f3f8;
+}
+.jev-prompt-option.selected {
+  color: var(--blue);
+  background: var(--blue-wash);
+  border-color: #dce5fc;
+}
+.jev-list-empty {
+  padding: 16px 12px;
+}
+.jev-prompt-editor {
+  min-width: 0;
+  padding: 28px;
+}
+.jev-output-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 30px 0 10px;
+}
+.jev-output-heading p {
+  margin-top: 5px;
+}
+.jev-output-heading > span {
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--blue);
+}
+.jev-threshold-note {
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+.jev-tag-search {
+  display: block;
+  margin-bottom: 16px;
+}
+.jev-tag-search input {
+  width: 100%;
+}
+.jev-output-columns,
+.jev-output-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: 24px;
+  padding: 12px 14px;
+}
+.jev-output-columns {
+  color: var(--muted);
+  background: var(--subtle);
+  font-size: 12px;
+  border-block: 1px solid var(--border);
+}
+.jev-output-row {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.jev-output-identity {
+  min-width: 0;
+}
+.jev-output-tag {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.jev-output-tag input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: var(--blue);
+}
+.jev-output-tag span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.jev-output-tag strong {
+  font-weight: 600;
+}
+.jev-output-tag small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.jev-tag-detail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 5px 0 0 28px;
+  color: var(--blue);
+  font-size: 11px;
+}
+.jev-tag-detail-link:hover {
+  text-decoration: underline;
+}
+.jev-output-threshold input {
+  width: 100%;
+}
+.jev-output-threshold small {
+  display: block;
+  margin-top: 6px;
+}
+.jev-editor-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+}
+.jev-tag-threshold-field {
+  display: grid;
+  gap: 10px;
+}
+.jev-tag-threshold-field input {
+  max-width: 200px;
+}
+@media (max-width: 1100px) {
+  .jev-settings-layout {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+  .jev-prompt-editor {
+    padding: 22px;
+  }
+}
+@media (max-width: 760px) {
+  .sidebar nav > .nav-link:last-child:nth-child(3n + 1) {
+    grid-column: 1 / -1;
+  }
+  .jev-settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .jev-prompt-list {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 12px;
+  }
+  .jev-prompt-editor {
+    padding: 20px 16px;
+  }
+  .jev-output-columns,
+  .jev-output-row {
+    grid-template-columns: minmax(0, 1fr) 110px;
+    padding-inline: 0;
+    gap: 12px;
+  }
+  .jev-output-heading {
+    align-items: flex-start;
+  }
+  .jev-editor-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

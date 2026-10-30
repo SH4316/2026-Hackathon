@@ -80,13 +80,13 @@ class ConfigurationRepository {
 
   void updateTagDetails(String versionId, Tag tag) {
     jdbc.update(
-        "UPDATE config_version_tags SET name=?,description=?,examples=?,guidance=?,jev_prompt=?,"
+        "UPDATE config_version_tags SET name=?,description=?,examples=?,guidance=?,jev_threshold=?,"
             + "python_regex=?,color=? WHERE version_id=? AND id=?",
         tag.name(),
         tag.description(),
         encode(tag.examples()),
         tag.guidance(),
-        tag.jevPrompt(),
+        tag.jevThreshold(),
         tag.pythonRegex(),
         tag.color(),
         versionId,
@@ -120,7 +120,7 @@ class ConfigurationRepository {
                 rs.getString("description"),
                 readExamples(rs.getString("examples")),
                 rs.getString("guidance"),
-                rs.getString("jev_prompt"),
+                rs.getBigDecimal("jev_threshold"),
                 rs.getString("python_regex"),
                 rs.getString("color"),
                 rs.getString("parent_id"),
@@ -152,7 +152,7 @@ class ConfigurationRepository {
     JdbcRows.insert(
         jdbc,
         "INSERT INTO"
-            + " config_version_tags(version_id,id,name,description,examples,guidance,jev_prompt,python_regex,color,parent_id,sort_order)"
+            + " config_version_tags(version_id,id,name,description,examples,guidance,jev_threshold,python_regex,color,parent_id,sort_order)"
             + " VALUES ",
         11,
         tags.stream()
@@ -165,7 +165,7 @@ class ConfigurationRepository {
                       t.description(),
                       encode(t.examples()),
                       t.guidance(),
-                      t.jevPrompt(),
+                      t.jevThreshold(),
                       t.pythonRegex(),
                       t.color(),
                       t.parentId(),

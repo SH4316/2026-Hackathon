@@ -69,13 +69,9 @@ class MySqlApiIntegrationTest {
         .andExpect(jsonPath("$.servers[0].url").value("/"))
         .andExpect(jsonPath("$.paths['/api/v1/config-versions']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/saved-searches/{id}/metrics']").exists());
-    var promptSchema =
-        getJson(get("/v3/api-docs")).at("/components/schemas/Tag/properties/jevPrompt");
-    assertThat(promptSchema.path("type")).isEqualTo(json.valueToTree(List.of("string", "null")));
-    assertThat(promptSchema.path("maxLength").asInt()).isEqualTo(12000);
-    assertThat(promptSchema.path("default").isTextual()).isTrue();
-    assertThat(promptSchema.path("default").asText()).isEmpty();
-    assertThat(promptSchema.path("description").asText()).contains("Unicode code point");
+    var tagSchema = getJson(get("/v3/api-docs")).at("/components/schemas/Tag/properties");
+    assertThat(tagSchema.has("jevPrompt")).isFalse();
+    assertThat(tagSchema.has("jevThreshold")).isTrue();
     var regexSchema =
         getJson(get("/v3/api-docs")).at("/components/schemas/Tag/properties/pythonRegex");
     assertThat(regexSchema.path("type")).isEqualTo(json.valueToTree(List.of("string", "null")));
@@ -92,24 +88,17 @@ class MySqlApiIntegrationTest {
   }
 
   @Test
-  void tagJevPromptsAndPythonRegexRoundTripIndependentlyAndFollowVersionLifecycle()
-      throws Exception {
-    var draft = createDraft("Jev 판단 기준", null);
-    assertThat(draft.path("tags")).isEmpty();
+  void pythonRegexRoundTripsIndependentlyAndFollowsVersionLifecycle() throws Exception {
+    var draft = createDraft("Python 정규식", null);
     String id = draft.path("id").asText();
-    String rootPrompt = "  부모 판단 😀\r\n\t공백 유지\n ";
-    String rootRegex = "(?im)^(?P<email>\\w+@example\\.com)$\r\n  ";
+    String regex = "(?im)^(?P<email>\\w+@example\\.com)$\r\n  ";
     var root = tag("root", "부모", null);
     root.put("guidance", "기존 가이드");
-    root.put("jevPrompt", rootPrompt);
-    root.put("pythonRegex", rootRegex);
-    var child = tag("child", "개별 자식", "root");
-    child.put("jevPrompt", "자식 자체 판단\n");
-    // Invalid Python syntax is accepted as configuration text, without using Java/JS regex rules.
+    root.put("pythonRegex", regex);
+    var child = tag("child", "자식", "root");
     child.put("pythonRegex", "(?P<unfinished>[");
-    var omitted = tag("omitted", "생략된 자식", "root");
-    var explicitNull = tag("null", "널 자식", "root");
-    explicitNull.put("jevPrompt", null);
+    var omitted = tag("omitted", "생략", "root");
+    var explicitNull = tag("null", "널", "root");
     explicitNull.put("pythonRegex", null);
     var saved =
         call(
@@ -118,111 +107,73 @@ class MySqlApiIntegrationTest {
                 "revision",
                 0,
                 "name",
-                "Jev 판단 기준",
+                "Python 정규식",
                 "tags",
                 List.of(root, child, omitted, explicitNull),
                 "policyStates",
                 policies()),
             200);
-    assertThat(find(saved.path("tags"), "root").path("jevPrompt").asText()).isEqualTo(rootPrompt);
+    assertThat(find(saved.path("tags"), "root").path("pythonRegex").asText()).isEqualTo(regex);
     assertThat(find(saved.path("tags"), "root").path("guidance").asText()).isEqualTo("기존 가이드");
-    assertThat(find(saved.path("tags"), "root").path("pythonRegex").asText()).isEqualTo(rootRegex);
-    assertThat(find(saved.path("tags"), "child").path("jevPrompt").asText())
-        .isEqualTo("자식 자체 판단\n");
     assertThat(find(saved.path("tags"), "child").path("pythonRegex").asText())
         .isEqualTo("(?P<unfinished>[");
-    for (String empty : List.of("omitted", "null")) {
-      assertThat(find(saved.path("tags"), empty).path("jevPrompt").isTextual()).isTrue();
-      assertThat(find(saved.path("tags"), empty).path("pythonRegex").isTextual()).isTrue();
+    for (String empty : List.of("omitted", "null"))
       assertThat(find(saved.path("tags"), empty).path("pythonRegex").asText()).isEmpty();
-    }
-    assertThat(find(saved.path("tags"), "omitted").path("jevPrompt").asText()).isEmpty();
-    assertThat(find(saved.path("tags"), "null").path("jevPrompt").asText()).isEmpty();
-    assertThat(getJson(get("/api/v1/config-versions/" + id)).path("tags"))
-        .isEqualTo(saved.path("tags"));
-
     var published =
         call(post("/api/v1/config-versions/" + id + "/publish"), Map.of("revision", 1), 200);
     call(post("/api/v1/config-versions/" + id + "/activate"), null, 200);
     assertThat(getJson(get("/api/v1/classifier-config")).path("tags"))
         .isEqualTo(saved.path("tags"));
-    var clone = createDraft("프롬프트 복제", id);
+    var clone = createDraft("복제", id);
     assertThat(clone.path("tags")).isEqualTo(published.path("tags"));
-
-    root.put("jevPrompt", "복제 버전에서 수정");
     child.put("pythonRegex", "(?s)new\\s+value");
-    var update =
-        Map.of(
-            "revision",
-            0,
-            "name",
-            "복제 수정",
-            "tags",
-            List.of(root, child, omitted, explicitNull),
-            "policyStates",
-            policies());
-    var changed = call(put("/api/v1/config-versions/" + clone.path("id").asText()), update, 200);
-    assertThat(find(changed.path("tags"), "root").path("jevPrompt").asText())
-        .isEqualTo("복제 버전에서 수정");
-    assertThat(find(changed.path("tags"), "child").path("jevPrompt").asText())
-        .isEqualTo("자식 자체 판단\n");
-    assertThat(find(changed.path("tags"), "root").path("pythonRegex").asText())
-        .isEqualTo(rootRegex);
-    assertThat(find(changed.path("tags"), "child").path("pythonRegex").asText())
-        .isEqualTo("(?s)new\\s+value");
-    var immutable =
+    var changed =
         call(
-            put("/api/v1/config-versions/" + id),
+            put("/api/v1/config-versions/" + clone.path("id").asText()),
             Map.of(
                 "revision",
-                published.path("revision").asLong(),
+                0,
                 "name",
-                "게시 수정",
+                "복제 수정",
                 "tags",
-                List.of(root),
+                List.of(root, child, omitted, explicitNull),
                 "policyStates",
                 policies()),
-            409);
-    assertThat(immutable.path("code").asText()).isEqualTo("VERSION_IMMUTABLE");
+            200);
+    assertThat(find(changed.path("tags"), "root").path("pythonRegex").asText()).isEqualTo(regex);
+    assertThat(find(changed.path("tags"), "child").path("pythonRegex").asText())
+        .isEqualTo("(?s)new\\s+value");
+    assertThat(
+            call(
+                    put("/api/v1/config-versions/" + id),
+                    Map.of(
+                        "revision",
+                        published.path("revision").asLong(),
+                        "name",
+                        "게시 수정",
+                        "tags",
+                        List.of(root),
+                        "policyStates",
+                        policies()),
+                    409)
+                .path("code")
+                .asText())
+        .isEqualTo("VERSION_IMMUTABLE");
     assertThat(getJson(get("/api/v1/config-versions/" + id)).path("tags"))
-        .isEqualTo(saved.path("tags"));
-    assertThat(getJson(get("/api/v1/classifier-config")).path("tags"))
         .isEqualTo(saved.path("tags"));
   }
 
   @Test
-  void acceptsMaximumJevCodePointsAndRejectsInvalidPromptsWithoutChangingDraft() throws Exception {
-    String id = createDraft("길이 검증", null).path("id").asText();
-    String maximum = "😀".repeat(12000);
-    var tag = tag("a", "판단", null);
-    tag.put("jevPrompt", maximum);
-    var saved =
-        call(
-            put("/api/v1/config-versions/" + id),
-            Map.of("revision", 0, "name", "길이 검증", "tags", List.of(tag), "policyStates", List.of()),
-            200);
-    assertThat(saved.at("/tags/0/jevPrompt").asText()).isEqualTo(maximum);
-    tag.put("jevPrompt", maximum + "x");
-    var tooLong =
-        call(
-            put("/api/v1/config-versions/" + id),
-            Map.of("revision", 1, "name", "초과", "tags", List.of(tag), "policyStates", List.of()),
-            400);
-    assertThat(tooLong.path("fieldErrors").has("tags.jevPrompt")).isTrue();
-    for (String surrogate : List.of("\\ud800", "\\udc00")) {
-      String malformed =
-          "{\"revision\":1,\"name\":\"잘못된 문자\",\"tags\":[{\"id\":\"a\",\"name\":\"판단\","
-              + "\"jevPrompt\":\""
-              + surrogate
-              + "\"}],\"policyStates\":[]}";
-      mvc.perform(
-              put("/api/v1/config-versions/" + id)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(malformed))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.fieldErrors['tags.jevPrompt']").exists());
-    }
-    assertThat(getJson(get("/api/v1/config-versions/" + id))).isEqualTo(saved);
+  void rejectsLegacyTagJevPromptInFullCatalogRequests() throws Exception {
+    var draft = createDraft("명시적 분리", null);
+    var oldTag = tag("a", "판단", null);
+    oldTag.put("jevPrompt", "이전 태그 프롬프트");
+    call(
+        put("/api/v1/config-versions/" + draft.path("id").asText()),
+        Map.of("revision", 0, "name", "명시적 분리", "tags", List.of(oldTag), "policyStates", List.of()),
+        400);
+    assertThat(getJson(get("/api/v1/config-versions/" + draft.path("id").asText())))
+        .isEqualTo(draft);
   }
 
   @Test
@@ -231,7 +182,6 @@ class MySqlApiIntegrationTest {
     String id = createDraft("Python 정규식 길이 검증", null).path("id").asText();
     String maximum = "😀".repeat(4000);
     var tag = tag("a", "패턴", null);
-    tag.put("jevPrompt", "독립 판단 프롬프트");
     tag.put("pythonRegex", maximum);
     var saved =
         call(
@@ -239,7 +189,6 @@ class MySqlApiIntegrationTest {
             Map.of("revision", 0, "name", "길이 검증", "tags", List.of(tag), "policyStates", List.of()),
             200);
     assertThat(saved.at("/tags/0/pythonRegex").asText()).isEqualTo(maximum);
-    assertThat(saved.at("/tags/0/jevPrompt").asText()).isEqualTo("독립 판단 프롬프트");
     tag.put("pythonRegex", maximum + "x");
     var tooLong =
         call(

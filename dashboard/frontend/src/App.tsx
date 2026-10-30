@@ -37,6 +37,7 @@ import {
 } from "./ui";
 import { Trend, MetricTree, ServiceChart, PolicyChart } from "./charts";
 import { MetricSettings } from "./MetricSettings";
+import { JevSettings } from "./JevSettings";
 import { SavedSearches, SavedSearchDetail } from "./SavedSearches";
 import type { Person, Filters } from "./types";
 const navigation: {
@@ -49,6 +50,7 @@ const navigation: {
   { to: "/events", label: "탐지 이력", icon: "events" },
   { to: "/people", label: "사람 관리", icon: "people" },
   { to: "/settings/metrics", label: "메트릭 설정", icon: "tree" },
+  { to: "/settings/jev", label: "Jev 설정", icon: "code" },
   { to: "/saved-searches", label: "저장된 검색", icon: "save" },
   { to: "/settings/monitoring", label: "감시 연동", icon: "settings" },
 ];
@@ -141,6 +143,7 @@ function Shell() {
             <Route path="/people" element={<People />} />
             <Route path="/people/:id" element={<PersonDetail />} />
             <Route path="/settings/metrics" element={<MetricSettings />} />
+            <Route path="/settings/jev" element={<JevSettings />} />
             <Route path="/saved-searches" element={<SavedSearches />} />
             <Route path="/saved-searches/:id" element={<SavedSearchDetail />} />
             <Route

@@ -25,8 +25,8 @@ export interface Tag {
   description: string;
   examples: string[];
   guidance: string;
-  /** Per-tag Jev judgment prompt; preserved verbatim, up to 12000 Unicode code points. */
-  jevPrompt: string;
+  /** Shared by every Jev prompt outputting this tag; null means unset, zero is valid. */
+  jevThreshold: number | null;
   /** Per-tag Python re source; stored verbatim, up to 4000 Unicode code points. */
   pythonRegex: string;
   color: string;
@@ -52,8 +52,31 @@ export interface VersionSummary {
   publishedAt: string | null;
 }
 
+export interface JevPrompt {
+  id: string;
+  name: string;
+  /** Preserved verbatim, up to 12000 Unicode code points. */
+  prompt: string;
+  /** Existing tags in this version; thresholds live on the shared tags. */
+  tagIds: string[];
+}
+
+export interface JevOutputInput {
+  tagId: string;
+  /** Inclusive 0..1 with up to six fractional digits; null means unset. */
+  threshold: number | null;
+}
+
+export interface SaveJevPromptInput {
+  revision: number;
+  name: string;
+  prompt: string;
+  outputs: JevOutputInput[];
+}
+
 export interface ConfigVersion extends VersionSummary {
   tags: Tag[];
+  jevPrompts: JevPrompt[];
   policyStates: PolicyDefinition[];
 }
 

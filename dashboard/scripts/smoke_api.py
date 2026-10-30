@@ -109,7 +109,7 @@ def main():
     # A logical ID is shared across cloned trees, but details belong only to the selected version.
     v1=api.expect("GET","/config-versions/"+v1["id"],200)
     before_details=v1
-    editable_fields=("name","description","examples","guidance","jevPrompt","pythonRegex","color")
+    editable_fields=("name","description","examples","guidance","jevThreshold","pythonRegex","color")
     def detail_input(version, tag_id):
         selected=next(t for t in version["tags"] if t["id"]==tag_id)
         return dict(revision=version["revision"], **{
@@ -117,7 +117,7 @@ def main():
         })
     detail_body=detail_input(v1,"name")
     detail_body.update(name="수정한 가상 이름",description="게시 후 설명",examples=["합성 이름 😀"],
-                       guidance="게시 후 판단 맥락",jevPrompt="  게시 후 기준 😀\n  ",
+                       guidance="게시 후 판단 맥락",jevThreshold=0.875,
                        pythonRegex=r"(?i)\b(?P<label>private)\b",color="#315A89")
     v1=api.expect("PUT","/config-versions/"+v1["id"]+"/tags/name",200,detail_body)
     assert v1["revision"]==before_details["revision"]+1
