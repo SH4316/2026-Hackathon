@@ -3,6 +3,7 @@
 ## 모델·장비 (팀 확인 필요)
 
 - [ ] "4GB 모델"의 의미: 모델 파일 ~4GB / 4B 파라미터 / VRAM 4GB 실행 중 무엇인가
+  (잠정: 4B 파라미터로 보고 `compose.local.yaml` 에 Qwen3 4B Instruct q4_K_M(약 2.5GB) 를 기본 decider 로 둠)
 - [ ] 실행 장비의 RAM, GPU 유무·VRAM, OS
 - [ ] 실행 환경 인터넷 사용 가능 여부(폐쇄망이면 이미지·모델 사전 반입 절차 필요)
 - [ ] 런타임: Ollama vs llama.cpp server

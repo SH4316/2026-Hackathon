@@ -50,12 +50,12 @@
 |---|---|
 | `PG_MODEL_MODE` | `disabled` \| `optional` \| `required` |
 | `PG_MODEL_API` | `ollama`(기본, `/api/chat`) \| `openai`(llama.cpp server·vLLM 등 OpenAI 호환 `/v1/chat/completions`) |
-| `PG_MODEL_BASE_URL` | 예: `http://model:11434`(Ollama), `http://llama:8080`(llama.cpp) |
+| `PG_MODEL_BASE_URL` | 예: `http://decider:11434`(compose.local.yaml), `http://llama:8080`(llama.cpp) |
 | `PG_MODEL_NAME` | 모델 이름. 정하지 않으면 모델 검사를 하지 않음 |
 | `PG_MODEL_API_KEY` | OpenAI 호환 로컬 서버가 키를 요구할 때만 |
 | `PG_MODEL_TIMEOUT_S`, `PG_MODEL_MAX_CONCURRENCY` | 시간 초과, 동시 호출 수 |
 
-모델·하드웨어("4GB" 의미)는 아직 미정입니다(`docs/open-questions.md`). 모델 서버는 내부 네트워크에만 두고 원문을 외부로 보내지 않습니다.
+`compose.local.yaml` 이 4B 판단 모델(decider, 기본 `qwen3:4b-instruct-2507-q4_K_M`)을 띄우고 위 값을 자동으로 채웁니다(서버 README "로컬 모델: decider"). 정확도 평가·실행 장비는 아직 미정입니다(`docs/open-questions.md`). 모델 서버는 내부 네트워크에만 두고 원문을 외부로 보내지 않습니다.
 
 ## 관리 API (대시보드용)
 
