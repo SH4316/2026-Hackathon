@@ -56,10 +56,30 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes.apiKey) $("apiKey").value = changes.apiKey.newValue || "";
 });
 
+// "https://검사서버#ABCD-EFGH" → { serverUrl, code }. 코드만 넣으면 serverUrl 은 null.
+function parseLinkInput(value) {
+  const hash = value.lastIndexOf("#");
+  if (hash < 0 || !/^https?:\/\//i.test(value)) return { serverUrl: null, code: value };
+  try {
+    const url = new URL(value.slice(0, hash));
+    return { serverUrl: (url.origin + url.pathname).replace(/\/+$/, ""), code: value.slice(hash + 1).trim() };
+  } catch {
+    return { serverUrl: null, code: "" };
+  }
+}
+
 $("linkBtn").addEventListener("click", async () => {
   const msgEl = $("linkMsg");
-  const code = $("linkCode").value.trim();
-  if (!code) { msgEl.textContent = "등록 코드를 입력하세요."; return; }
+  const { serverUrl, code } = parseLinkInput($("linkCode").value.trim());
+  if (!code) { msgEl.textContent = "연결 정보나 등록 코드를 입력하세요."; return; }
+  if (serverUrl) {
+    if (!(await ensurePermission(serverUrl))) {
+      msgEl.textContent = "검사 서버 접근 권한이 없어 연결하지 않았습니다.";
+      return;
+    }
+    await chrome.storage.local.set({ serverUrl, serverEnabled: true });
+    $("serverUrl").value = serverUrl;
+  }
   msgEl.textContent = "연결 중…";
   const res = await chrome.runtime.sendMessage({ type: "enroll", code });
   $("linkCode").value = "";

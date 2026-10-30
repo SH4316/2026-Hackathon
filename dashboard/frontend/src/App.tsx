@@ -39,6 +39,8 @@ import {
 import { Trend, MetricTree, ServiceChart, PolicyChart } from "./charts";
 import { MetricSettings } from "./MetricSettings";
 import { JevSettings } from "./JevSettings";
+import { ConnectionSettings } from "./ConnectionSettings";
+import { PersonEnrollment } from "./PersonEnrollment";
 import { SavedSearches, SavedSearchDetail } from "./SavedSearches";
 import type { Person, Filters } from "./types";
 const navigation: {
@@ -52,6 +54,7 @@ const navigation: {
   { to: "/people", label: "사람 관리", icon: "people" },
   { to: "/settings/metrics", label: "메트릭 설정", icon: "tree" },
   { to: "/settings/jev", label: "Jev 설정", icon: "code" },
+  { to: "/settings/connections", label: "검사 서버 연결", icon: "settings" },
   { to: "/saved-searches", label: "저장된 검색", icon: "save" },
 ];
 export default function App() {
@@ -163,6 +166,10 @@ function Shell() {
             <Route path="/settings/jev" element={<JevSettings />} />
             <Route path="/saved-searches" element={<SavedSearches />} />
             <Route path="/saved-searches/:id" element={<SavedSearchDetail />} />
+            <Route
+              path="/settings/connections"
+              element={<ConnectionSettings />}
+            />
             <Route
               path="/settings/monitoring"
               element={
@@ -718,6 +725,7 @@ function PersonDetail() {
         description={"사람 ID: " + id}
         action={<RefreshButton {...r} />}
       />
+      <PersonEnrollment personId={id} />
       <div className="search-toolbar">
         <VersionSelect state={state} />
       </div>

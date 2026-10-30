@@ -47,7 +47,7 @@ class Settings:
     # 대시보드 웹 화면의 출처(브라우저에서 관리 API 를 직접 호출할 때). CORS 는 인증을 대체하지 않는다.
     cors_origins: list[str] = field(default_factory=list)
     # 조직 관리: 대시보드 주소가 있으면 대시보드 규칙(태그 정규식·Jev)을 적용하고 판정을 기록한다.
-    dashboard_url: str = ""
+    dashboard_url: str = ""  # 연결 URL(PG_DASHBOARD_CONNECTION) 또는 대시보드 주소(PG_DASHBOARD_URL, 인증 없음)
     dashboard_timeout_s: float = 5.0
     dashboard_refresh_s: float = 30.0
     org_db_path: Path = Path("data/org.sqlite3")
@@ -73,7 +73,7 @@ class Settings:
             clients_db_path=Path(os.getenv("PG_CLIENTS_DB_PATH", "data/clients.sqlite3")),
             enrollment_ttl_minutes=int(os.getenv("PG_ENROLLMENT_TTL_MINUTES", str(24 * 60))),
             cors_origins=_env_list("PG_CORS_ORIGINS"),
-            dashboard_url=os.getenv("PG_DASHBOARD_URL", ""),
+            dashboard_url=os.getenv("PG_DASHBOARD_CONNECTION") or os.getenv("PG_DASHBOARD_URL", ""),
             dashboard_timeout_s=float(os.getenv("PG_DASHBOARD_TIMEOUT_S", "5")),
             dashboard_refresh_s=float(os.getenv("PG_DASHBOARD_REFRESH_S", "30")),
             org_db_path=Path(os.getenv("PG_ORG_DB_PATH", "data/org.sqlite3")),
