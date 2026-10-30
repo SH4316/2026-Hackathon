@@ -40,7 +40,7 @@ class ConfigurationController {
   @Tag(name = "설정 버전")
   @Operation(
       summary = "빈 초안 또는 버전 복제",
-      description = "baseVersionId를 생략하면 빈 초안입니다. 복제 시 태그와 정책의 논리 ID를 유지합니다.")
+      description = "baseVersionId를 생략하면 빈 초안입니다. 복제 시 태그·정책·Jev 프롬프트와 출력 연결을 복사하며 논리 ID를 유지합니다.")
   @PostMapping("/config-versions")
   ResponseEntity<ConfigVersion> createVersion(@RequestBody CreateVersion input) {
     var value = configs.create(input);
@@ -58,7 +58,8 @@ class ConfigurationController {
       summary = "초안 저장",
       description =
           "revision이 최신 값과 다르면 409 REVISION_CONFLICT입니다. 트리 구조와 정책은 초안에서만 저장할 수 있습니다."
-              + " 태그별 jevPrompt와 pythonRegex는 부모와 독립적이며 생략하거나 null이면 빈 문자열로 저장합니다.")
+              + " 태그의 jevThreshold는 0~1 또는 null이며 Python 정규식은 부모와 독립적입니다."
+              + " Jev 판단 프롬프트는 전용 API에서 수정합니다.")
   @PutMapping("/config-versions/{id}")
   ConfigVersion updateVersion(@PathVariable String id, @Valid @RequestBody UpdateVersion input) {
     return configs.update(id, input);
@@ -68,7 +69,7 @@ class ConfigurationController {
   @Operation(
       summary = "선택한 버전의 태그 상세 저장",
       description =
-          "초안과 게시 버전 모두 기존 태그의 이름·설명·예시·가이드·Jev 프롬프트·Python 정규식·색상을 수정할 수 있습니다."
+          "초안과 게시 버전 모두 기존 태그의 이름·설명·예시·가이드·Jev 임계값·Python 정규식·색상을 수정할 수 있습니다."
               + " 선택한 버전에만 적용하며 같은 논리 ID를 사용하는 다른 버전은 바꾸지 않습니다."
               + " 버전 ID, 상태, 활성 여부, 트리의 태그 구성·부모·순서와 정책은 유지합니다."
               + " revision은 필수이며 최신 값과 다르면 409 REVISION_CONFLICT입니다."
@@ -105,7 +106,7 @@ class ConfigurationController {
   @Operation(
       summary = "활성 분류 설정",
       description =
-          "트리, 예시, 가이드, 태그별 Jev 판단 프롬프트·Python 정규식과 정책 정의를 반환합니다."
+          "트리, 예시, 가이드, 태그별 Jev 임계값·Python 정규식, 독립적인 Jev 판단 프롬프트·출력 태그와 정책 정의를 반환합니다."
               + " 게시 후 수정한 현재 태그 상세와 revision을 포함합니다."
               + " 프롬프트와 정규식은 저장·조회만 하며 실행하지 않습니다. 최초 실행에는 404 NO_ACTIVE_VERSION입니다.")
   @GetMapping("/classifier-config")

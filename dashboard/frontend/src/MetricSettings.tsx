@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "./api";
+import { parseJevThreshold, jevThresholdError } from "./jev";
 import { useResource } from "./hooks";
 import {
   compareTagOrder,
@@ -28,7 +29,7 @@ function tagDetails(tag: Tag) {
     description: tag.description,
     examples: tag.examples,
     guidance: tag.guidance,
-    jevPrompt: tag.jevPrompt || "",
+    jevThreshold: tag.jevThreshold ?? null,
     pythonRegex: tag.pythonRegex || "",
     color: tag.color,
   };
@@ -68,25 +69,43 @@ export function MetricSettings() {
   const [savedVersion, setSavedVersion] = useState<ConfigVersion | null>(null);
   const [selected, setSelected] = useState("");
   const [tab, setTab] = useState<"tags" | "policies">("tags");
-  const [dirty, setDirty] = useState(false);
+  const [contentDirty, setDirty] = useState(false);
+  const [thresholdTexts, setThresholdTexts] = useState<Record<string, string>>(
+    {},
+  );
+  const [badThresholds, setBadThresholds] = useState<Record<string, boolean>>(
+    {},
+  );
+  const hasInvalidThresholds = !!version?.tags.some(
+    (item) =>
+      badThresholds[item.id] ||
+      (thresholdTexts[item.id] !== undefined &&
+        parseJevThreshold(thresholdTexts[item.id]) === undefined),
+  );
+  const dirty = contentDirty || hasInvalidThresholds;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => {
+    setThresholdTexts({});
+    setBadThresholds({});
     if (r.data) {
       setVersion(r.data);
       setSavedVersion(r.data);
       setDirty(false);
       setError("");
       setSelected((previous) =>
-        r.data!.tags.some((t) => t.id === previous) ||
-        r.data!.policyStates.some((p) => p.id === previous)
-          ? previous
-          : (tab === "policies"
-              ? r.data!.policyStates[0]?.id
-              : flattenTree(r.data!.tags)[0]?.id) || "",
+        params.get("tagId") &&
+        r.data!.tags.some((t) => t.id === params.get("tagId"))
+          ? params.get("tagId")!
+          : r.data!.tags.some((t) => t.id === previous) ||
+              r.data!.policyStates.some((p) => p.id === previous)
+            ? previous
+            : (tab === "policies"
+                ? r.data!.policyStates[0]?.id
+                : flattenTree(r.data!.tags)[0]?.id) || "",
       );
     } else {
       setVersion(null);
@@ -126,7 +145,14 @@ export function MetricSettings() {
     !!tag &&
     !!savedTag &&
     JSON.stringify(tagDetails(tag)) !== JSON.stringify(tagDetails(savedTag));
-  const jevPromptLength = Array.from(tag?.jevPrompt || "").length;
+  const thresholdText = tag
+    ? (thresholdTexts[tag.id] ??
+      (tag.jevThreshold == null ? "" : String(tag.jevThreshold)))
+    : "";
+  const thresholdError =
+    tag && badThresholds[tag.id]
+      ? "0~1 사이의 숫자를 입력하세요."
+      : jevThresholdError(thresholdText);
   const pythonRegexLength = Array.from(tag?.pythonRegex || "").length;
   const policy = version?.policyStates.find((p) => p.id === selected);
   const change = (value: ConfigVersion) => {
@@ -167,6 +193,8 @@ export function MetricSettings() {
       const next = await action();
       setVersion(next);
       setSavedVersion(next);
+      setThresholdTexts({});
+      setBadThresholds({});
       setDirty(false);
       setNotice(message);
       ws.reload();
@@ -179,7 +207,7 @@ export function MetricSettings() {
   }
 
   async function saveTagDetails() {
-    if (!version || !tag || !savedTag || pending) return;
+    if (!version || !tag || !savedTag || pending || thresholdError) return;
     setPending(true);
     setError("");
     setNotice("");
@@ -200,6 +228,16 @@ export function MetricSettings() {
         policyStates: version.policyStates,
       };
       setSavedVersion(next);
+      setThresholdTexts((values) => {
+        const next = { ...values };
+        delete next[tag.id];
+        return next;
+      });
+      setBadThresholds((values) => {
+        const next = { ...values };
+        delete next[tag.id];
+        return next;
+      });
       setVersion(merged);
       setDirty(editableContent(merged) !== editableContent(next));
       setNotice(
@@ -242,7 +280,7 @@ export function MetricSettings() {
           description: "",
           examples: [],
           guidance: "",
-          jevPrompt: "",
+          jevThreshold: null,
           pythonRegex: "",
           color: "#5776c6",
           parentId,
@@ -425,7 +463,7 @@ export function MetricSettings() {
                 <>
                   <button
                     className="button"
-                    disabled={pending || !dirty}
+                    disabled={pending || !dirty || hasInvalidThresholds}
                     onClick={() =>
                       perform(
                         () =>
@@ -732,7 +770,9 @@ export function MetricSettings() {
                       )}
                       <button
                         className="button button-primary"
-                        disabled={pending || !tagDetailsDirty}
+                        disabled={
+                          pending || !tagDetailsDirty || !!thresholdError
+                        }
                         onClick={() => void saveTagDetails()}
                       >
                         <Icon name="save" size={15} />
@@ -802,42 +842,53 @@ export function MetricSettings() {
                         </small>
                       )}
                     </label>
-                    <div className="jev-prompt-field">
+                    <div className="jev-tag-threshold-field">
                       <label>
                         <span>
-                          Jev 판단 프롬프트 <small>선택</small>
+                          Jev 임계값 <small>선택</small>
                         </span>
-                        <span className="jev-prompt-hint" id="jev-prompt-help">
-                          이 태그로 분류할 조건과 제외할 조건을 작성하세요.
-                        </span>
-                        <textarea
-                          aria-label="Jev 판단 프롬프트"
-                          aria-describedby="jev-prompt-help jev-prompt-scope jev-prompt-count"
-                          aria-invalid={jevPromptLength > 12000}
-                          rows={6}
-                          value={tag.jevPrompt || ""}
-                          placeholder={
-                            "예: 입력에 비공개 기술 정보가 포함되어 있는지 문맥을 기준으로 판단하세요.\n공개된 예시나 인용 자료는 제외하고, 조건에 해당하는 구간을 찾아 주세요."
-                          }
-                          onChange={(e) =>
-                            patchTag({ jevPrompt: e.target.value })
-                          }
+                        <input
+                          type="number"
+                          aria-label="Jev 임계값"
+                          min={0}
+                          max={1}
+                          step="0.000001"
+                          placeholder="미설정"
+                          value={thresholdText}
+                          aria-invalid={!!thresholdError}
+                          aria-describedby="tag-jev-threshold-help"
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            const badInput =
+                              event.currentTarget.validity.badInput;
+                            setThresholdTexts((values) => ({
+                              ...values,
+                              [tag.id]: value,
+                            }));
+                            setBadThresholds((values) => ({
+                              ...values,
+                              [tag.id]: badInput,
+                            }));
+                            const parsed = parseJevThreshold(value);
+                            if (!badInput && parsed !== undefined)
+                              patchTag({ jevThreshold: parsed });
+                          }}
                         />
-                      </label>
-                      <div className="jev-prompt-footer">
-                        <span id="jev-prompt-scope">
-                          하위 태그에는 자동 적용되지 않습니다.
-                        </span>
-                        <span
-                          id="jev-prompt-count"
-                          className={
-                            jevPromptLength > 12000 ? "danger-text" : ""
-                          }
+                        <small
+                          id="tag-jev-threshold-help"
+                          className={thresholdError ? "danger-text" : ""}
                         >
-                          {formatNumber(jevPromptLength)} / 12,000자
-                          {jevPromptLength > 12000 && " · 길이를 줄여 주세요"}
-                        </span>
-                      </div>
+                          {thresholdError ||
+                            "0~1 사이, 소수점 최대 6자리. 비우면 미설정입니다. 같은 버전의 Jev 판단들이 이 태그의 임계값을 함께 사용합니다."}
+                        </small>
+                      </label>
+                      <Link
+                        className="text-link"
+                        to={`/settings/jev?versionId=${encodeURIComponent(version.id)}`}
+                      >
+                        Jev 판단 프롬프트 설정
+                        <Icon name="arrow" size={14} />
+                      </Link>
                     </div>
                     <div className="python-regex-field">
                       <label>
@@ -1044,7 +1095,7 @@ export function MetricSettings() {
           </div>
           <Panel
             title="분류기 연동"
-            description="활성 설정의 태그 ID·Jev 판단 프롬프트·Python 정규식을 읽고, 해당 버전으로 결과를 전송하세요."
+            description="활성 설정의 Jev 판단·결과 태그·임계값·Python 정규식을 읽고, 해당 버전으로 결과를 전송하세요."
             className="api-panel"
           >
             <div className="api-links">

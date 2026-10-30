@@ -1,0 +1,223 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T19:46:08.350Z",
+  "baseUrl": "http://127.0.0.1:8085",
+  "scope": "Synthetic configuration only on an isolated test DB. Publishes and activates one version; no people or events created. Automated axe and overflow checks do not establish full WCAG conformance.",
+  "fixtures": {
+    "versionId": "v_1a91fdf3bdd14466885dad8d562e615b",
+    "parentId": "jev-parent-mvvduf7s",
+    "childId": "jev-child-mvvduf7s",
+    "siblingId": "jev-sibling-mvvduf7s",
+    "firstPromptId": "j_0b9d9a8119c24ff9bffbee171a351744",
+    "secondPromptId": "j_07aa0670bfa14dd4ac18a1b0745d6aeb",
+    "cloneId": "v_44b8b1e4f121413cbe7800f7891897d7"
+  },
+  "checks": [
+    "A standalone prompt maps to parent and child result tags; zero, a six-place fraction and an unset sibling remain distinct. Korean text, emoji, whitespace and newlines survive save and reload exactly.",
+    "Prompts share a tag's current threshold. Unselecting an output preserves its tag, threshold and bindings from other prompts.",
+    "Published Jev settings stay editable; saving atomically increments the active version revision and classifier config while preserving an earlier clone. Clearing a threshold stores null without a default.",
+    "Deleting a published prompt removes only that prompt and its output bindings; tags, shared thresholds and other prompts remain intact.",
+    "A version/tag deep link selects the output tag in metric settings. Its shared threshold is editable after publication; Jev prompt text stays on the dedicated page and Python regex remains independent.",
+    "Removing an output tag through a full clone draft save prunes only that tag's bindings; standalone prompts and remaining output mappings survive and the active original stays unchanged."
+  ],
+  "screenshots": [
+    {
+      "state": "draft",
+      "width": 390,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-jev-results/dashboard/.impeccable/review/jev-settings-draft-mobile.png"
+    },
+    {
+      "state": "draft",
+      "width": 1440,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-jev-results/dashboard/.impeccable/review/jev-settings-draft-desktop.png"
+    },
+    {
+      "state": "published",
+      "width": 390,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-jev-results/dashboard/.impeccable/review/jev-settings-published-mobile.png"
+    },
+    {
+      "state": "published",
+      "width": 1440,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-jev-results/dashboard/.impeccable/review/jev-settings-published-desktop.png"
+    },
+    {
+      "state": "metric-threshold",
+      "width": 390,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-jev-results/dashboard/.impeccable/review/jev-settings-metric-threshold-mobile.png"
+    },
+    {
+      "state": "metric-threshold",
+      "width": 1440,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-jev-results/dashboard/.impeccable/review/jev-settings-metric-threshold-desktop.png"
+    }
+  ],
+  "responsive": [
+    {
+      "state": "draft",
+      "width": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "viewportWidth": 320,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "viewportWidth": 390,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "viewportWidth": 768,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "viewportWidth": 1280,
+      "overflow": false
+    },
+    {
+      "state": "draft",
+      "width": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "viewportWidth": 1440,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "viewportWidth": 320,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "viewportWidth": 390,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "viewportWidth": 768,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "viewportWidth": 1280,
+      "overflow": false
+    },
+    {
+      "state": "published",
+      "width": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "viewportWidth": 1440,
+      "overflow": false
+    },
+    {
+      "state": "metric-threshold",
+      "width": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "viewportWidth": 320,
+      "overflow": false
+    },
+    {
+      "state": "metric-threshold",
+      "width": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "viewportWidth": 390,
+      "overflow": false
+    },
+    {
+      "state": "metric-threshold",
+      "width": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "viewportWidth": 768,
+      "overflow": false
+    },
+    {
+      "state": "metric-threshold",
+      "width": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "viewportWidth": 1280,
+      "overflow": false
+    },
+    {
+      "state": "metric-threshold",
+      "width": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "viewportWidth": 1440,
+      "overflow": false
+    }
+  ],
+  "axe": [
+    {
+      "state": "draft",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 16
+    },
+    {
+      "state": "draft",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 16
+    },
+    {
+      "state": "published",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 19
+    },
+    {
+      "state": "published",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 19
+    },
+    {
+      "state": "metric-threshold",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 18
+    },
+    {
+      "state": "metric-threshold",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 18
+    }
+  ],
+  "uncaughtErrors": [],
+  "axeStatus": "PASS"
+}

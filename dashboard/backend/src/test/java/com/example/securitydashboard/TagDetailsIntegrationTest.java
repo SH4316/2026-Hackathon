@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -89,13 +90,12 @@ class TagDetailsIntegrationTest {
             List.of(Map.of("start", 0, "end", 1, "text", "x", "tagIds", List.of("child")))),
         201);
     var counts = catalogCounts();
-    String prompt = "  자체 판단 😀\r\n\t줄바꿈 유지\n ";
     String regex = "(?im)^(?P<email>\\w+@example\\.com)$\r\n  ";
     var body = details(before.path("revision").asLong(), "  변경 이름  ");
     body.put("description", "새 설명");
     body.put("examples", List.of("새 예시", "  공백 예시\n"));
     body.put("guidance", "새 가이드");
-    body.put("jevPrompt", prompt);
+    body.put("jevThreshold", new BigDecimal("0.123456"));
     body.put("pythonRegex", regex);
     body.put("color", "#ab12ef");
     var changed = call(put(tagPath(id, "child")), body, 200);
@@ -116,7 +116,8 @@ class TagDetailsIntegrationTest {
     assertThat(child.path("description").asText()).isEqualTo("새 설명");
     assertThat(child.path("examples")).isEqualTo(json.valueToTree(body.get("examples")));
     assertThat(child.path("guidance").asText()).isEqualTo("새 가이드");
-    assertThat(child.path("jevPrompt").asText()).isEqualTo(prompt);
+    assertThat(child.path("jevThreshold").decimalValue()).isEqualByComparingTo("0.123456");
+    assertThat(child.has("jevPrompt")).isFalse();
     assertThat(child.path("pythonRegex").asText()).isEqualTo(regex);
     assertThat(child.path("color").asText()).isEqualTo("#AB12EF");
     assertThat(call(get("/api/v1/config-versions/" + clone.path("id").asText()), null, 200))
@@ -134,14 +135,15 @@ class TagDetailsIntegrationTest {
     body.put("description", null);
     body.put("examples", null);
     body.put("guidance", null);
-    body.put("jevPrompt", null);
+    body.put("jevThreshold", null);
     body.put("pythonRegex", null);
     body.put("color", null);
     var changed = call(put(tagPath(id, "child")), body, 200);
     var child = find(changed.path("tags"), "child");
     assertThat(child.path("name").asText()).isEqualTo("상세만 변경");
-    for (String field : List.of("description", "guidance", "jevPrompt", "pythonRegex"))
+    for (String field : List.of("description", "guidance", "pythonRegex"))
       assertThat(child.path(field).asText()).as(field).isEmpty();
+    assertThat(child.path("jevThreshold").isNull()).isTrue();
     assertThat(child.path("examples")).isEmpty();
     assertThat(child.path("color").asText()).isEqualTo("#64748B");
     assertThat(changed.path("status").asText()).isEqualTo("DRAFT");
@@ -188,7 +190,9 @@ class TagDetailsIntegrationTest {
                 "status",
                 "PUBLISHED",
                 "unknown",
-                true)
+                true,
+                "jevPrompt",
+                "old tag prompt")
             .entrySet()) {
       var body = details(1, "구조 변경 시도");
       body.put(field.getKey(), field.getValue());
@@ -214,7 +218,13 @@ class TagDetailsIntegrationTest {
     invalid.add(Map.entry("examples", java.util.Collections.nCopies(21, "x")));
     invalid.add(Map.entry("examples", List.of("x".repeat(1001))));
     invalid.add(Map.entry("examples", java.util.Arrays.asList((String) null)));
-    invalid.add(Map.entry("jevPrompt", "😀".repeat(12001)));
+    for (Object threshold :
+        List.of(
+            new BigDecimal("-0.000001"),
+            new BigDecimal("1.000001"),
+            new BigDecimal("0.1234567"),
+            "0.5",
+            true)) invalid.add(Map.entry("jevThreshold", threshold));
     invalid.add(Map.entry("pythonRegex", "😀".repeat(4001)));
     invalid.add(Map.entry("color", "invalid"));
     invalid.add(Map.entry("revision", -1));
@@ -224,7 +234,7 @@ class TagDetailsIntegrationTest {
       body.put(field.getKey(), field.getValue());
       call(put(tagPath(id, "child")), body, 400);
     }
-    for (String field : List.of("jevPrompt", "pythonRegex"))
+    for (String field : List.of("pythonRegex"))
       for (String surrogate : List.of("\\ud800", "\\udc00"))
         mvc.perform(
                 put(tagPath(id, "child"))
@@ -322,7 +332,8 @@ class TagDetailsIntegrationTest {
     assertThat(schema.at("/properties/name/maxLength").asInt()).isEqualTo(80);
     assertThat(schema.at("/properties/description/maxLength").asInt()).isEqualTo(4000);
     assertThat(schema.at("/properties/examples/maxItems").asInt()).isEqualTo(20);
-    assertThat(schema.at("/properties/jevPrompt/maxLength").asInt()).isEqualTo(12000);
+    assertThat(schema.path("properties").has("jevPrompt")).isFalse();
+    assertThat(schema.path("properties").has("jevThreshold")).isTrue();
     assertThat(schema.at("/properties/pythonRegex/maxLength").asInt()).isEqualTo(4000);
     for (String field : List.of("id", "parentId", "order", "tags", "policyStates"))
       assertThat(schema.path("properties").has(field)).as(field).isFalse();
@@ -339,19 +350,7 @@ class TagDetailsIntegrationTest {
   private JsonNode catalog() throws Exception {
     var draft = call(post("/api/v1/config-versions"), Map.of("name", "트리"), 201);
     var root =
-        Map.of(
-            "id",
-            "root",
-            "name",
-            "부모",
-            "jevPrompt",
-            "부모 판단",
-            "pythonRegex",
-            "부모 패턴",
-            "color",
-            "#AA0000",
-            "order",
-            10);
+        Map.of("id", "root", "name", "부모", "pythonRegex", "부모 패턴", "color", "#AA0000", "order", 10);
     var child = Map.of("id", "child", "name", "자식", "parentId", "root", "order", 20);
     var sibling = Map.of("id", "sibling", "name", "다른 자식", "parentId", "root", "order", 30);
     return call(

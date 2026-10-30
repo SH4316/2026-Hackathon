@@ -1,5 +1,6 @@
 package com.example.securitydashboard.configuration.model;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public record Tag(
@@ -8,7 +9,7 @@ public record Tag(
     String description,
     List<String> examples,
     String guidance,
-    String jevPrompt,
+    BigDecimal jevThreshold,
     String pythonRegex,
     String color,
     String parentId,

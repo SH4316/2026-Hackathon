@@ -2,6 +2,7 @@ package com.example.securitydashboard.configuration;
 
 import com.example.securitydashboard.common.ApiException;
 import com.example.securitydashboard.common.InputValidation;
+import com.example.securitydashboard.configuration.jev.JevPromptRepository;
 import com.example.securitydashboard.configuration.model.ConfigVersion;
 import com.example.securitydashboard.configuration.model.CreateVersion;
 import com.example.securitydashboard.configuration.model.PolicyDefinition;
@@ -9,6 +10,7 @@ import com.example.securitydashboard.configuration.model.Tag;
 import com.example.securitydashboard.configuration.model.UpdateTagDetails;
 import com.example.securitydashboard.configuration.model.UpdateVersion;
 import com.example.securitydashboard.configuration.model.VersionSummary;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -20,16 +22,20 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
 public class ConfigurationService {
   private final ConfigurationRepository repository;
+  private final JevPromptRepository jevPrompts;
   private final Clock clock;
 
-  ConfigurationService(ConfigurationRepository repository, Clock clock) {
+  ConfigurationService(
+      ConfigurationRepository repository, JevPromptRepository jevPrompts, Clock clock) {
     this.repository = repository;
+    this.jevPrompts = jevPrompts;
     this.clock = clock;
   }
 
@@ -49,7 +55,8 @@ public class ConfigurationService {
         version.createdAt(),
         version.publishedAt(),
         tags(id),
-        policies(id));
+        policies(id),
+        jevPrompts.list(id));
   }
 
   String activeId() {
@@ -84,7 +91,10 @@ public class ConfigurationService {
     var base = input.baseVersionId() == null ? null : get(input.baseVersionId());
     String id = "v_" + UUID.randomUUID().toString().replace("-", "");
     repository.createVersion(id, name, clock.instant());
-    if (base != null) repository.insertCatalog(id, base.tags(), base.policyStates());
+    if (base != null) {
+      repository.insertCatalog(id, base.tags(), base.policyStates());
+      jevPrompts.insertAll(id, base.jevPrompts());
+    }
     return get(id);
   }
 
@@ -94,19 +104,19 @@ public class ConfigurationService {
     String name = InputValidation.name(input.name(), "name");
     List<Tag> tags = normalizeTags(input.tags());
     List<PolicyDefinition> policies = normalizePolicies(input.policyStates());
+    var retainedPrompts = jevPrompts.list(id);
     repository.replaceCatalog(id, tags, policies);
+    Set<String> retainedTagIds = new HashSet<>();
+    tags.forEach(tag -> retainedTagIds.add(tag.id()));
+    jevPrompts.restoreOutputs(id, retainedPrompts, retainedTagIds);
     repository.updateVersionName(id, name);
     return get(id);
   }
 
   @Transactional
   ConfigVersion updateTagDetails(String id, String tagId, UpdateTagDetails input) {
-    InputValidation.validateId(id, "versionId");
     InputValidation.validateId(tagId, "tagId");
-    // Use the same lock order as activation and ingestion so captured labels are atomic with edits.
-    lockActiveId();
-    var version = repository.lockVersion(id).orElseThrow(ConfigurationService::versionNotFound);
-    requireRevision(version, input.revision());
+    lockMetadataVersion(id, input.revision());
     var existing =
         tags(id).stream()
             .filter(tag -> tag.id().equals(tagId))
@@ -121,7 +131,7 @@ public class ConfigurationService {
                 input.description(),
                 input.examples(),
                 input.guidance(),
-                input.jevPrompt(),
+                input.jevThreshold(),
                 input.pythonRegex(),
                 input.color(),
                 existing.parentId(),
@@ -157,11 +167,21 @@ public class ConfigurationService {
 
   private void lockDraft(String id, Long revision) {
     InputValidation.validateId(id, "versionId");
+    lockActiveId();
     var version = repository.lockVersion(id).orElseThrow(ConfigurationService::versionNotFound);
     if (!version.status().equals("DRAFT"))
       throw new ApiException(
           HttpStatus.CONFLICT, "VERSION_IMMUTABLE", "게시한 버전은 수정하거나 삭제할 수 없습니다. 새 초안을 만들어 주세요.");
     if (revision != null) requireRevision(version, revision);
+  }
+
+  /** Shared metadata lock order also used by Jev edits and event capture. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void lockMetadataVersion(String id, long revision) {
+    InputValidation.validateId(id, "versionId");
+    lockActiveId();
+    var version = repository.lockVersion(id).orElseThrow(ConfigurationService::versionNotFound);
+    requireRevision(version, revision);
   }
 
   private static void requireRevision(VersionState version, long revision) {
@@ -222,11 +242,20 @@ public class ConfigurationService {
         InputValidation.text(input.description(), 4000, "description"),
         List.copyOf(examples),
         InputValidation.text(input.guidance(), 4000, "guidance"),
-        InputValidation.text(input.jevPrompt(), 12000, "tags.jevPrompt"),
+        normalizeJevThreshold(input.jevThreshold(), "tags.jevThreshold"),
         InputValidation.text(input.pythonRegex(), 4000, "tags.pythonRegex"),
         color(input.color()),
         input.parentId(),
         input.order() == null ? 0 : input.order());
+  }
+
+  public static BigDecimal normalizeJevThreshold(BigDecimal value, String field) {
+    if (value != null
+        && (value.compareTo(BigDecimal.ZERO) < 0
+            || value.compareTo(BigDecimal.ONE) > 0
+            || value.scale() > 6))
+      throw ApiException.invalid(field, "임계값은 0~1 사이이며 소수점 아래 최대 6자리입니다.");
+    return value;
   }
 
   static List<PolicyDefinition> normalizePolicies(List<PolicyDefinition> input) {

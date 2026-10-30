@@ -12,4 +12,5 @@ public record ConfigVersion(
     Instant createdAt,
     Instant publishedAt,
     List<Tag> tags,
-    List<PolicyDefinition> policyStates) {}
+    List<PolicyDefinition> policyStates,
+    List<JevPrompt> jevPrompts) {}

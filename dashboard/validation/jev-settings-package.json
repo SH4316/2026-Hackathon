@@ -1,0 +1,64 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T19:45:54.872310+00:00",
+  "baseUrl": "http://127.0.0.1:8085",
+  "runtime": "native packaged Spring Boot JAR on Java21 / MySQL8.4.7",
+  "jarSha256": "24d77e3a62c22ee16766b996ba07d533122dd8e931860e46fad3c1405019d6d3",
+  "spaRoutes": [
+    "/",
+    "/events",
+    "/people",
+    "/settings/monitoring",
+    "/settings/metrics",
+    "/settings/jev",
+    "/saved-searches"
+  ],
+  "assets": [
+    "/assets/index-Cet0qFqV.js",
+    "/assets/index-BfPyw03C.css"
+  ],
+  "missingResourcesReturn404": true,
+  "apiReturnsJson": true,
+  "swaggerUiServed": true,
+  "openApiRelativeServer": true,
+  "devSqlExcludedFromJar": true,
+  "migrations": {
+    "latest": 7,
+    "appliedSuccessfully": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "V7IncludedInJar": true
+  },
+  "freshDatabaseBootstrap": {
+    "configVersionsStatus": 200,
+    "configVersionsInitiallyEmpty": true,
+    "classifierStatus": 404,
+    "classifierCode": "NO_ACTIVE_VERSION"
+  },
+  "afterBrowserFixtures": {
+    "configVersionsStatus": 200,
+    "classifierStatus": 200,
+    "standaloneJevPromptsReturned": true,
+    "tagThresholdsReturned": true,
+    "legacyTagPromptAbsent": true
+  },
+  "openApi": {
+    "status": 200,
+    "jevPromptCrud": true,
+    "JevPromptModel": true,
+    "ConfigVersionJevPrompts": true,
+    "TagJevThreshold": true,
+    "legacyTagPromptAbsent": true
+  },
+  "javaFormatting": {
+    "status": "PASS",
+    "formatter": "google-java-format1.24.0",
+    "changedOrNewFilesChecked": 22
+  }
+}
