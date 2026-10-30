@@ -32,6 +32,7 @@ class JevPromptController {
           "초안과 게시 버전 모두 수정할 수 있습니다. outputs는 같은 버전의 기존 태그를 선택합니다."
               + " threshold는 해당 태그의 공통 임계값이며 null은 임계값 사용 안 함, 0은 유효한 임계값입니다."
               + " 한 버전에 새 프롬프트는 최대 100개까지 추가할 수 있습니다."
+              + " enabled를 생략하거나 null로 보내면 true로 생성하며 출력 태그의 enabled 값은 바꾸지 않습니다."
               + " 저장 시 revision이 한 번 증가하며 Jev를 실행하지 않습니다.")
   @PostMapping
   ResponseEntity<ConfigVersion> create(
@@ -45,6 +46,8 @@ class JevPromptController {
       description =
           "이름·판단 프롬프트·출력 태그와 임계값을 함께 저장합니다. 같은 태그를 여러 프롬프트가 참조할 수 있으며"
               + " 임계값은 해당 버전의 태그에 공통으로 적용됩니다. 출력에서 태그를 제외해도 태그와 임계값은 유지합니다."
+              + " enabled는 선택한 버전의 프롬프트에만 적용하며 생략하거나 null로 보내면 기존 값을 유지합니다."
+              + " 프롬프트나 출력 태그의 enabled 값은 서로 독립적이며 출력 연결은 유지합니다."
               + " revision이 최신 값과 다르면 409 REVISION_CONFLICT입니다.")
   @PutMapping("/{promptId}")
   ConfigVersion update(

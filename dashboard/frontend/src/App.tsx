@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   Link,
   NavLink,
+  Navigate,
   Route,
   Routes,
   useLocation,
@@ -38,7 +39,7 @@ import {
 import { Trend, MetricTree, ServiceChart, PolicyChart } from "./charts";
 import { MetricSettings } from "./MetricSettings";
 import { JevSettings } from "./JevSettings";
-import { MonitoringSettings } from "./MonitoringSettings";
+import { ConnectionSettings } from "./ConnectionSettings";
 import { PersonEnrollment } from "./PersonEnrollment";
 import { SavedSearches, SavedSearchDetail } from "./SavedSearches";
 import type { Person, Filters } from "./types";
@@ -53,8 +54,8 @@ const navigation: {
   { to: "/people", label: "사람 관리", icon: "people" },
   { to: "/settings/metrics", label: "메트릭 설정", icon: "tree" },
   { to: "/settings/jev", label: "Jev 설정", icon: "code" },
+  { to: "/settings/connections", label: "검사 서버 연결", icon: "settings" },
   { to: "/saved-searches", label: "저장된 검색", icon: "save" },
-  { to: "/settings/monitoring", label: "감시 연동", icon: "settings" },
 ];
 export default function App() {
   return (
@@ -79,15 +80,21 @@ function Shell() {
         <Link className="brand" to="/">
           <span className="brand-symbol">
             <svg width="25" height="25" viewBox="0 0 48 48" fill="none">
-              <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z"
-                    fill="#0F172A" stroke="#3B82F6" strokeWidth="3.2" strokeLinejoin="round"/>
-              <circle cx="24" cy="15" r="3.5" fill="#EF4444"/>
-              <circle cx="24" cy="24" r="3.5" fill="#F59E0B"/>
-              <circle cx="24" cy="33" r="3.5" fill="#10B981"/>
+              <path
+                d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z"
+                fill="#0F172A"
+                stroke="#3B82F6"
+                strokeWidth="3.2"
+                strokeLinejoin="round"
+              />
+              <circle cx="24" cy="15" r="3.5" fill="#EF4444" />
+              <circle cx="24" cy="24" r="3.5" fill="#F59E0B" />
+              <circle cx="24" cy="33" r="3.5" fill="#10B981" />
             </svg>
           </span>
           <span className="brand-name">
-            Safe<span className="brand-accent">Prompt</span><span>AI 보안 관제 대시보드</span>
+            Safe<span className="brand-accent">Prompt</span>
+            <span>AI 보안 관제 대시보드</span>
           </span>
         </Link>
         <div className="workspace-label">워크스페이스</div>
@@ -140,7 +147,15 @@ function Shell() {
             <span>수동 갱신</span>
           </div>
         </header>
-        <main id="main" tabIndex={-1}>
+        <main
+          id="main"
+          tabIndex={-1}
+          className={
+            location.pathname.startsWith("/settings/")
+              ? "configuration-page"
+              : undefined
+          }
+        >
           <Routes>
             <Route path="/" element={<Overview />} />
             <Route path="/events" element={<Events />} />
@@ -152,8 +167,20 @@ function Shell() {
             <Route path="/saved-searches" element={<SavedSearches />} />
             <Route path="/saved-searches/:id" element={<SavedSearchDetail />} />
             <Route
+              path="/settings/connections"
+              element={<ConnectionSettings />}
+            />
+            <Route
               path="/settings/monitoring"
-              element={<MonitoringSettings />}
+              element={
+                <Navigate
+                  to={{
+                    pathname: "/settings/metrics",
+                    search: location.search,
+                  }}
+                  replace
+                />
+              }
             />
             <Route
               path="*"

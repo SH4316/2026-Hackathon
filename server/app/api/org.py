@@ -1,4 +1,4 @@
-"""조직 설정·상태 관리 API(X-Admin-Key). 대시보드 '감시 연동' 화면이 쓸 수 있다."""
+"""조직 설정·상태 관리 API(X-Admin-Key). 대시보드 '검사 서버 연결' 화면이 쓸 수 있다."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def get_settings(request: Request, _: str = Depends(require_admin)) -> OrgSettin
 def put_settings(body: OrgSettingsBody, request: Request, actor: str = Depends(require_admin)) -> OrgSettings:
     org = request.app.state.org
     if org.settings.source == "dashboard":
-        raise HTTPException(status.HTTP_409_CONFLICT, "대시보드 '감시 연동' 설정을 따르고 있습니다. 대시보드에서 바꾸세요")
+        raise HTTPException(status.HTTP_409_CONFLICT, "대시보드 '검사 서버 연결' 설정을 따르고 있습니다. 대시보드에서 바꾸세요")
     org.settings_store.update(body, actor)
     return org.settings
 

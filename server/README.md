@@ -4,7 +4,7 @@
 브라우저 확장프로그램과 CLI가 같은 API·정책을 사용합니다.
 
 > 현재 상태: 규칙 기반 탐지·정제·재검사, API 초안, 원문 없는 감사 이벤트, CLI 초안까지 동작합니다.
-> 로컬 판단 모델은 `compose.local.yaml` 의 decider(기본 Qwen3 4B Instruct)로 띄웁니다. 정확도 평가·실행 장비는 아직 미정입니다.
+> 대시보드·서버·실제 Mapika Decider 4B 를 함께 띄우는 기본 경로는 저장소 루트의 [Compose 안내](../README.md)입니다. 모델 정확도 평가는 아직 진행 전입니다.
 
 ## 구조
 
@@ -37,11 +37,11 @@ server/
 
 ### Docker (권장)
 
-compose 파일이 두 개입니다.
+대시보드까지 함께 띄우려면 [저장소 루트 Compose 안내](../README.md)를 사용합니다. 아래 파일은 서버를 따로 띄우는 기존 경로입니다.
 
 | 파일 | 띄우는 것 | 모델 |
 |---|---|---|
-| `compose.local.yaml` | API + **decider**(4B 판단 모델, Ollama) | 같은 장비에서 실행. 처음 한 번 자동으로 내려받음 |
+| `compose.local.yaml` | API + Ollama(Qwen3 4B Instruct) | 기존 생성형 모델 경로. 서비스 이름 `decider` 는 Mapika Decider 모델을 뜻하지 않음 |
 | `compose.api.yaml` | API 만 | 규칙만(`PG_MODEL_MODE=disabled`), 또는 `.env` 의 `PG_MODEL_*` 로 지정한 조직 내부 모델 서버 |
 
 ```bash
@@ -123,7 +123,7 @@ python -m prompt_guard inspect                                  # 대화형 입�
 
 ### 대시보드 연결
 
-1. 대시보드 **감시 연동** → **연결 URL 만들기**. `http://대시보드/api/v1/connectors/c_…#sk_…` 가 한 번만 표시됩니다.
+1. 대시보드 **검사 서버 연결** → **연결 URL 만들기**. `http://대시보드/api/v1/connectors/c_…#sk_…` 가 한 번만 표시됩니다.
 2. 이 서버를 `PG_DASHBOARD_CONNECTION=<연결 URL>` 로 실행합니다. `#` 뒤 비밀값은 `Authorization: Bearer` 로만 보냅니다.
 3. `POST /v1/admin/org/refresh`(관리 키)로 연결과 활성 설정을 확인합니다. `/v1/admin/org/status` 의 `connector_id`, `settings_source` 로 상태를 봅니다.
 4. 대시보드에서 연결을 해지하면 401 이 되어 조직 규칙을 적용할 수 없으므로 검사는 회색(전송 보류)입니다.
@@ -131,8 +131,12 @@ python -m prompt_guard inspect                                  # 대화형 입�
 대시보드 기록의 `source_id` 는 연결 ID 입니다. `PG_DASHBOARD_URL`(주소만, 인증 없음)은 대시보드가 아직 연결을 발급하지 않았을 때만 동작하는 이전 방식입니다.
 
 - **태그 정규식:** Python `re` 로 실행합니다. 4000자 이하, 빈 문자열 일치·중첩 수량자(`(a+)+`)는 건너뜁니다(`/v1/admin/org/status` 의 `skipped_regex`).
-- **Jev:** 프롬프트마다 로컬 모델(decider)이 출력 태그별 점수(0~1)와 근거 구간을 냅니다. 태그의 `jevThreshold` 가 설정된 경우에만
-  `점수 >= 임계값` 이면 탐지입니다. 근거 구간을 원문에서 찾지 못하면 위치 없이 최소 `warn` 입니다(`org_jev_unlocated`).
+- **Jev:** 프롬프트마다 출력 태그별 점수(0~1)를 받고, 태그의 `jevThreshold` 가 설정된 경우에만 `점수 >= 임계값` 이면 탐지입니다.
+  `PG_MODEL_API=decider` 는 Noul(참일 확률)을 쓰며 입력 전체가 분류 단위입니다. 응답의 전체 입력 span 은 근거 추출 위치가 아니고,
+  이유에 `입력 전체 분류`로 표시됩니다. 임계값을 넘으면 입력 전체에 `tag_action` 을 적용하므로 기본 `mask` 는 입력 전체를 토큰 하나로 바꿉니다.
+  기존 `ollama`·`openai` 모델은 근거 문구를 추출하고, 그 문구를 원문에서 찾지 못하면 최소 `warn` 입니다(`org_jev_unlocated`).
+- 태그·Jev 프롬프트의 `enabled=false` 는 실행에서 제외합니다(필드가 없는 이전 설정은 활성). 부모·자식 태그는 각각 독립적으로 적용하며,
+  비활성 태그는 프롬프트의 출력 목록에서도 제외합니다. 출력이 하나도 없거나 프롬프트가 비활성이면 모델을 호출하지 않습니다.
 - 대시보드 태그 탐지의 조치는 조직 설정 `tag_action`(기본 `mask`, 토큰 `[ORG_<태그>_n]`)이며 목적지 등급으로 강화됩니다.
   태그 ID 가 내장 유형과 같으면 유형 이름은 `org_<태그 ID>` 이고 기록할 때 원래 태그로 되돌립니다.
 - 기존 규칙 결과는 취소하지 않고 합쳐서 더 엄격한 쪽을 적용합니다.
@@ -142,7 +146,7 @@ python -m prompt_guard inspect                                  # 대화형 입�
 
 ### 조직 설정
 
-대시보드 **감시 연동 → 검사 서버 설정**이 기준입니다(대시보드 `GET /api/v1/detector-settings` 를 활성 설정과 함께 받음).
+대시보드 **검사 서버 연결 → 검사 서버 설정**이 기준입니다(대시보드 `GET /api/v1/detector-settings` 를 활성 설정과 함께 받음).
 대시보드 설정을 받을 수 없을 때만 이 서버의 `GET·PUT /v1/admin/org/settings`(관리 키) 값을 쓰고,
 대시보드 설정을 따르는 중에는 서버 PUT 이 409 입니다. 항목은 같습니다.
 
@@ -224,7 +228,27 @@ curl -X POST $SERVER/v1/admin/enrollments -H "X-Admin-Key: $ADMIN" -H "Content-T
 - 로컬 실행: `python tools/policy_watch/watch.py --report report.md [--only openai,google]`
 - 매번 바뀌는 문구로 거짓 변경이 생기면 `sources.yaml` 의 `ignore` 정규식에 추가합니다.
 
-## 로컬 모델: decider (4B)
+## 실제 Decider 모델 연결
+
+루트 Compose 는 [Mapika/decider-4b](https://huggingface.co/Mapika/decider-4b) 를 공식
+[Decider typed API](https://github.com/Mapika/decider) 로 연결합니다. 별도 런타임을 연결할 때도 같은 계약을 사용합니다.
+
+```dotenv
+PG_MODEL_API=decider
+PG_MODEL_BASE_URL=http://decider:8000
+PG_MODEL_NAME=Mapika/decider-4b
+PG_MODEL_MODE=optional
+```
+
+서버는 `POST /v1/systemone` 에 `state.document` 와 출력마다 독립적인 `type=noul` 질문을 보내고,
+`answers.<태그>.noul` 의 확률을 읽습니다. 모든 요청 태그의 유한한 0~1 점수가 있어야 성공입니다.
+점수 누락·잘못된 형식·HTTP 오류·시간 초과는 `optional` 에서 `incomplete`, `required` 에서 `error` 이며 `allow` 하지 않습니다.
+빈 입력이나 빈 출력 목록은 호출하지 않습니다. `/readyz` 는 런타임의 `/health` 에서 `ok=true` 와 설정 모델 ID 가 일치하는지 확인합니다.
+
+로컬 문맥 탐지기(`context_detectors`)도 입력 전체를 분류하며 기본 임계값은 **0.5 이상**입니다. 이 값은 태그별 `jevThreshold` 와 별개입니다.
+`action=mask` 인 문맥 탐지기에 걸리면 입력 전체를 마스킹합니다. 모델이 정확한 민감 구간을 추출한다고 해석하면 안 됩니다.
+
+## 기존 Ollama 모델 별도 실행
 
 `compose.local.yaml` 은 문맥 탐지기(정규식으로 판단할 수 없는 기준)를 판단하는 4B 모델을 함께 띄웁니다.
 

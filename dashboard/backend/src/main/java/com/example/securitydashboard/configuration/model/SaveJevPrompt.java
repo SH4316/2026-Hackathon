@@ -5,4 +5,8 @@ import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 
 public record SaveJevPrompt(
-    @NotNull @PositiveOrZero Long revision, String name, String prompt, List<JevOutput> outputs) {}
+    @NotNull @PositiveOrZero Long revision,
+    String name,
+    String prompt,
+    List<JevOutput> outputs,
+    Boolean enabled) {}

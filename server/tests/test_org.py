@@ -6,8 +6,9 @@ import httpx
 import pytest
 
 from app.config import ModelMode
-from app.detection.model import JevScore, ModelUnavailable
+from app.detection.model import ContextModelDetector, JevScore, ModelUnavailable
 from app.org.dashboard import DashboardClient
+from app.org.rules import compile_org
 
 from tests.conftest import ADMIN_KEY, body, make_client
 
@@ -154,6 +155,63 @@ def test_jev_without_span_is_at_least_warn():
     c, _ = org_client(model=FakeModel([JevScore("research", 0.95, ())]))
     r = c.post("/v1/inspect", json=body("평범한 문장")).json()
     assert r["decision"] == "warn" and "org_jev_unlocated" in r["notices"]
+
+
+def test_whole_input_classification_applies_policy_and_reports_unicode_scope():
+    model = FakeModel([JevScore("research", 0.95, (), whole_input=True)])
+    c, dash = org_client(model=model)
+    tok, _ = enroll(c)
+    text = "실험😀 결과는 미공개"
+    c.put("/v1/admin/org/settings", json={"report_text": "full"}, headers=ADMIN)
+    r = c.post("/v1/inspect", json=body(text), headers=tok).json()
+    [finding] = r["findings"]
+    assert r["decision"] == "block" and "org_jev_unlocated" not in r["notices"]
+    assert finding["span"] == {"start": 0, "end": len(text), "start_utf16": 0, "end_utf16": len(text) + 1}
+    assert "입력 전체 분류" in finding["reason"]
+    assert dash.events[0]["result"]["findings"][0]["span"] == finding["span"]
+    c.put("/v1/admin/org/settings", json={}, headers=ADMIN)
+    c.post("/v1/inspect", json=body(text), headers=tok)
+    assert dash.events[-1]["text"] == "[ORG_RESEARCH_1]"
+    sanitized = c.post("/v1/sanitize", json=body(text)).json()
+    assert sanitized["sanitized_text"] == "[ORG_RESEARCH_1]"
+
+
+@pytest.mark.parametrize("mode,status", [(ModelMode.OPTIONAL, "incomplete"), (ModelMode.REQUIRED, "error")])
+def test_malformed_decider_response_cannot_allow(mode, status):
+    model = ContextModelDetector("decider", "http://decider", "Mapika/decider-4b", 10, 1,
+                                 transport=httpx.MockTransport(lambda _: httpx.Response(200, json={"answers": {}})))
+    c, _ = org_client(model=model, mode=mode)
+    result = c.post("/v1/inspect", json=body("평범한 문장")).json()
+    assert result["status"] == status and result["decision"] != "allow"
+    assert "org_jev_failed" in result["notices"]
+
+
+@pytest.mark.parametrize("parent_enabled,child_enabled", [(False, True), (True, False)])
+def test_dashboard_tag_enabled_is_independent_for_parent_and_child(parent_enabled, child_enabled):
+    cfg = {"id": "v-enabled", "tags": [
+        {"id": "parent", "name": "부모", "enabled": parent_enabled, "pythonRegex": "부모", "jevThreshold": 0.7},
+        {"id": "child", "name": "자식", "parentId": "parent", "enabled": child_enabled,
+         "pythonRegex": "자식", "jevThreshold": 0.8},
+    ], "jevPrompts": [{"id": "jp", "prompt": "분류 기준", "tagIds": ["parent", "child"]}]}
+    rules = compile_org(cfg, set())
+    enabled = "parent" if parent_enabled else "child"
+    assert set(rules.tag_names) == set(rules.thresholds) == set(rules.type_of) == {enabled}
+    assert list(rules.jev[0].outputs) == [enabled]
+    assert [c.type for c in rules.detect_regex("부모 자식")] == [enabled]
+
+
+@pytest.mark.parametrize("disable", ["prompt", "tag"])
+def test_disabled_prompt_or_all_output_tags_prevents_model_call(disable):
+    dash = FakeDashboard()
+    if disable == "prompt":
+        dash.config["jevPrompts"][0]["enabled"] = False
+    else:
+        dash.config["tags"][1]["enabled"] = False
+    model = FakeModel(fail=True)
+    c, _ = org_client(dash=dash, model=model)
+    result = c.post("/v1/inspect", json=body("평범한 문장")).json()
+    assert result["decision"] == "allow" and result["status"] == "complete"
+    assert model.calls == 0
 
 
 def test_jev_failure_or_disabled_model_is_never_allow():

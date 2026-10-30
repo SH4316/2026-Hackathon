@@ -66,6 +66,7 @@ describe("Korean display formatting", () => {
 function tag(id: string, parentId: string | null = null, order = 0): Tag {
   return {
     id,
+    enabled: true,
     name: id,
     parentId,
     order,

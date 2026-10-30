@@ -1,0 +1,151 @@
+services:
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    pull_policy: build
+    environment:
+      # Keep the database address on the Compose network.
+      DB_URL: "jdbc:mysql://mysql:3306/ai_security_dashboard?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true"
+      DB_USERNAME: ${DB_USERNAME:-dashboard}
+      DB_PASSWORD: ${DB_PASSWORD:-dashboard-local}
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: "8080"
+    ports:
+      - "${APP_BIND_IP:-0.0.0.0}:${APP_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ai_security_dashboard
+      MYSQL_USER: ${DB_USERNAME:-dashboard}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-dashboard-local}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Copy .env.example to .env and set MYSQL_ROOT_PASSWORD}
+      TZ: UTC
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --host=127.0.0.1 --user=root --password=\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    pull_policy: build
+    environment:
+      PG_API_KEYS: ${PG_API_KEYS:?Copy .env.example to .env and generate PG_API_KEYS}
+      PG_ADMIN_KEYS: ${PG_ADMIN_KEYS:-}
+      PG_AUTH_DISABLED: ${PG_AUTH_DISABLED:-false}
+      PG_POLICY_PATH: ${PG_POLICY_PATH:-/srv/policies/default.yaml}
+      PG_MAX_TEXT_CHARS: ${PG_MAX_TEXT_CHARS:-50000}
+      PG_MAX_BODY_BYTES: ${PG_MAX_BODY_BYTES:-262144}
+      PG_MODEL_MODE: ${PG_MODEL_MODE:-required}
+      PG_MODEL_API: decider
+      PG_MODEL_BASE_URL: http://decider:8000
+      PG_MODEL_API_KEY: ""
+      PG_MODEL_NAME: Mapika/decider-4b
+      PG_MODEL_TIMEOUT_S: ${PG_MODEL_TIMEOUT_S:-120}
+      PG_MODEL_MAX_CONCURRENCY: ${PG_MODEL_MAX_CONCURRENCY:-2}
+      PG_AUDIT_DB_PATH: ${PG_AUDIT_DB_PATH:-/srv/data/audit.sqlite3}
+      PG_CLIENTS_DB_PATH: ${PG_CLIENTS_DB_PATH:-/srv/data/clients.sqlite3}
+      PG_RULESET_DB_PATH: ${PG_RULESET_DB_PATH:-/srv/data/ruleset.sqlite3}
+      PG_ORG_DB_PATH: ${PG_ORG_DB_PATH:-/srv/data/org.sqlite3}
+      PG_ENROLLMENT_TTL_MINUTES: ${PG_ENROLLMENT_TTL_MINUTES:-1440}
+      PG_CORS_ORIGINS: ${PG_CORS_ORIGINS:-}
+      # The server reads active rules and records events through this internal URL.
+      PG_DASHBOARD_URL: http://dashboard:8080
+      # Connection URL issued on the dashboard's 검사 서버 연결 screen (dashboard address http://dashboard:8080).
+      # Takes precedence over PG_DASHBOARD_URL; required once any connection has been issued.
+      PG_DASHBOARD_CONNECTION: ${PG_DASHBOARD_CONNECTION:-}
+      PG_DASHBOARD_TIMEOUT_S: ${PG_DASHBOARD_TIMEOUT_S:-5}
+      PG_DASHBOARD_REFRESH_S: ${PG_DASHBOARD_REFRESH_S:-30}
+    ports:
+      - "${PG_BIND_IP:-0.0.0.0}:${PG_PORT:-8000}:8000"
+    volumes:
+      - server-data:/srv/data
+      - ./server/policies:/srv/policies:ro
+    networks: [default, decider-internal]
+    depends_on:
+      dashboard:
+        condition: service_healthy
+      decider:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Only this service downloads weights; it never shares a network with server.
+  decider-pull:
+    build:
+      context: ./server/decider
+      dockerfile: Dockerfile
+      target: downloader
+    pull_policy: build
+    environment:
+      DECIDER_OFFLINE: ${DECIDER_OFFLINE:-false}
+    volumes:
+      - decider-data:/models
+    networks: [model-download]
+    restart: "no"
+
+  decider:
+    build:
+      context: ./server/decider
+      dockerfile: Dockerfile
+      target: cpu
+    pull_policy: build
+    environment:
+      DECIDER_THREADS: ${DECIDER_THREADS:-4}
+      # CPU remains the default even when the host has a GPU.
+      DECIDER_GPU_LAYERS: "0"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    volumes:
+      - decider-data:/models:ro
+    networks: [decider-internal]
+    depends_on:
+      decider-pull:
+        condition: service_completed_successfully
+    healthcheck:
+      # /health is available after the weights load and a real warmup decision.
+      test: ["CMD", "python", "-c", "import json,urllib.request;h=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3));assert h.get('ok') is True and h.get('model') == 'Mapika/decider-4b'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+    restart: unless-stopped
+
+networks:
+  default:
+  model-download:
+  decider-internal:
+    internal: true
+
+volumes:
+  mysql-data:
+  server-data:
+  decider-data:

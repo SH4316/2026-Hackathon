@@ -600,6 +600,142 @@ class FlywayMigrationIntegrationTest {
   }
 
   @Test
+  void v8DefaultsExistingAndNewSettingsToEnabledWithoutChangingConfigurationOrHistory() {
+    var source = migrationSource();
+    var jdbc = new JdbcTemplate(source);
+    var v7 =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .cleanDisabled(false)
+            .target("7")
+            .load();
+    v7.clean();
+    v7.migrate();
+    jdbc.update("INSERT INTO people(id,name) VALUES('preserved','기존 사용자 😀')");
+    jdbc.update(
+        "INSERT INTO config_versions(id,name,status,revision,created_at,published_at)"
+            + " VALUES('published','게시 설정','PUBLISHED',7,'2026-10-20 01:02:03.123456',"
+            + " '2026-10-20 02:03:04.123456'),('draft','작성 설정','DRAFT',3,"
+            + " '2026-10-21 01:02:03.123456',NULL)");
+    jdbc.update(
+        "INSERT INTO config_version_tags"
+            + "(version_id,id,name,description,examples,guidance,jev_prompt,jev_threshold,python_regex,color,parent_id,sort_order)"
+            + " VALUES('published','email','이메일','설명',JSON_ARRAY('😀'),'가이드','원본 보관',"
+            + " 0.123456,'(?P<email>[','#123456',NULL,5),"
+            + " ('published','child','자식','',JSON_ARRAY(),'','',NULL,'','#ABCDEF','email',6),"
+            + " ('draft','email','다른 이메일','다른 설명',JSON_ARRAY(),'','',1,'raw','#654321',NULL,2)");
+    jdbc.update(
+        "INSERT INTO config_tag_closure(version_id,ancestor_id,descendant_id)"
+            + " VALUES('published','email','email'),('published','email','child'),"
+            + " ('published','child','child'),('draft','email','email')");
+    jdbc.update(
+        "INSERT INTO config_version_policies(version_id,id,name,description,color,sort_order)"
+            + " VALUES('published','review','검토','정책','#987654',7)");
+    String raw = "  독립 판단 😀\r\n\t원문 유지\n ";
+    jdbc.update(
+        "INSERT INTO config_version_jev_prompts(version_id,id,name,prompt,sort_order)"
+            + " VALUES('published','judge','게시 판단',?,8),('draft','judge','초안 판단','다른 원문',3)",
+        raw);
+    jdbc.update(
+        "INSERT INTO config_version_jev_outputs(version_id,prompt_id,tag_id,sort_order)"
+            + " VALUES('published','judge','email',0),('published','judge','child',1),"
+            + " ('draft','judge','email',0)");
+    jdbc.update("UPDATE active_config SET version_id='published' WHERE singleton_id=1");
+    jdbc.update(
+        "INSERT INTO security_events"
+            + "(id,source_id,event_id,person_id,version_id,prompt,occurred_at,received_at,service,model,policy_state_id)"
+            + " VALUES(991,'legacy-v7','existing','preserved','published','user@example.com',"
+            + " '2026-10-20 01:02:03.123456','2026-10-20 01:02:04.654321','service','모델','review')");
+    jdbc.update(
+        "INSERT INTO detections(id,event_id,start_offset,end_offset,text)"
+            + " VALUES(992,991,0,16,'user@example.com')");
+    jdbc.update(
+        "INSERT INTO detection_tags(detection_id,version_id,tag_id,captured_name,captured_color)"
+            + " VALUES(992,'published','email','캡처 이름','#FEDCBA')");
+    jdbc.update(
+        "INSERT INTO saved_searches(id,name,version_id,created_at,filters,event_count,finding_count)"
+            + " VALUES('snapshot','기존 저장 검색','published','2026-10-20 04:05:06.123456',"
+            + " JSON_OBJECT('tagId','email'),1,1)");
+    jdbc.update("INSERT INTO saved_search_events(saved_search_id,event_id) VALUES('snapshot',991)");
+    jdbc.update(
+        "INSERT INTO detector_events(event_id,envelope,content_hash) VALUES(991,?,?)",
+        "{\"input_version\":123456789012345678901234567890,\"metadata\":\" 원문 😀\\n \"}",
+        "f".repeat(64));
+    jdbc.update(
+        "INSERT INTO detector_event_images(id,event_id,name,media_type,data) VALUES(993,991,?,?,?)",
+        "원본 😀.png", "image/png", new byte[] {0, 1, 2, -1});
+    var before = snapshotVersionedData(jdbc);
+    var promptsBefore = jdbc.queryForList("SELECT * FROM config_version_jev_prompts ORDER BY 1,2");
+    var outputsBefore = jdbc.queryForList("SELECT * FROM config_version_jev_outputs ORDER BY 1,2,3");
+
+    var v8 =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .target("8")
+            .load();
+    assertThat(v8.migrate().migrationsExecuted).isEqualTo(1);
+    var after = snapshotVersionedData(jdbc);
+    for (var tag : after.get("config_version_tags"))
+      assertThat(tag.remove("enabled")).isEqualTo(true);
+    assertThat(after).usingRecursiveComparison().isEqualTo(before);
+    var promptsAfter = jdbc.queryForList("SELECT * FROM config_version_jev_prompts ORDER BY 1,2");
+    for (var prompt : promptsAfter) assertThat(prompt.remove("enabled")).isEqualTo(true);
+    assertThat(promptsAfter).usingRecursiveComparison().isEqualTo(promptsBefore);
+    assertThat(jdbc.queryForList("SELECT * FROM config_version_jev_outputs ORDER BY 1,2,3"))
+        .isEqualTo(outputsBefore);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT IS_NULLABLE,COLUMN_DEFAULT FROM information_schema.COLUMNS"
+                    + " WHERE TABLE_SCHEMA=DATABASE() AND COLUMN_NAME='enabled'"
+                    + " AND TABLE_NAME IN ('config_version_tags','config_version_jev_prompts')"))
+        .hasSize(2)
+        .allSatisfy(column -> assertThat(column).containsEntry("IS_NULLABLE", "NO").containsEntry("COLUMN_DEFAULT", "1"));
+    assertThat(v8.migrate().migrationsExecuted).isZero();
+
+    jdbc.update("UPDATE config_version_tags SET enabled=FALSE WHERE version_id='published' AND id='email'");
+    jdbc.update("UPDATE config_version_jev_prompts SET enabled=FALSE WHERE version_id='published'");
+    jdbc.update(
+        "INSERT INTO config_version_tags(version_id,id,name,description,examples,guidance,color,parent_id,sort_order)"
+            + " VALUES('draft','new','새 태그','',JSON_ARRAY(),'','#222222',NULL,9)");
+    jdbc.update(
+        "INSERT INTO config_version_jev_prompts(version_id,id,name,prompt,sort_order)"
+            + " VALUES('draft','new','새 판단','',9)");
+    for (String table : List.of("config_version_tags", "config_version_jev_prompts")) {
+      assertThat(jdbc.queryForObject("SELECT enabled FROM " + table + " WHERE version_id='draft' AND id='new'", Boolean.class))
+          .as(table + " default").isTrue();
+      assertThat(jdbc.queryForObject("SELECT enabled FROM " + table + " WHERE version_id='published' AND id=?", Boolean.class,
+          table.equals("config_version_tags") ? "email" : "judge"))
+          .as(table + " explicit false").isFalse();
+    }
+    assertThat(jdbc.queryForList("SELECT * FROM config_version_jev_outputs ORDER BY 1,2,3"))
+        .isEqualTo(outputsBefore);
+  }
+
+  @Test
+  void freshV8SchemaLeavesConfigurationAndHistoryEmpty() {
+    var source = migrationSource();
+    var latest =
+        Flyway.configure()
+            .dataSource(source)
+            .locations("classpath:db/migration")
+            .cleanDisabled(false)
+            .target("8")
+            .load();
+    latest.clean();
+    assertThat(latest.migrate().migrationsExecuted).isEqualTo(8);
+    var jdbc = new JdbcTemplate(source);
+    var tables = new ArrayList<>(VERSIONED_DATA_TABLES);
+    tables.remove("active_config");
+    tables.addAll(List.of("config_version_jev_prompts", "config_version_jev_outputs"));
+    for (String table : tables)
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class)).as(table).isZero();
+    assertThat(jdbc.queryForObject("SELECT version_id FROM active_config WHERE singleton_id=1", String.class))
+        .isNull();
+  }
+
+  @Test
   void freshV7SchemaDoesNotSeedPromptsOutputsOrConfiguration() {
     var source = migrationSource();
     var latest =

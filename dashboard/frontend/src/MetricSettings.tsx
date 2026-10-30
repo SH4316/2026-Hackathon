@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "./api";
+import { EnabledSetting } from "./EnabledSetting";
 import { parseJevThreshold, jevThresholdError } from "./jev";
 import { useResource } from "./hooks";
 import {
@@ -26,6 +27,7 @@ import {
 function tagDetails(tag: Tag) {
   return {
     name: tag.name,
+    enabled: tag.enabled,
     description: tag.description,
     examples: tag.examples,
     guidance: tag.guidance,
@@ -277,12 +279,13 @@ export function MetricSettings() {
         {
           id,
           name: "새 태그",
+          enabled: true,
           description: "",
           examples: [],
           guidance: "",
           jevThreshold: null,
           pythonRegex: "",
-          color: "#5776c6",
+          color: "#3B82F6",
           parentId,
           order: version.tags.filter((t) => t.parentId === parentId).length,
         },
@@ -309,7 +312,7 @@ export function MetricSettings() {
           id,
           name: "새 정책 상태",
           description: "",
-          color: "#648a83",
+          color: "#10B981",
           order: version.policyStates.length,
         },
       ],
@@ -688,6 +691,9 @@ export function MetricSettings() {
                               style={{ background: t.color }}
                             />
                             <span>{t.name || "이름 없는 태그"}</span>
+                            {!t.enabled && (
+                              <small className="usage-badge">사용 안 함</small>
+                            )}
                           </button>
                         </div>
                       );
@@ -786,6 +792,13 @@ export function MetricSettings() {
                     </p>
                   )}
                   <fieldset disabled={pending} className="tag-fields">
+                    <EnabledSetting
+                      label="태그 사용"
+                      checked={tag.enabled}
+                      disabled={pending}
+                      onChange={(enabled) => patchTag({ enabled })}
+                      description="이 태그의 정규식과 Jev 결과 사용 여부입니다. 상위·하위 태그는 각각의 설정을 따르며, 꺼도 세부 정보와 기존 기록은 유지됩니다."
+                    />
                     <div className="field-pair">
                       <label>
                         <span>태그 이름</span>

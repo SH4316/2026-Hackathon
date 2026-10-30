@@ -43,7 +43,7 @@ class OrgSettingsBody(BaseModel):
 class OrgSettings(OrgSettingsBody):
     version: int
     updated_at: str | None
-    # server: 이 서버의 관리 API로 정한 값 / dashboard: 연결된 대시보드의 '감시 연동' 설정(우선)
+    # server: 이 서버의 관리 API로 정한 값 / dashboard: 연결된 대시보드의 '검사 서버 연결' 설정(우선)
     source: Literal["server", "dashboard"] = "server"
 
     @property

@@ -3,10 +3,10 @@
 - 활성 설정: GET  /api/v1/classifier-config  (태그·pythonRegex·jevThreshold·jevPrompts)
 - 사람 확인: GET  /api/v1/people/{id}
 - 판정 기록: POST /api/v1/detector-events   (CONTRACT.md "Detector HTTP ingestion")
-- 조직 설정: GET  /api/v1/detector-settings  (대시보드 '감시 연동' 화면에서 편집)
+- 조직 설정: GET  /api/v1/detector-settings  (대시보드 '검사 서버 연결' 화면에서 편집)
 - 연결 코드: POST /api/v1/enrollments/redeem (대시보드 사람 화면에서 발급한 확장 연결 코드 사용 처리)
 
-연결: 대시보드 '감시 연동'에서 발급한 연결 URL(<대시보드 주소>/api/v1/connectors/<id>#<secret>)을 PG_DASHBOARD_CONNECTION 에
+연결: 대시보드 '검사 서버 연결'에서 발급한 연결 URL(<대시보드 주소>/api/v1/connectors/<id>#<secret>)을 PG_DASHBOARD_CONNECTION 에
 넣는다. 주소와 비밀값을 나눠 Authorization: Bearer <secret> 으로 요청한다(비밀값이 경로·로그에 남지 않게).
 
 대시보드는 설정을 저장·제공만 하고, 정규식·Jev 실행과 `점수 >= 임계값` 판정은 이 서버가 한다.

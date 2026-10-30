@@ -31,6 +31,7 @@ const draft = (id: string, name = id): ConfigVersion => ({
   tags: [
     {
       id: "tag_1",
+      enabled: true,
       name: "고객 정보",
       description: "",
       examples: ["첫 예시", "둘째 예시"],
@@ -243,6 +244,7 @@ describe("configuration editing", () => {
       .mockImplementation(async (_id, input) => ({
         ...config,
         ...input,
+        tags: input.tags.map((tag) => ({ ...tag, enabled: tag.enabled ?? config.tags.find((item) => item.id === tag.id)?.enabled ?? true })),
         revision: 2,
       }));
     render(
@@ -288,6 +290,7 @@ describe("configuration editing", () => {
       .mockImplementation(async (_id, input) => ({
         ...config,
         ...input,
+        tags: input.tags.map((tag) => ({ ...tag, enabled: tag.enabled ?? config.tags.find((item) => item.id === tag.id)?.enabled ?? true })),
         revision: 2,
       }));
     render(
@@ -332,6 +335,7 @@ describe("configuration editing", () => {
       .mockImplementation(async (_id, input) => ({
         ...config,
         ...input,
+        tags: input.tags.map((tag) => ({ ...tag, enabled: tag.enabled ?? config.tags.find((item) => item.id === tag.id)?.enabled ?? true })),
         revision: 2,
       }));
     render(
@@ -375,6 +379,7 @@ describe("configuration editing", () => {
       .mockImplementation(async (_id, input) => ({
         ...config,
         ...input,
+        tags: input.tags.map((tag) => ({ ...tag, enabled: tag.enabled ?? config.tags.find((item) => item.id === tag.id)?.enabled ?? true })),
         revision: 2,
       }));
     render(
@@ -450,7 +455,7 @@ describe("configuration editing", () => {
     vi.spyOn(api, "version").mockResolvedValue(config);
     const save = vi.spyOn(api, "saveTagDetails").mockImplementation(async (_versionId, tagId, input) => {
       const { revision, ...details } = input;
-      return { ...config, revision: revision + 1, tags: config.tags.map((tag) => tag.id === tagId ? { ...tag, ...details } : tag) };
+      return { ...config, revision: revision + 1, tags: config.tags.map((tag) => tag.id === tagId ? { ...tag, ...details, enabled: details.enabled ?? tag.enabled } : tag) };
     });
     render(<MemoryRouter initialEntries={["/settings/metrics?versionId=published_clear_threshold"]}><WorkspaceProvider><MetricSettings /></WorkspaceProvider></MemoryRouter>);
     const threshold = await screen.findByRole<HTMLInputElement>("spinbutton", { name: "Jev 임계값" });
@@ -506,7 +511,7 @@ describe("configuration editing", () => {
       return {
         ...config,
         revision: revision + 1,
-        tags: config.tags.map((tag) => tag.id === tagId ? { ...tag, ...details } : tag),
+        tags: config.tags.map((tag) => tag.id === tagId ? { ...tag, ...details, enabled: details.enabled ?? tag.enabled } : tag),
       };
     });
     render(
@@ -543,6 +548,7 @@ describe("configuration editing", () => {
     await waitFor(() => expect(save).toHaveBeenCalledOnce());
     expect(save).toHaveBeenCalledWith(config.id, "tag_1", {
       revision: 1,
+      enabled: true,
       name: "수정한 고객 정보",
       color: "#654321",
       description: "새 설명",
@@ -569,9 +575,9 @@ describe("configuration editing", () => {
     vi.spyOn(api, "version").mockResolvedValue(config);
     const detailsSave = vi.spyOn(api, "saveTagDetails").mockImplementation(async (_id, tagId, input) => {
       const { revision, ...details } = input;
-      return { ...config, revision: revision + 1, tags: config.tags.map((tag) => tag.id === tagId ? { ...tag, ...details } : tag) };
+      return { ...config, revision: revision + 1, tags: config.tags.map((tag) => tag.id === tagId ? { ...tag, ...details, enabled: details.enabled ?? tag.enabled } : tag) };
     });
-    const fullSave = vi.spyOn(api, "saveVersion").mockImplementation(async (_id, input) => ({ ...config, ...input, revision: input.revision + 1 }));
+    const fullSave = vi.spyOn(api, "saveVersion").mockImplementation(async (_id, input) => ({ ...config, ...input, tags: input.tags.map((tag) => ({ ...tag, enabled: tag.enabled ?? config.tags.find((item) => item.id === tag.id)?.enabled ?? true })), revision: input.revision + 1 }));
     render(<MemoryRouter initialEntries={["/settings/metrics?versionId=draft_partial"]}><WorkspaceProvider><MetricSettings /></WorkspaceProvider></MemoryRouter>);
     await screen.findByRole("textbox", { name: "태그 이름" });
     fireEvent.change(screen.getByRole("textbox", { name: "버전 이름" }), { target: { value: "저장 전 버전 이름" } });
@@ -625,12 +631,12 @@ describe("configuration editing", () => {
     vi.spyOn(api, "version").mockResolvedValue(config);
     let saved = config;
     const fullSave = vi.spyOn(api, "saveVersion").mockImplementation(async (_id, input) => {
-      saved = { ...config, ...input, revision: input.revision + 1 };
+      saved = { ...config, ...input, tags: input.tags.map((tag) => ({ ...tag, enabled: tag.enabled ?? config.tags.find((item) => item.id === tag.id)?.enabled ?? true })), revision: input.revision + 1 };
       return saved;
     });
     const detailsSave = vi.spyOn(api, "saveTagDetails").mockImplementation(async (_id, tagId, input) => {
       const { revision, ...details } = input;
-      return { ...saved, revision: revision + 1, tags: saved.tags.map((tag) => tag.id === tagId ? { ...tag, ...details } : tag) };
+      return { ...saved, revision: revision + 1, tags: saved.tags.map((tag) => tag.id === tagId ? { ...tag, ...details, enabled: details.enabled ?? tag.enabled } : tag) };
     });
     render(<MemoryRouter initialEntries={["/settings/metrics?versionId=draft_new_tag"]}><WorkspaceProvider><MetricSettings /></WorkspaceProvider></MemoryRouter>);
     await screen.findByRole("textbox", { name: "태그 이름" });

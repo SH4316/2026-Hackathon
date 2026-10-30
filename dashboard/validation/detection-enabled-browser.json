@@ -1,0 +1,375 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T20:59:13.859Z",
+  "baseUrl": "http://127.0.0.1:8086",
+  "scope": "Synthetic configuration, person, event and saved search on an isolated test DB. No external detector/server integration. Focused changed settings are asserted; broad shell axe results are reported separately. Automated checks do not establish full WCAG conformance.",
+  "fixtures": {
+    "versionId": "v_2b5c91475cbc422a92de8c94da30e8d0",
+    "cloneId": "v_ada3f53bf4564589b662dfc4700d0ce7",
+    "parentId": "enabled-parent-mvvggf3k",
+    "childId": "enabled-child-mvvggf3k",
+    "siblingId": "enabled-sibling-mvvggf3k",
+    "promptId": "j_8612072accca4d709dda345a79b4b86c",
+    "personId": "enabled-browser-mvvggf3k",
+    "eventId": 4,
+    "savedId": "s_84a0bed0a2664c1695c63e0c6c49f0bb"
+  },
+  "checks": [
+    "Legacy-compatible omitted flags create enabled tags/prompts; explicit false survives publication, activation and cloning. Disabled output tags remain valid ingestion targets.",
+    "The published tag switch supports keyboard Space, stays local until explicit save, locks during save, persists after reload, increments only that version's revision and preserves its enabled child, regex, thresholds and prompt bindings.",
+    "The independent published Jev switch persists without touching tags. Disabled output bindings remain selectable and their threshold/deep link editable; disabled judgments retain editable prompt text and shared thresholds. List and output badges state 사용 안 함 without extra switches.",
+    "Classifier configuration includes every enabled and disabled tag/judgment. Earlier clone state, historical event labels, metrics, saved-search membership and saved counts remain unchanged after flags and thresholds change.",
+    "A real concurrent update returns 409 without discarding local Jev switch, text or threshold changes. Reloading resolves to persisted state, and both published switches can be enabled again with revision-checked saves.",
+    "The removed monitoring route redirects to metric settings with version, tag and literal-search query preserved; its navigation item is absent.",
+    "New child tags and Jev judgments start enabled in the UI. Saving an inactive clone leaves the active published configuration unchanged."
+  ],
+  "screenshots": [
+    {
+      "state": "tag-off",
+      "width": 390,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-detection-enabled/dashboard/.impeccable/review/detection-enabled-tag-off-mobile.png"
+    },
+    {
+      "state": "tag-off",
+      "width": 1440,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-detection-enabled/dashboard/.impeccable/review/detection-enabled-tag-off-desktop.png"
+    },
+    {
+      "state": "jev-off",
+      "width": 390,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-detection-enabled/dashboard/.impeccable/review/detection-enabled-jev-off-mobile.png"
+    },
+    {
+      "state": "jev-off",
+      "width": 1440,
+      "path": "/home/soohyuk/Projects/2026-Hackathon/.worktree/dashboard-detection-enabled/dashboard/.impeccable/review/detection-enabled-jev-off-desktop.png"
+    }
+  ],
+  "responsive": [
+    {
+      "state": "tag-off",
+      "width": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "viewportWidth": 320,
+      "overflow": false
+    },
+    {
+      "state": "tag-off",
+      "width": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "viewportWidth": 390,
+      "overflow": false
+    },
+    {
+      "state": "tag-off",
+      "width": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "viewportWidth": 768,
+      "overflow": false
+    },
+    {
+      "state": "tag-off",
+      "width": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "viewportWidth": 1280,
+      "overflow": false
+    },
+    {
+      "state": "tag-off",
+      "width": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "viewportWidth": 1440,
+      "overflow": false
+    },
+    {
+      "state": "jev-off",
+      "width": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320,
+      "viewportWidth": 320,
+      "overflow": false
+    },
+    {
+      "state": "jev-off",
+      "width": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390,
+      "viewportWidth": 390,
+      "overflow": false
+    },
+    {
+      "state": "jev-off",
+      "width": 768,
+      "documentWidth": 768,
+      "bodyWidth": 768,
+      "viewportWidth": 768,
+      "overflow": false
+    },
+    {
+      "state": "jev-off",
+      "width": 1280,
+      "documentWidth": 1280,
+      "bodyWidth": 1280,
+      "viewportWidth": 1280,
+      "overflow": false
+    },
+    {
+      "state": "jev-off",
+      "width": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440,
+      "viewportWidth": 1440,
+      "overflow": false
+    }
+  ],
+  "axe": [
+    {
+      "state": "tag-off",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 18
+    },
+    {
+      "state": "tag-off",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 18
+    },
+    {
+      "state": "jev-off",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "passes": 19
+    },
+    {
+      "state": "jev-off",
+      "width": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passes": 19
+    }
+  ],
+  "broadAxe": [
+    {
+      "state": "tag-off",
+      "width": 390,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            {
+              "target": [
+                "a[aria-current=\"page\"] > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.19 (foreground color: #3b82f6, background color: #142442, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "footer > span:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.5 (foreground color: #616a78, background color: #0b0f19, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "footer > span:nth-child(2)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.5 (foreground color: #616a78, background color: #0b0f19, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ],
+      "incomplete": [],
+      "passes": 24
+    },
+    {
+      "state": "tag-off",
+      "width": 1440,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            {
+              "target": [
+                ".workspace-label"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.25 (foreground color: #5e6a7b, background color: #0f172a, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "a[aria-current=\"page\"] > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.19 (foreground color: #3b82f6, background color: #142442, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".sidebar-api > a[href$=\"swagger-ui.html\"][target=\"_blank\"][rel=\"noreferrer\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.35 (foreground color: #5e6c82, background color: #0f172a, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".sidebar-bottom > div > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.25 (foreground color: #606a78, background color: #0f172a, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".breadcrumb > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.34 (foreground color: #5f6c7e, background color: #0f172a, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".breadcrumb > strong"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 1.8 (foreground color: #34445c, background color: #0f172a, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".environment-label > span:nth-child(2)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.34 (foreground color: #5f6c7e, background color: #0f172a, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "span:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.34 (foreground color: #5f6c7e, background color: #0f172a, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "footer > span:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.5 (foreground color: #616a78, background color: #0b0f19, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "footer > span:nth-child(2)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.5 (foreground color: #616a78, background color: #0b0f19, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ],
+      "incomplete": [],
+      "passes": 24
+    },
+    {
+      "state": "jev-off",
+      "width": 390,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            {
+              "target": [
+                ".active > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.19 (foreground color: #3b82f6, background color: #142442, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "footer > span:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.5 (foreground color: #616a78, background color: #0b0f19, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "footer > span:nth-child(2)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.5 (foreground color: #616a78, background color: #0b0f19, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ],
+      "incomplete": [],
+      "passes": 25
+    },
+    {
+      "state": "jev-off",
+      "width": 1440,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            {
+              "target": [
+                ".workspace-label"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.25 (foreground color: #5e6a7b, background color: #0f172a, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".active > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.19 (foreground color: #3b82f6, background color: #142442, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "a[href$=\"swagger-ui.html\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.35 (foreground color: #5e6c82, background color: #0f172a, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".sidebar-bottom > div > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.25 (foreground color: #606a78, background color: #0f172a, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".breadcrumb > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.34 (foreground color: #5f6c7e, background color: #0f172a, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".breadcrumb > strong"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 1.8 (foreground color: #34445c, background color: #0f172a, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".environment-label > span:nth-child(2)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.34 (foreground color: #5f6c7e, background color: #0f172a, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "span:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.34 (foreground color: #5f6c7e, background color: #0f172a, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "footer > span:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.5 (foreground color: #616a78, background color: #0b0f19, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "footer > span:nth-child(2)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.5 (foreground color: #616a78, background color: #0b0f19, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ],
+      "incomplete": [],
+      "passes": 25
+    }
+  ],
+  "uncaughtErrors": []
+}

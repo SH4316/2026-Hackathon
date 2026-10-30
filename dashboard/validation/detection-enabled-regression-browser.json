@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T20:59:39.401Z",
+  "baseUrl": "http://127.0.0.1:8086",
+  "personId": "browser-mvvggvz4",
+  "eventId": 5,
+  "savedId": "s_35e58e1e86ef49ac9a0d545b6e651a79",
+  "editedId": "v_542b3a57bebd4b088fa3f879e50a13f4",
+  "checks": [
+    "graph-first overview, manual refresh with no automatic polling, 24-hour interval and tree drill-down preserving filters",
+    "full prompt, Unicode emoji highlighting, multiple tags, selected detection and person-detail navigation",
+    "literal prompt filters, zero-detection records, saved whole-result snapshot remains fixed after ingestion and explicit requery",
+    "UI creates parent/child tags, examples/guidance and custom policies; save/publish/activate, locked published version name, stable-ID clone and revision-conflict recovery",
+    "person registration/personQuery, removed monitoring navigation and old route redirect preserving version/tag query",
+    "network retry, missing event detail and mobile navigation"
+  ],
+  "uncaughtErrors": []
+}

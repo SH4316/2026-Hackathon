@@ -7,6 +7,7 @@ import com.example.securitydashboard.configuration.model.ConfigVersion;
 import com.example.securitydashboard.configuration.model.CreateVersion;
 import com.example.securitydashboard.configuration.model.PolicyDefinition;
 import com.example.securitydashboard.configuration.model.Tag;
+import com.example.securitydashboard.configuration.model.TagInput;
 import com.example.securitydashboard.configuration.model.UpdateTagDetails;
 import com.example.securitydashboard.configuration.model.UpdateVersion;
 import com.example.securitydashboard.configuration.model.VersionSummary;
@@ -102,7 +103,7 @@ public class ConfigurationService {
   ConfigVersion update(String id, UpdateVersion input) {
     lockDraft(id, input.revision());
     String name = InputValidation.name(input.name(), "name");
-    List<Tag> tags = normalizeTags(input.tags());
+    List<Tag> tags = normalizeTagInputs(input.tags(), tags(id));
     List<PolicyDefinition> policies = normalizePolicies(input.policyStates());
     var retainedPrompts = jevPrompts.list(id);
     repository.replaceCatalog(id, tags, policies);
@@ -135,7 +136,8 @@ public class ConfigurationService {
                 input.pythonRegex(),
                 input.color(),
                 existing.parentId(),
-                existing.order()));
+                existing.order(),
+                input.enabled() == null ? existing.enabled() : input.enabled()));
     repository.updateTagDetails(id, updated);
     return get(id);
   }
@@ -202,6 +204,33 @@ public class ConfigurationService {
     return new ApiException(HttpStatus.NOT_FOUND, "VERSION_NOT_FOUND", "설정 버전을 찾을 수 없습니다.");
   }
 
+  private static List<Tag> normalizeTagInputs(List<TagInput> input, List<Tag> existing) {
+    if (input == null || input.size() > 1000)
+      throw ApiException.invalid("tags", "태그 목록은 필수이며 최대 1000개입니다.");
+    Map<String, Boolean> existingEnabled = new LinkedHashMap<>();
+    existing.forEach(tag -> existingEnabled.put(tag.id(), tag.enabled()));
+    List<Tag> resolved = new ArrayList<>();
+    for (var tag : input) {
+      if (tag == null) throw ApiException.invalid("tags", "비어 있는 태그는 저장할 수 없습니다.");
+      resolved.add(
+          new Tag(
+              tag.id(),
+              tag.name(),
+              tag.description(),
+              tag.examples(),
+              tag.guidance(),
+              tag.jevThreshold(),
+              tag.pythonRegex(),
+              tag.color(),
+              tag.parentId(),
+              tag.order(),
+              tag.enabled() == null
+                  ? existingEnabled.getOrDefault(tag.id(), true)
+                  : tag.enabled()));
+    }
+    return normalizeTags(resolved);
+  }
+
   static List<Tag> normalizeTags(List<Tag> input) {
     if (input == null || input.size() > 1000)
       throw ApiException.invalid("tags", "태그 목록은 필수이며 최대 1000개입니다.");
@@ -246,7 +275,8 @@ public class ConfigurationService {
         InputValidation.text(input.pythonRegex(), 4000, "tags.pythonRegex"),
         color(input.color()),
         input.parentId(),
-        input.order() == null ? 0 : input.order());
+        input.order() == null ? 0 : input.order(),
+        input.enabled());
   }
 
   public static BigDecimal normalizeJevThreshold(BigDecimal value, String field) {

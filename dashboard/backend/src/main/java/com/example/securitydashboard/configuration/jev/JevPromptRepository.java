@@ -31,14 +31,15 @@ public class JevPromptRepository {
         },
         versionId);
     return jdbc.query(
-        "SELECT id,name,prompt FROM config_version_jev_prompts WHERE version_id=?"
+        "SELECT id,name,prompt,enabled FROM config_version_jev_prompts WHERE version_id=?"
             + " ORDER BY sort_order,id",
         (rs, row) ->
             new JevPrompt(
                 rs.getString("id"),
                 rs.getString("name"),
                 rs.getString("prompt"),
-                List.copyOf(outputs.getOrDefault(rs.getString("id"), List.of()))),
+                List.copyOf(outputs.getOrDefault(rs.getString("id"), List.of())),
+                rs.getBoolean("enabled")),
         versionId);
   }
 
@@ -58,7 +59,7 @@ public class JevPromptRepository {
             promptId));
   }
 
-  void insert(String versionId, String id, String name, String prompt) {
+  void insert(String versionId, String id, String name, String prompt, boolean enabled) {
     Integer order =
         jdbc.queryForObject(
             "SELECT COALESCE(MAX(sort_order),-1)+1 FROM config_version_jev_prompts"
@@ -66,20 +67,23 @@ public class JevPromptRepository {
             Integer.class,
             versionId);
     jdbc.update(
-        "INSERT INTO config_version_jev_prompts(version_id,id,name,prompt,sort_order)"
-            + " VALUES(?,?,?,?,?)",
+        "INSERT INTO config_version_jev_prompts(version_id,id,name,prompt,sort_order,enabled)"
+            + " VALUES(?,?,?,?,?,?)",
         versionId,
         id,
         name,
         prompt,
-        order);
+        order,
+        enabled);
   }
 
-  void update(String versionId, String promptId, String name, String prompt) {
+  void update(String versionId, String promptId, String name, String prompt, Boolean enabled) {
     jdbc.update(
-        "UPDATE config_version_jev_prompts SET name=?,prompt=? WHERE version_id=? AND id=?",
+        "UPDATE config_version_jev_prompts SET name=?,prompt=?,enabled=COALESCE(?,enabled)"
+            + " WHERE version_id=? AND id=?",
         name,
         prompt,
+        enabled,
         versionId,
         promptId);
   }
@@ -111,12 +115,16 @@ public class JevPromptRepository {
     List<Object[]> rows = new ArrayList<>();
     for (int i = 0; i < prompts.size(); i++) {
       var prompt = prompts.get(i);
-      rows.add(new Object[] {versionId, prompt.id(), prompt.name(), prompt.prompt(), i});
+      rows.add(
+          new Object[] {
+            versionId, prompt.id(), prompt.name(), prompt.prompt(), i, prompt.enabled()
+          });
     }
     JdbcRows.insert(
         jdbc,
-        "INSERT INTO config_version_jev_prompts(version_id,id,name,prompt,sort_order) VALUES ",
-        5,
+        "INSERT INTO config_version_jev_prompts(version_id,id,name,prompt,sort_order,enabled)"
+            + " VALUES ",
+        6,
         rows);
     for (var prompt : prompts) insertOutputs(versionId, prompt.id(), prompt.tagIds());
   }

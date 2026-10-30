@@ -450,13 +450,13 @@ function DetectorSettingsPanel() {
   );
 }
 
-export function MonitoringSettings() {
+export function ConnectionSettings() {
   const { versions } = useWorkspace();
   const active = versions.find((v) => v.isActive);
   return (
     <>
       <PageTitle
-        title="감시 연동"
+        title="검사 서버 연결"
         description="검사 서버를 이 대시보드에 연결하고, 연결된 서버가 따를 설정을 정합니다."
       />
       <Connectors />

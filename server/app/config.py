@@ -30,7 +30,7 @@ class Settings:
     max_body_bytes: int = 256 * 1024
 
     model_mode: ModelMode = ModelMode.DISABLED
-    model_api: str = "ollama"  # ollama | openai(llama.cpp server·vLLM 등 OpenAI 호환 로컬 서버)
+    model_api: str = "ollama"  # decider(확률 분류) | ollama | openai(OpenAI 호환 로컬 서버)
     model_api_key: str = ""    # OpenAI 호환 로컬 서버가 키를 요구할 때만
     model_base_url: str = "http://model:11434"
     model_name: str = ""

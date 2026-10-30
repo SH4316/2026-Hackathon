@@ -81,7 +81,7 @@ class ConfigurationRepository {
   void updateTagDetails(String versionId, Tag tag) {
     jdbc.update(
         "UPDATE config_version_tags SET name=?,description=?,examples=?,guidance=?,jev_threshold=?,"
-            + "python_regex=?,color=? WHERE version_id=? AND id=?",
+            + "python_regex=?,color=?,enabled=? WHERE version_id=? AND id=?",
         tag.name(),
         tag.description(),
         encode(tag.examples()),
@@ -89,6 +89,7 @@ class ConfigurationRepository {
         tag.jevThreshold(),
         tag.pythonRegex(),
         tag.color(),
+        tag.enabled(),
         versionId,
         tag.id());
     jdbc.update("UPDATE config_versions SET revision=revision+1 WHERE id=?", versionId);
@@ -124,7 +125,8 @@ class ConfigurationRepository {
                 rs.getString("python_regex"),
                 rs.getString("color"),
                 rs.getString("parent_id"),
-                rs.getInt("sort_order")),
+                rs.getInt("sort_order"),
+                rs.getBoolean("enabled")),
         id);
   }
 
@@ -152,9 +154,9 @@ class ConfigurationRepository {
     JdbcRows.insert(
         jdbc,
         "INSERT INTO"
-            + " config_version_tags(version_id,id,name,description,examples,guidance,jev_threshold,python_regex,color,parent_id,sort_order)"
+            + " config_version_tags(version_id,id,name,description,examples,guidance,jev_threshold,python_regex,color,parent_id,sort_order,enabled)"
             + " VALUES ",
-        11,
+        12,
         tags.stream()
             .map(
                 t ->
@@ -169,7 +171,8 @@ class ConfigurationRepository {
                       t.pythonRegex(),
                       t.color(),
                       t.parentId(),
-                      t.order()
+                      t.order(),
+                      t.enabled()
                     })
             .toList());
     Map<String, Tag> byId = new HashMap<>();
