@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import get_clients, get_pipeline, require_admin, require_client
 from app.clients.store import Client, ClientStore, EnrollmentInvalid
+from app.org.dashboard import DashboardUnavailable
 from app.schemas import ClientType
 from app.services.pipeline import Pipeline
 
@@ -38,22 +39,29 @@ class EnrollRequest(BaseModel):
 class EnrollResponse(BaseModel):
     client_id: str
     label: str
+    person_id: str | None = None
+    managed: bool = False  # 조직 관리(대시보드 규칙 적용·기록) 여부
     token: str  # 이 응답에서만 볼 수 있다. 클라이언트는 X-API-Key 또는 Authorization: Bearer 로 쓴다.
 
 
 @router.post("/v1/auth/enroll", response_model=EnrollResponse, status_code=status.HTTP_201_CREATED)
-def enroll(body: EnrollRequest, clients: ClientStore = Depends(get_clients)) -> EnrollResponse:
+def enroll(body: EnrollRequest, request: Request, clients: ClientStore = Depends(get_clients)) -> EnrollResponse:
     try:
         client, token = clients.enroll(body.code, body.client_type.value, body.device_name)
     except EnrollmentInvalid:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "등록 코드가 올바르지 않거나 만료되었습니다") from None
-    return EnrollResponse(client_id=client.client_id, label=client.label, token=token)
+    return EnrollResponse(client_id=client.client_id, label=client.label, token=token, person_id=client.person_id,
+                          managed=request.app.state.org.enabled)
 
 
 @router.get("/v1/auth/me")
 def me(client: Client = Depends(require_client), pipeline: Pipeline = Depends(get_pipeline)) -> dict:
+    org = pipeline.org
     return {**client.to_dict(), "policy_version": pipeline.policy.version,
-            "ruleset_version": pipeline.compiled.ruleset.version}
+            "ruleset_version": pipeline.compiled.ruleset.version,
+            "managed": org is not None,
+            "reporting": bool(org and client.person_id and org.settings.report_text != "off"),
+            "report_text": org.settings.report_text if org else None}
 
 
 @router.post("/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
@@ -63,16 +71,30 @@ def logout(client: Client = Depends(require_client), clients: ClientStore = Depe
 
 # ── 대시보드 ──
 class EnrollmentRequest(BaseModel):
-    label: str = Field(min_length=1, max_length=60)  # 사용자 이름·부서 등 대시보드에 보일 이름
+    # 대시보드 사람 ID(조직 관리). 조직 서버면 대시보드에 등록된 사람인지 확인하고, label 을 비우면 그 이름을 쓴다.
+    person_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,80}$")
+    label: str | None = Field(default=None, min_length=1, max_length=60)  # 사용자 이름·부서 등
     ttl_minutes: int | None = Field(default=None, ge=5, le=7 * 24 * 60)
 
 
 @router.post("/v1/admin/enrollments", status_code=status.HTTP_201_CREATED)
-def create_enrollment(body: EnrollmentRequest, request: Request, actor: str = Depends(require_admin),
-                      clients: ClientStore = Depends(get_clients)) -> dict:
+async def create_enrollment(body: EnrollmentRequest, request: Request, actor: str = Depends(require_admin),
+                            clients: ClientStore = Depends(get_clients)) -> dict:
     """일회용 등록 코드(XXXX-XXXX). 코드는 이 응답에서만 볼 수 있다."""
+    label = body.label
+    dashboard = request.app.state.org.client
+    if body.person_id and dashboard is not None:
+        try:
+            person = await dashboard.person(body.person_id)
+        except DashboardUnavailable:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "대시보드에 연결할 수 없습니다") from None
+        if person is None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "대시보드에 등록되지 않은 사람입니다")
+        label = label or str(person.get("name") or body.person_id)[:60]
+    if not label:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "label 또는 person_id 가 필요합니다")
     ttl = body.ttl_minutes or request.app.state.settings.enrollment_ttl_minutes
-    return clients.create_enrollment(body.label, timedelta(minutes=ttl), actor)
+    return clients.create_enrollment(label, timedelta(minutes=ttl), actor, body.person_id)
 
 
 @router.get("/v1/admin/clients")

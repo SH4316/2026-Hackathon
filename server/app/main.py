@@ -9,9 +9,13 @@ from fastapi.responses import JSONResponse
 
 from app.api.admin import router as admin_router
 from app.api.clients import router as clients_router
+from app.api.org import router as org_router
 from app.api.routes import router
 from app.audit.events import AuditStore
 from app.clients.store import ClientStore
+from app.org.dashboard import DashboardClient
+from app.org.service import OrgService
+from app.org.settings import OrgSettingsStore
 from app.config import ModelMode, Settings
 from app.detection.model import ContextModelDetector
 from app.policy.engine import Policy
@@ -22,7 +26,8 @@ log = logging.getLogger("prompt_guard")
 
 
 def create_app(settings: Settings | None = None, audit: AuditStore | None = None,
-               ruleset_store: RuleSetStore | None = None, clients: ClientStore | None = None) -> FastAPI:
+               ruleset_store: RuleSetStore | None = None, clients: ClientStore | None = None,
+               org_settings: OrgSettingsStore | None = None, dashboard: DashboardClient | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     if not settings.auth_disabled and not settings.api_keys:
         raise RuntimeError("PG_API_KEYS 가 비어 있습니다. 개발 중이면 PG_AUTH_DISABLED=true 를 사용하세요.")
@@ -41,8 +46,12 @@ def create_app(settings: Settings | None = None, audit: AuditStore | None = None
     app.state.settings = settings
     app.state.ruleset_store = ruleset_store
     app.state.clients = clients or ClientStore(settings.clients_db_path)
+    if dashboard is None and settings.dashboard_url:
+        dashboard = DashboardClient(settings.dashboard_url, settings.dashboard_timeout_s, settings.dashboard_refresh_s)
+    org = OrgService(dashboard, org_settings or OrgSettingsStore(settings.org_db_path), model, settings.model_mode)
+    app.state.org = org
     app.state.pipeline = Pipeline(settings, policy, audit or AuditStore(settings.audit_db_path),
-                                  model=model, ruleset_source=ruleset_store)
+                                  model=model, ruleset_source=ruleset_store, org=org)
 
     @app.middleware("http")
     async def limit_body(request: Request, call_next):
@@ -74,4 +83,5 @@ def create_app(settings: Settings | None = None, audit: AuditStore | None = None
     app.include_router(router)
     app.include_router(admin_router)
     app.include_router(clients_router)
+    app.include_router(org_router)
     return app

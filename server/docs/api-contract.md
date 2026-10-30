@@ -6,6 +6,7 @@
 
 - 인증: `X-API-Key` 헤더(정적 API 키 또는 대시보드에서 연결한 개인 토큰 `pgc_…`). 개인 토큰은 `Authorization: Bearer` 로도 받는다. CORS 는 인증을 대체하지 않음.
 - `context.client_type`: `browser_extension` | `cli`. 분류값일 뿐 권한·예외 근거가 아님.
+- `context.stage`(선택): `draft`(입력 중 검사) | `submit`(전송 직전). 생략하면 `submit`. 조직 서버는 `draft` 를 대시보드에 기록하지 않는다.
 - `input_version`: 클라이언트가 보낸 값을 그대로 반환. 클라이언트는 최신 버전이 아닌 응답을 버린다.
 - 위치: 시작 포함·끝 제외. `span.start/end` 는 Unicode code point(Python),
   `span.start_utf16/end_utf16` 는 UTF-16 code unit(JavaScript `String.slice`).
@@ -70,10 +71,12 @@ GET /v1/admin/audit/summary ◀────────────────�
 
 | 메서드·경로 | 인증 | 용도 |
 |---|---|---|
-| `POST /v1/auth/enroll` `{code, client_type, device_name?}` | 없음(코드가 비밀) | 201 `{client_id, label, token}`. 토큰은 이 응답에서만 보임. 틀리거나 만료·사용된 코드는 모두 400 |
+| `POST /v1/auth/enroll` `{code, client_type, device_name?}` | 없음(코드가 비밀) | 201 `{client_id, label, token, person_id, managed}`. 토큰은 이 응답에서만 보임. 틀리거나 만료·사용된 코드는 모두 400. `managed` 는 조직 서버 여부 |
 | `GET /v1/auth/me` | 개인 토큰 | 내 연결 정보 + `policy_version`, `ruleset_version` |
 | `POST /v1/auth/logout` | 개인 토큰 | 204, 내 토큰 해지 |
-| `POST /v1/admin/enrollments` `{label, ttl_minutes?}` | 관리 키 | 201 `{code, label, expires_at}`. 일회용, 기본 24시간(`PG_ENROLLMENT_TTL_MINUTES`) |
+| `POST /v1/admin/enrollments` `{person_id?, label?, ttl_minutes?}` | 관리 키 | 201 `{code, label, person_id, expires_at}`. 일회용, 기본 24시간(`PG_ENROLLMENT_TTL_MINUTES`). 조직 서버면 대시보드 사람인지 확인(없으면 422), `label` 생략 시 대시보드 이름 |
+| `GET·PUT /v1/admin/org/settings` | 관리 키 | 조직 설정(원문 처리·태그 매핑·태그 조치·Jev 사용). README "로컬 모드와 조직 관리 모드" |
+| `GET /v1/admin/org/status` · `POST /v1/admin/org/refresh` | 관리 키 | 대시보드 연동 상태(활성 버전·revision·건너뛴 정규식·기록 수/실패) / 활성 설정 즉시 다시 받기 |
 | `GET /v1/admin/clients?include_revoked=` | 관리 키 | 연결 목록(`client_id, label, client_type, device_name, created_at, last_seen_at, revoked_at`) |
 | `PATCH /v1/admin/clients/{id}` `{label}` | 관리 키 | 표시 이름 변경 |
 | `DELETE /v1/admin/clients/{id}` | 관리 키 | 204, 연결 해지(토큰 즉시 무효) |

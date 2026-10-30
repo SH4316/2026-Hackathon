@@ -17,11 +17,18 @@ const DEFAULTS = {
   timeoutMs: 15000,
   // 내용을 검사할 수 없는 파일(이미지·음성 등) 첨부를 막을지
   blockUnscannableFiles: false,
+  // 대시보드 등록 코드로 연결한 정보 { clientId, label, personId, managed }
+  linkedClient: null,
 };
 
+// 조직 관리: 대시보드와 연결된 조직 서버에 등록 코드로 연결된 상태.
+// 서버 검사(대시보드 규칙)는 끌 수 없고, 기기 내 AI·개인 규칙(자체 판단)은 그 위에 더해진다.
 async function getSettings() {
   const stored = await chrome.storage.local.get(Object.keys(DEFAULTS));
-  return { ...DEFAULTS, ...stored };
+  const s = { ...DEFAULTS, ...stored };
+  s.orgManaged = !!s.linkedClient?.managed;
+  if (s.orgManaged) s.serverEnabled = true;
+  return s;
 }
 
 async function callServer(method, path, body, settings) {
@@ -50,6 +57,8 @@ async function callServer(method, path, body, settings) {
 function checkRequest(msg) {
   const context = { client_type: "browser_extension" };
   if (msg.destination) context.destination = msg.destination;
+  // draft: 입력 중 검사(조직 대시보드에 기록하지 않음) / submit: 전송·첨부 직전 검사
+  if (msg.stage === "draft" || msg.stage === "submit") context.stage = msg.stage;
   return {
     request_id: crypto.randomUUID(),
     input_version: msg.inputVersion,
@@ -64,9 +73,10 @@ async function enroll(code) {
     code, client_type: "browser_extension", device_name: navigator.userAgentData?.platform || null,
   });
   if (!res.ok) return res;
-  const { client_id: clientId, label, token } = res.data;
-  await chrome.storage.local.set({ apiKey: token, linkedClient: { clientId, label } });
-  return { ok: true, data: { clientId, label } };
+  const { client_id: clientId, label, token, person_id: personId = null, managed = false } = res.data;
+  const linkedClient = { clientId, label, personId, managed };
+  await chrome.storage.local.set({ apiKey: token, linkedClient, ...(managed ? { serverEnabled: true } : {}) });
+  return { ok: true, data: linkedClient };
 }
 
 async function unlink() {
@@ -147,7 +157,8 @@ async function inspect(msg, sender) {
 }
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
-  if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", PERSONAL_KEY].some((key) => changes[key])) {
+  if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "linkedClient", PERSONAL_KEY]
+    .some((key) => changes[key])) {
     settingsGeneration++;
     // Release model memory and cancel in-flight work when the user turns AI off.
     serializeLifecycle(async () => {

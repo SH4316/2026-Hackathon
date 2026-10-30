@@ -111,3 +111,20 @@ test("personal rules cannot clear server errors or an AI block", async () => {
   assert.equal(r.data.status, "incomplete");
   assert.equal(r.data.signal, "gray");
 });
+test("org-managed: server failure never falls back to the local check", async () => {
+  for (const error of ["network", "timeout"]) {
+    let aiDone = false;
+    const r = await run({ settings: { serverEnabled: true, localAiEnabled: true, orgManaged: true },
+      server: async () => ({ ok: false, error }), ai: async () => { aiDone = true; return prediction(); } });
+    assert.deepEqual(r, { ok: false, error });
+    assert.equal(aiDone, true); // 진행 중인 AI 작업은 정리하고 끝낸다
+  }
+});
+test("org-managed: server (dashboard rules) and local AI are combined, stricter wins", async () => {
+  const settings = { serverEnabled: true, localAiEnabled: true, orgManaged: true };
+  const strictAI = await run({ settings, ai: async () => prediction("block") });
+  assert.equal(strictAI.data.decision, "block");
+  assert.equal(strictAI.data.inspection_source, "server_and_local_ai");
+  const strictServer = await run({ settings, server: async () => ({ ok: true, data: { ...base, decision: "warn" } }) });
+  assert.equal(strictServer.data.decision, "warn");
+});

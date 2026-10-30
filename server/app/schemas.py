@@ -68,6 +68,8 @@ class RequestContext(BaseModel):
     # 분류값일 뿐 권한·예외 근거가 아니다.
     client_type: ClientType
     destination: DestinationIn | None = None
+    # draft: 입력 중 검사(대시보드에 기록하지 않음) / submit: 전송 직전 검사. 생략하면 submit(CLI 등).
+    stage: Literal["draft", "submit"] | None = None
 
 
 class DestinationOut(BaseModel):

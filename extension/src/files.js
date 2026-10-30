@@ -41,7 +41,7 @@ PG.files = (() => {
 
   async function inspectPart(name, text) {
     const res = await chrome.runtime.sendMessage({
-      type: "inspect", text, inputVersion: `file:${name}`, destination: PG.resolveDestination(),
+      type: "inspect", text, inputVersion: `file:${name}`, destination: PG.resolveDestination(), stage: "submit",
     }).catch(() => ({ ok: false, error: "network" }));
     return res?.ok ? res.data : null;
   }
@@ -56,7 +56,7 @@ PG.files = (() => {
       if (!result || result.status !== "complete") return { state: "failed", hits: [], truncated };
       for (const f of result.findings) {
         if (!["mask", "block", "warn"].includes(f.action)) continue;
-        hits.push({ type: f.type, action: f.action,
+        hits.push({ type: f.type, rule_id: f.rule_id, reason: f.reason, action: f.action,
                     start: parts[i].start + f.span.start_utf16, end: parts[i].start + f.span.end_utf16 });
       }
       const aiWarning = result.ai_assessment && result.ai_assessment.decision !== "allow";
@@ -185,7 +185,7 @@ PG.files = (() => {
           before: "", value: "AI 또는 전송 정책상 확인이 필요합니다.", after: "",
         } : ({
           where: whereFn(h.start),
-          label: PG.TYPE_LABELS[h.type] || h.type,
+          label: PG.findingLabel(h),
           action: h.action,
           ...excerpt(text, h.start, h.end),
         }));
