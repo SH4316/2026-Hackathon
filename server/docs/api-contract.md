@@ -18,12 +18,26 @@
   "request_id": "uuid",
   "input_version": 3,
   "text": "...",
-  "context": { "task_type": "summarize", "client_type": "browser_extension" }
+  "context": {
+    "task_type": "summarize",
+    "client_type": "browser_extension",
+    "destination": { "provider": "openai", "channel": "consumer" }
+  }
 }
 ```
 
+`context.destination`(선택): 전송할 외부 AI. `provider`/`channel` 은 `^[a-z0-9_]{1,32}$`.
+값은 `policies/destinations.yaml` 의 프로필 키(provider: anthropic, openai, google, meta, xai, deepseek,
+moonshot, mistral, cohere, amazon, perplexity, microsoft, alibaba / channel: consumer, enterprise, api,
+api_free, cloud, self_hosted). 생략하거나 모르는 값이면 기본 등급(elevated)을 적용한다.
+기본 등급보다 낮은 등급(enterprise·api 등)은 서버의 `org_contracts` 에 등록된 경우에만 인정한다.
+
 응답 주요 필드: `status`(complete|incomplete|error), `decision`(allow|warn|block),
-`signal`(green|yellow|red|gray), `findings[]`, `policy_version`, `detector_versions`, `notices[]`.
+`signal`(green|yellow|red|gray), `findings[]`, `policy_version`, `destination`, `detector_versions`, `notices[]`.
+
+`destination`: `provider`, `channel`(해석 결과, 모르면 `unknown`), `tier`(standard|elevated|restricted),
+`verified`(조직 계약으로 낮은 등급이 확인됐는지), `basis`(등급 근거 요약).
+관련 `notices`: `destination_unknown`, `destination_channel_unknown`, `destination_channel_unverified`.
 
 `findings[]`: `finding_id`, `type`, `category`, `rule_id`, `detector`(rule|model),
 `confidence`(탐지 신뢰도), `severity`(정보 위험도), `action`(block|mask|warn|allow), `span`, `reason`, `replacement`.
@@ -49,3 +63,5 @@
 - [ ] 클라이언트 → 서버 "실제 전송/차단" 이벤트 형식(검사 요청 수와 차단 수 분리, 타이핑 중 반복 검사 중복 제거)
 - [ ] CLI 종료 코드 0/2/3/4 확정
 - [ ] 인증 방식(정적 키 → 조직 SSO/mTLS 여부)
+- [ ] 확장프로그램의 사이트 → `destination` 매핑(예: chatgpt.com → openai/consumer). 요금제·계약은 브라우저가 알 수 없으므로 channel 은 소비자 경로로 보낸다
+- [ ] 조직이 실제 계약한 목적지 목록(`org_contracts`) 관리 주체

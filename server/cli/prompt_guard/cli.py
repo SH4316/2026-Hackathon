@@ -33,12 +33,16 @@ def _read_text(use_stdin: bool) -> str:
     return sys.stdin.buffer.read().decode("utf-8-sig")
 
 
-def _call(endpoint: str, text: str, server: str, api_key: str | None, timeout: float) -> dict:
+def _call(endpoint: str, text: str, server: str, api_key: str | None, timeout: float,
+          destination: dict | None = None) -> dict:
+    context: dict = {"client_type": "cli"}
+    if destination:
+        context["destination"] = destination
     body = json.dumps({
         "request_id": str(uuid.uuid4()),
         "input_version": 1,
         "text": text,
-        "context": {"client_type": "cli"},
+        "context": context,
     }).encode("utf-8")
     req = urllib.request.Request(f"{server.rstrip('/')}/v1/{endpoint}", data=body, method="POST",
                                  headers={"Content-Type": "application/json"})
@@ -74,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--json", action="store_true", help="결과 JSON 을 stdout 에 출력")
     p.add_argument("--server", default=os.getenv("PG_SERVER_URL", "http://127.0.0.1:8000"))
     p.add_argument("--timeout", type=float, default=float(os.getenv("PG_CLI_TIMEOUT_S", "30")))
+    p.add_argument("--provider", help="전송할 AI 제공사(예: openai, anthropic). 생략 시 기본 등급")
+    p.add_argument("--channel", help="접근 경로(consumer, enterprise, api, api_free, cloud, self_hosted)")
     args = p.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8")
@@ -84,7 +90,9 @@ def main(argv: list[str] | None = None) -> int:
         print("[prompt-guard] 입력이 UTF-8 이 아닙니다. 전송을 보류하세요.", file=sys.stderr)
         return EXIT_ERROR
     try:
-        result = _call(args.command, text, args.server, os.getenv("PG_API_KEY"), args.timeout)
+        destination = {k: v for k, v in (("provider", args.provider), ("channel", args.channel)) if v}
+        result = _call(args.command, text, args.server, os.getenv("PG_API_KEY"), args.timeout,
+                       destination or None)
     except urllib.error.HTTPError as exc:
         print(f"[prompt-guard] 검사 실패: HTTP {exc.code}. 전송을 보류하세요.", file=sys.stderr)
         return EXIT_ERROR

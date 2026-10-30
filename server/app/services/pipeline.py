@@ -1,6 +1,6 @@
 """검사·정제 오케스트레이션.
 
-규칙 탐지 + (선택) 모델 탐지 → 병합 → 정책 → 판단.
+규칙 탐지 + (선택) 모델 탐지 → 병합 → 정책(목적지 등급으로 강화) → 판단.
 검사 오류·모델 오류·시간 초과는 절대 allow 로 귀결되지 않는다.
 """
 
@@ -15,11 +15,11 @@ from app.detection.base import Candidate
 from app.detection.merge import Merged, merge
 from app.detection.model import ModelUnavailable, OllamaDetector
 from app.detection.rules import RuleDetector
-from app.policy.engine import Policy, decide
+from app.policy.engine import Destination, Policy, Tier, decide
 from app.sanitize.replacer import Replacement, apply, assign_tokens
 from app.schemas import (
-    Action, Change, Decision, Finding, InspectRequest, InspectResponse, SanitizeResponse,
-    Signal, Span, Status,
+    Action, Change, Decision, DestinationOut, Finding, InspectRequest, InspectResponse,
+    SanitizeResponse, Signal, Span, Status,
 )
 
 _SIGNAL = {Decision.ALLOW: Signal.GREEN, Decision.WARN: Signal.YELLOW, Decision.BLOCK: Signal.RED}
@@ -32,6 +32,7 @@ class Analysis:
     signal: Signal
     merged: list[Merged]
     notices: list[str]
+    tier: Tier
 
 
 def utf16_index(text: str, idx: int) -> int:
@@ -54,7 +55,11 @@ class Pipeline:
             v["model"] = self.model.version
         return v
 
-    async def analyze(self, text: str) -> Analysis:
+    def resolve_destination(self, req: InspectRequest) -> tuple[Destination, list[str]]:
+        d = req.context.destination
+        return self.policy.destinations.resolve(d.provider if d else None, d.channel if d else None)
+
+    async def analyze(self, text: str, tier: Tier) -> Analysis:
         candidates: list[Candidate] = self.rules.detect(text)
         notices: list[str] = []
         status = Status.COMPLETE
@@ -73,56 +78,61 @@ class Pipeline:
                 notices.append("model_check_failed")
 
         merged = merge(candidates, self.policy.priority)
-        decision = decide([self.policy.for_type(m.primary.type).action for m in merged])
+        decision = decide([self.policy.action_for(m.primary.type, tier) for m in merged],
+                          tier.min_decision)
         if status is not Status.COMPLETE:
             # 회색: 검사 미완료. 규칙상 통과여도 allow 로 내보내지 않는다.
             if decision is Decision.ALLOW:
                 decision = Decision.WARN
-            return Analysis(status, decision, Signal.GRAY, merged, notices)
-        return Analysis(status, decision, _SIGNAL[decision], merged, notices)
+            return Analysis(status, decision, Signal.GRAY, merged, notices, tier)
+        return Analysis(status, decision, _SIGNAL[decision], merged, notices, tier)
 
-    def to_findings(self, text: str, merged: list[Merged]) -> list[Finding]:
+    def to_findings(self, text: str, merged: list[Merged], tier: Tier) -> list[Finding]:
         out = []
         for i, m in enumerate(merged, start=1):
             c = m.primary
             tp = self.policy.for_type(c.type)
+            action = self.policy.action_for(c.type, tier)
             out.append(Finding(
                 finding_id=f"f{i}", type=c.type, category=tp.category, rule_id=c.rule_id,
                 detector="model" if c.detector == "model" else "rule",
-                confidence=c.confidence, severity=tp.severity, action=tp.action,
+                confidence=c.confidence, severity=tp.severity, action=action,
                 span=Span(start=c.start, end=c.end, start_utf16=utf16_index(text, c.start),
                           end_utf16=utf16_index(text, c.end)),
                 reason=c.reason,
-                replacement=None if tp.action in (Action.ALLOW, Action.BLOCK) else f"[{tp.token}_n]",
+                replacement=None if action in (Action.ALLOW, Action.BLOCK) else f"[{tp.token}_n]",
             ))
         return out
 
     async def inspect(self, req: InspectRequest) -> InspectResponse:
         t0 = time.perf_counter()
-        a = await self.analyze(req.text)
+        dest, dest_notices = self.resolve_destination(req)
+        a = await self.analyze(req.text, dest.tier)
         resp = InspectResponse(
             request_id=req.request_id, input_version=req.input_version, status=a.status,
-            decision=a.decision, signal=a.signal, findings=self.to_findings(req.text, a.merged),
-            policy_version=self.policy.version, detector_versions=self.detector_versions,
-            notices=a.notices,
+            decision=a.decision, signal=a.signal,
+            findings=self.to_findings(req.text, a.merged, dest.tier),
+            policy_version=self.policy.version, destination=_dest_out(dest),
+            detector_versions=self.detector_versions, notices=dest_notices + a.notices,
         )
-        self._record("inspect", req, a, masked=0, t0=t0)
+        self._record("inspect", req, a, dest, masked=0, t0=t0)
         return resp
 
     async def sanitize(self, req: InspectRequest) -> SanitizeResponse:
         """클라이언트가 보낸 구간을 믿지 않고 서버가 직접 검사 → 치환 → 재검사한다."""
         t0 = time.perf_counter()
-        first = await self.analyze(req.text)
+        dest, dest_notices = self.resolve_destination(req)
+        first = await self.analyze(req.text, dest.tier)
         targets = [
             Replacement(m.primary.start, m.primary.end, m.primary.type,
                         self.policy.for_type(m.primary.type).token)
             for m in first.merged
-            if self.policy.for_type(m.primary.type).action in (Action.MASK, Action.WARN)
+            if self.policy.action_for(m.primary.type, dest.tier) in (Action.MASK, Action.WARN)
         ]
         tokens = assign_tokens(req.text, targets)
         sanitized = apply(req.text, tokens)
 
-        second = await self.analyze(sanitized)
+        second = await self.analyze(sanitized, dest.tier)
         status = _worst(first.status, second.status)
         decision, signal = second.decision, second.signal
         if status is not Status.COMPLETE:
@@ -137,26 +147,35 @@ class Pipeline:
             request_id=req.request_id, input_version=req.input_version, status=status,
             sanitized_text=sanitized, decision=decision, signal=signal,
             changes=[Change(type=t, token=tok, count=n) for (t, tok), n in changes_by_token.items()],
-            remaining_findings=self.to_findings(sanitized, second.merged),
-            policy_version=self.policy.version, detector_versions=self.detector_versions,
-            notices=sorted(set(first.notices + second.notices)),
+            remaining_findings=self.to_findings(sanitized, second.merged, dest.tier),
+            policy_version=self.policy.version, destination=_dest_out(dest),
+            detector_versions=self.detector_versions,
+            notices=dest_notices + sorted(set(first.notices + second.notices)),
         )
-        final = Analysis(status, decision, signal, second.merged, resp.notices)
-        self._record("sanitize", req, final, masked=len(tokens), t0=t0)
+        final = Analysis(status, decision, signal, second.merged, resp.notices, dest.tier)
+        self._record("sanitize", req, final, dest, masked=len(tokens), t0=t0)
         return resp
 
-    def _record(self, endpoint: str, req: InspectRequest, a: Analysis, masked: int, t0: float) -> None:
+    def _record(self, endpoint: str, req: InspectRequest, a: Analysis, dest: Destination,
+                masked: int, t0: float) -> None:
         self.audit.record(AuditEvent.new(
             endpoint=endpoint, client_type=req.context.client_type.value,
+            destination_provider=dest.provider, destination_channel=dest.channel,
+            destination_tier=dest.tier.name,
             request_id=req.request_id, input_version=str(req.input_version),
             status=a.status.value, decision=a.decision.value,
             finding_counts=count([m.primary.type for m in a.merged]),
-            actions=count([self.policy.for_type(m.primary.type).action.value for m in a.merged]),
+            actions=count([self.policy.action_for(m.primary.type, a.tier).value for m in a.merged]),
             rule_ids=sorted({c.rule_id for m in a.merged for c in m.members}),
             masked_count=masked, policy_version=self.policy.version,
             detector_versions=self.detector_versions,
             duration_ms=int((time.perf_counter() - t0) * 1000),
         ))
+
+
+def _dest_out(d: Destination) -> DestinationOut:
+    return DestinationOut(provider=d.provider, channel=d.channel, tier=d.tier.name,
+                          verified=d.verified, basis=d.basis)
 
 
 def _worst(a: Status, b: Status) -> Status:

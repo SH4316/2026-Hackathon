@@ -23,6 +23,9 @@ class AuditEvent:
     occurred_at: str
     endpoint: str              # inspect | sanitize
     client_type: str           # browser_extension | cli
+    destination_provider: str  # 정책 프로필에 있는 값 또는 unknown(자유 텍스트 저장 안 함)
+    destination_channel: str
+    destination_tier: str
     request_id: str
     input_version: str
     status: str

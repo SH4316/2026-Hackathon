@@ -24,7 +24,9 @@ server/
 │  ├─ sanitize/replacer.py# 일관 토큰 치환([EMAIL_1]), 뒤에서부터 적용
 │  ├─ audit/events.py     # 원문 없는 감사 이벤트(SQLite)
 │  └─ services/pipeline.py# 검사 → 정제 → 재검사 오케스트레이션
-├─ policies/default.yaml  # 유형별 category·severity·action·token
+├─ policies/
+│  ├─ default.yaml        # 유형별 category·severity·action·token
+│  └─ destinations.yaml   # 전송 목적지(AI 제공사·경로)별 강화 등급
 ├─ cli/prompt_guard/      # 독립 검사 CLI
 ├─ tests/
 ├─ docs/                  # API 계약·미결 사항
@@ -64,6 +66,7 @@ cd server
 export PYTHONPATH=cli PG_SERVER_URL=http://127.0.0.1:8000 PG_API_KEY=...
 prompt_text | python -m prompt_guard inspect --stdin --json     # 판정 JSON → stdout
 prompt_text | python -m prompt_guard sanitize --stdin           # 정제문 → stdout
+prompt_text | python -m prompt_guard inspect --stdin --provider openai --channel consumer   # 목적지 지정
 python -m prompt_guard inspect                                  # 대화형 입력
 ```
 
@@ -88,6 +91,41 @@ python -m prompt_guard inspect                                  # 대화형 입�
 | yellow | `decision=warn` — 사용자 확인 필요 |
 | green | `status=complete` 이고 `decision=allow`. 현재 정책 통과일 뿐 절대 안전 보장이 아님 |
 | gray | `status` 가 `incomplete`/`error` — 전송 보류. 이때 `decision` 은 절대 `allow` 가 아님 |
+
+## 전송 목적지 등급
+
+`policies/destinations.yaml` 은 [AI 모델별 데이터 정책 정리](../docs/ai-model-data-policy.md)를 근거로
+목적지별 등급을 정합니다. 등급은 기본 정책을 **강화만** 합니다.
+
+| 등급 | 근거 | 효과 |
+|---|---|---|
+| standard | 상업 계약 경로에서 문서상 기본 학습 안 함 | 기본 정책 그대로 |
+| elevated | 기본 학습·opt-out 방식·장기 보관, 또는 학습 정책 확인 불가 | `warn` → `mask` (예: 내부 IP 치환 필요) |
+| restricted | 학습·보관·저장 국가가 문서 간 충돌, 또는 승인 범위 밖 국가 저장 명시 | `allow` → `warn`, `warn` → `mask`, 깨끗한 문장도 최소 `warn` |
+
+- 목적지를 모르거나 프로필에 없으면 `elevated` 입니다.
+- 브라우저·CLI 는 요금제·계약(ZDR 등)을 알 수 없으므로, `enterprise`·`api` 같은 낮은 등급은
+  관리자가 `org_contracts` 에 등록한 목적지만 인정합니다.
+- standard 도 안전 보장이 아닙니다. 제공사 정책이 바뀌면 YAML 과 `version` 을 함께 갱신합니다.
+- 제공사마다 `verified_at`(근거 확인일)이 있고, `stale_after_days`(기본 90일)가 지나면 서버가 그 제공사를
+  기본 등급 이상으로 자동 강화합니다(`destination_policy_stale` 알림).
+
+### 제공사 정책 변경 감지
+
+`.github/workflows/policy-watch.yml` 이 매주 월요일 `tools/policy_watch/sources.yaml` 의 공식 페이지를 가져와
+스냅샷(`tools/policy_watch/snapshots/`)과 비교합니다. **등급은 자동으로 바꾸지 않습니다.**
+
+| 결과 | 동작 |
+|---|---|
+| 페이지 변경·신규 | `bot/policy-watch` 브랜치로 PR(diff 포함) → 사람이 읽고 `destinations.yaml` 등급·`verified_at`·정책 `version` 갱신 |
+| 가져오기 실패, 재확인 기한 14일 이내 | `policy-watch` 라벨 이슈 생성 또는 댓글 |
+| `manual: true` 페이지(봇 차단·JS 렌더링) | 보고서에 수동 확인 대상으로만 표시 |
+
+- 첫 실행은 모든 페이지가 "신규"로 잡혀 기준 스냅샷 PR 이 열립니다.
+- 스케줄은 기본 브랜치에 병합된 뒤부터 동작합니다. Actions 탭에서 수동 실행도 됩니다.
+- 저장소 설정 → Actions → General → "Allow GitHub Actions to create and approve pull requests" 를 켜야 합니다.
+- 로컬 실행: `python tools/policy_watch/watch.py --report report.md [--only openai,google]`
+- 매번 바뀌는 문구로 거짓 변경이 생기면 `sources.yaml` 의 `ignore` 정규식에 추가합니다.
 
 ## 로컬 모델(미정)
 

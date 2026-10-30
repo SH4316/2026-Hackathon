@@ -1,0 +1,37 @@
+# 감시할 제공사 공식 정책 페이지. provider 는 policies/destinations.yaml 의 키와 같다.
+# ignore: 매번 바뀌는 문구(날짜·세션 값 등)를 비교에서 제외할 정규식 목록.
+# manual: true 는 봇 차단·JS 렌더링으로 자동 수집이 안 되는 페이지. 가져오지 않고 보고서에 수동 확인 대상으로만 표시한다.
+
+# 모든 페이지에 적용(요청마다 바뀌는 추적 ID 등)
+ignore:
+  - '^This is the Trace Id: [0-9a-f]+$'
+  - '^\d{12,}$'
+
+sources:
+  - { id: anthropic-privacy, provider: anthropic, url: "https://www.anthropic.com/legal/privacy" }
+  - { id: anthropic-commercial-terms, provider: anthropic, url: "https://www.anthropic.com/legal/commercial-terms" }
+  - { id: anthropic-consumer-terms, provider: anthropic, url: "https://www.anthropic.com/legal/consumer-terms" }
+  - { id: openai-privacy, provider: openai, url: "https://openai.com/policies/row-privacy-policy/" }
+  - { id: openai-api-your-data, provider: openai, url: "https://platform.openai.com/docs/guides/your-data" }
+  - { id: openai-enterprise-privacy, provider: openai, url: "https://openai.com/enterprise-privacy/" }
+  - { id: openai-usage-policies, provider: openai, url: "https://openai.com/policies/usage-policies/" }
+  - { id: google-gemini-api-terms, provider: google, url: "https://ai.google.dev/gemini-api/terms" }
+  - { id: google-gemini-apps-privacy, provider: google, url: "https://support.google.com/gemini/answer/13594961?hl=en" }
+  - { id: google-cloud-dpa, provider: google, url: "https://cloud.google.com/terms/data-processing-addendum" }
+  - { id: meta-genai-privacy, provider: meta, url: "https://www.facebook.com/privacy/genai/", manual: true }
+  - { id: meta-llama-use-policy, provider: meta, url: "https://www.llama.com/llama3/use-policy/" }
+  - { id: xai-privacy, provider: xai, url: "https://x.ai/legal/privacy-policy" }
+  - { id: xai-enterprise-terms, provider: xai, url: "https://x.ai/legal/terms-of-service-enterprise" }
+  - { id: deepseek-privacy, provider: deepseek, url: "https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html" }
+  - { id: deepseek-terms, provider: deepseek, url: "https://cdn.deepseek.com/policies/en-US/deepseek-terms-of-use.html" }
+  - { id: moonshot-platform-privacy, provider: moonshot, url: "https://platform.moonshot.ai/docs/agreement/userprivacy" }
+  - { id: mistral-terms, provider: mistral, url: "https://mistral.ai/terms" }
+  - { id: mistral-privacy, provider: mistral, url: "https://legal.mistral.ai/terms/privacy-policy" }
+  - { id: cohere-privacy, provider: cohere, url: "https://cohere.com/privacy" }
+  - { id: cohere-terms, provider: cohere, url: "https://cohere.com/terms-of-use" }
+  - { id: amazon-bedrock-data-protection, provider: amazon, url: "https://docs.aws.amazon.com/bedrock/latest/userguide/data-protection.html" }
+  - { id: perplexity-privacy, provider: perplexity, url: "https://www.perplexity.ai/hub/legal/privacy-policy", manual: true }
+  - { id: microsoft-privacy, provider: microsoft, url: "https://privacy.microsoft.com/en-us/privacystatement" }
+  - { id: microsoft-services-agreement, provider: microsoft, url: "https://www.microsoft.com/en-us/servicesagreement" }
+  - { id: microsoft-365-copilot-privacy, provider: microsoft, url: "https://learn.microsoft.com/en-us/copilot/microsoft-365/microsoft-365-copilot-privacy" }
+  - { id: alibaba-model-studio-privacy, provider: alibaba, url: "https://www.alibabacloud.com/help/en/model-studio/privacy-notice" }
