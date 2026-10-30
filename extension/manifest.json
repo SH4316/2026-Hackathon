@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Prompt Guard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "외부 생성형 AI에 보내기 전에 조직 검사 서버로 프롬프트의 민감정보를 확인하고 정제합니다.",
   "permissions": [
     "storage"
@@ -46,6 +46,7 @@
         "src/ui.js",
         "src/restore.js",
         "src/pdf.js",
+        "src/office.js",
         "src/files.js",
         "src/local.js",
         "src/content.js"
@@ -85,5 +86,5 @@
       ]
     }
   ],
-  "version_name": "0.2.0 (SafePrompt 위젯·PDF·붙여넣기)"
+  "version_name": "0.3.0 (문서 검사: Word·Excel·PowerPoint·한글)"
 }
