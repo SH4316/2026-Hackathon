@@ -3521,17 +3521,19 @@ textarea::placeholder {
 }
 
 /* 감시 연동: 검사 서버 연결·설정 */
+.monitoring-panel {
+  margin-bottom: 22px;
+}
+.monitoring-body {
+  display: grid;
+  gap: 16px;
+  padding: 18px 24px 22px;
+}
 .connector-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
   gap: 18px;
   align-items: start;
-  margin-bottom: 16px;
-}
-.connector-form label,
-.detector-grid label {
-  display: grid;
-  gap: 6px;
 }
 .connector-form .button {
   margin-top: 24px;
@@ -3540,23 +3542,28 @@ textarea::placeholder {
 .detector-grid small,
 .connector-created small {
   font-size: 11px;
-  color: #616a79;
+  color: var(--muted);
   line-height: 1.6;
 }
 .connector-created {
   display: grid;
   gap: 10px;
   padding: 16px 18px;
-  margin-bottom: 16px;
-  border: 1px solid #cbd8f1;
+  border: 1px solid rgba(59, 130, 246, 0.4);
   border-radius: var(--radius);
-  background: #f5f8ff;
+  background: var(--blue-wash);
+  color: var(--text);
 }
 .connector-created p {
-  display: flex;
-  align-items: center;
-  gap: 7px;
   font-size: 12px;
+  line-height: 1.6;
+}
+.connector-created p svg {
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+.connector-created p strong {
+  margin-right: 4px;
 }
 .connector-url {
   display: flex;
@@ -3570,17 +3577,20 @@ textarea::placeholder {
   padding: 9px 11px;
   overflow-wrap: anywhere;
   font-size: 12px;
-  background: #fff;
+  color: var(--text);
+  background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 5px;
 }
-.connector-list {
-  list-style: none;
+.connector-list,
+.detector-settings {
   margin: 0;
-  padding: 0 22px;
+  padding: 0 18px;
+  list-style: none;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--bg-sub);
+  min-width: 0;
 }
 .connector-list li {
   display: flex;
@@ -3588,58 +3598,70 @@ textarea::placeholder {
   align-items: center;
   gap: 20px;
   padding: 14px 0;
-  border-bottom: 1px solid #edf0f5;
+  border-bottom: 1px solid var(--border);
 }
 .connector-list li:last-child {
   border-bottom: 0;
 }
+.connector-list .setting-label,
+.detector-settings .setting-label,
+.detector-check .setting-label {
+  color: var(--text);
+}
+.connector-list .setting-description,
+.detector-settings .setting-description,
+.detector-check .setting-description,
+.detector-map .setting-description {
+  color: var(--muted);
+}
 .connector-list li[data-revoked] .setting-label {
-  color: #8a94a6;
+  color: var(--hint);
   text-decoration: line-through;
 }
 .detector-settings {
-  margin: 0 0 18px;
-  padding: 6px 22px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: #fff;
-  min-width: 0;
+  padding: 4px 18px;
 }
 .detector-settings legend {
   padding: 0 6px;
   font-size: 12px;
   font-weight: 600;
+  color: var(--text);
 }
-.detector-choice,
-.detector-check {
-  display: flex;
+label.detector-choice,
+label.detector-check {
+  flex-direction: row;
   align-items: flex-start;
   gap: 12px;
   padding: 12px 0;
   cursor: pointer;
 }
 .detector-choice + .detector-choice {
-  border-top: 1px solid #edf0f5;
+  border-top: 1px solid var(--border);
 }
 .detector-choice input,
 .detector-check input {
-  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-top: 1px;
+  flex-shrink: 0;
+  accent-color: var(--blue);
+  cursor: pointer;
 }
 .detector-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 22px;
   align-items: start;
-  margin-bottom: 20px;
 }
 .detector-map {
   display: grid;
   gap: 10px;
-  margin-bottom: 20px;
   justify-items: start;
 }
 .detector-map h3 {
   font-size: 13px;
+  color: var(--text);
 }
 .detector-map-row {
   display: grid;
@@ -3648,18 +3670,18 @@ textarea::placeholder {
   align-items: center;
   width: 100%;
   max-width: 720px;
+  color: var(--muted);
 }
 @media (max-width: 760px) {
+  .monitoring-body {
+    padding: 16px;
+  }
   .connector-form,
   .detector-grid {
     grid-template-columns: 1fr;
   }
   .connector-form .button {
     margin-top: 0;
-  }
-  .connector-list,
-  .detector-settings {
-    padding: 0 14px;
   }
   .connector-url {
     flex-direction: column;
