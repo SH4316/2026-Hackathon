@@ -4,6 +4,8 @@ services:
     extends:
       file: compose.yaml
       service: backend
+    # Keep the packaged migrations current with the bind-mounted demo callback.
+    pull_policy: build
     ports: !override
       - "${APP_BIND_IP:-0.0.0.0}:${APP_PORT:-8080}:8080"
     environment:

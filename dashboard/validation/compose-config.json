@@ -1,12 +1,13 @@
 {
   "status": "PASS",
-  "checkedAt": "2026-10-30T17:26:08.970760+00:00",
+  "checkedAt": "2026-10-30T17:50:25.244582+00:00",
   "scope": "Compose config parsing only; Docker Engine/container/volume lifecycle not executed",
   "checks": [
     "base loopback binding unchanged",
     "dev APP_BIND_IP/APP_PORT override, single published app port",
     "normal mysql-data and isolated dev-mysql-data, one MySQL mount",
     "dev-only readonly SQL mount and Flyway locations",
+    "dev rebuilds backend to keep packaged migrations current with demo SQL",
     "no init container",
     "container DB_URL isolated from host environment"
   ]

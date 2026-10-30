@@ -41,6 +41,17 @@ APP_BIND_IP=192.168.0.20 APP_PORT=8081 \
 
 개발 구성은 `./dev/sql`을 `/app/dev-sql:ro`로 마운트하고 `SPRING_FLYWAY_LOCATIONS=classpath:db/migration,filesystem:/app/dev-sql`을 설정합니다. Flyway가 스키마 마이그레이션을 완료한 뒤 `afterMigrate__demo.sql`을 실행합니다. 별도 초기화 컨테이너와 API 시드 요청은 없습니다. 이 디렉터리는 배포 JAR에 포함되지 않습니다.
 
+개발 백엔드는 [`pull_policy: build`](https://docs.docker.com/reference/compose-file/services/#pull_policy)를 사용해 `up`마다 현재 소스로 이미지를 빌드합니다. 변경되지 않은 빌드 단계는 캐시를 재사용합니다. 따라서 `--build`를 생략해도 최신 SQL 콜백이 이전 이미지의 스키마와 섞이지 않습니다. `restart`는 이미지를 갱신하지 않으므로 코드 변경 후에는 `up`을 사용합니다.
+
+`afterMigrate__demo.sql`에서 `Table 'ai_security_dashboard.config_versions' doesn't exist`가 발생하면, V2 마이그레이션이 없는 이전 이미지에 최신 개발 SQL이 마운트된 경우인지 먼저 확인합니다. 현재 소스로 다음 명령을 실행하면 DB 볼륨을 유지하면서 백엔드를 교체합니다.
+
+```bash
+docker compose -f compose-dev.yml up --build --force-recreate -d --wait backend
+docker compose -f compose-dev.yml logs --tail=100 backend
+```
+
+로그에서 `Successfully validated 2 migrations`와 V2 적용 또는 현재 스키마 버전 `2`를 확인합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
+
 SQL은 게시 버전 `demo-v1`, `demo-v2`, 14개 원본 분류와 개인정보 하위 태그, 사용자 정의 정책 3종, 이름에 `데모`가 붙은 가상 사람 6명, 서울 기준 최근 완료된 30일의 이벤트를 만듭니다. V2는 같은 태그 ID를 기술정보·업무정보 묶음으로 재구성합니다. 각 분류의 하위 예시와 판단 지침을 포함하며 초안으로 복제한 뒤 모두 편집할 수 있습니다. 프롬프트는 합성 자료로 표시되고 이름·전화번호·이메일도 가상 값입니다. 시간대·날짜별 이벤트 수, 서비스, 정책, 감지 0건, 여러 태그를 가진 동일 구간과 같은 텍스트의 서로 다른 구간을 포함합니다.
 
 고정 버전 ID와 날짜별 이벤트 ID를 사용합니다. 재시작 또는 SQL 재실행은 기존 버전·태그·정책·사람·이벤트를 덮어쓰지 않습니다. 활성 버전이 없을 때만 `demo-v1`을 활성화하므로 사용자가 고른 활성 버전을 보존합니다. 날짜가 바뀌면 최근 30일 중 없는 날짜의 샘플만 추가하며 오래된 이벤트를 삭제하지 않습니다. 직접 다시 적용하려면 개발 MySQL이 실행 중인 상태에서 다음 명령을 사용합니다.

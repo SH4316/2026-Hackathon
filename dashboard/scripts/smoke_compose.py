@@ -35,14 +35,17 @@ def main():
         assert cfg['services']['mysql']['ports'][0]['host_ip']=='127.0.0.1'
         assert set(cfg['services'])=={'backend','mysql'}
     assert 'SPRING_FLYWAY_LOCATIONS' not in base['services']['backend']['environment']
+    assert 'pull_policy' not in base['services']['backend']
     backend=dev['services']['backend']
+    assert backend['pull_policy']=='build'
     assert backend['environment']['SPRING_FLYWAY_LOCATIONS']=='classpath:db/migration,filesystem:/app/dev-sql'
     mount=backend['volumes'][0]
     assert mount['target']=='/app/dev-sql' and mount['read_only'] and Path(mount['source'])==root/'dev/sql'
     report={'status':'PASS','checkedAt':datetime.now(timezone.utc).isoformat(),'scope':'Compose config parsing only; Docker Engine/container/volume lifecycle not executed',
             'checks':['base loopback binding unchanged','dev APP_BIND_IP/APP_PORT override, single published app port',
                       'normal mysql-data and isolated dev-mysql-data, one MySQL mount',
-                      'dev-only readonly SQL mount and Flyway locations','no init container','container DB_URL isolated from host environment']}
+                      'dev-only readonly SQL mount and Flyway locations','dev rebuilds backend to keep packaged migrations current with demo SQL',
+                      'no init container','container DB_URL isolated from host environment']}
     if args.report:args.report.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps(report,ensure_ascii=False,indent=2))
 
