@@ -224,6 +224,17 @@ curl --fail-with-body -sS "http://127.0.0.1:8080$image_path" \
 
 이 기록은 **검사 판정**입니다. 확장프로그램이나 외부 AI에서 실제 전송·차단이 일어났는지 나타내지 않습니다. 전체 필드와 검증 규칙은 [수집 계약](CONTRACT.md#detector-http-ingestion)을 참고하세요.
 
+## 검사 서버 연결 (감시 연동)
+
+`/settings/monitoring`에서 검사 서버(`server/`)를 연결합니다.
+
+1. **연결 URL 만들기**: 이름과(선택) 검사 서버에서 보이는 대시보드 주소를 넣으면 `http://…/api/v1/connectors/c_…#sk_…` 형식의 URL이 한 번만 표시됩니다. 비밀번호처럼 다룹니다.
+2. 검사 서버를 `PG_DASHBOARD_CONNECTION=<연결 URL>`로 실행합니다. 서버는 `#` 뒤의 비밀값을 `Authorization: Bearer`로 보내므로 경로·접근 로그에 남지 않습니다.
+3. 연결을 처음 만든 뒤부터 `/api/v1/classifier-config`와 `/api/v1/detector-events`는 유효한 연결로만 호출할 수 있습니다(401 `CONNECTOR_AUTH_REQUIRED`). 화면이 쓰는 나머지 API는 기존처럼 로컬 무인증입니다.
+4. **해지**하면 그 서버는 즉시 규칙을 받지 못해 검사를 회색(전송 보류)으로 처리합니다.
+
+같은 화면의 **검사 서버 설정**은 연결된 모든 서버가 30초 안에 반영합니다: 탐지 이력의 원문 처리(마스킹 문장·원문·기록 안 함), 대시보드 태그 탐지 시 조치, Jev 사용, 검사 서버 탐지 유형(email 등) → 태그 매핑. API 계약은 [CONTRACT.md](CONTRACT.md#detector-connections-and-settings)입니다.
+
 ## 검증 재실행
 
 ```bash

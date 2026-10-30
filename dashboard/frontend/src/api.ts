@@ -1,6 +1,9 @@
 import type {
   ApiErrorResponse,
   ConfigVersion,
+  Connector,
+  CreatedConnector,
+  DetectorSettings,
   CreateVersionInput,
   Filters,
   Metrics,
@@ -163,6 +166,26 @@ export const api = {
   },
   deleteVersion(id: string): Promise<void> {
     return request(`/config-versions/${resourceId(id)}`, { method: "DELETE" });
+  },
+  connectors(signal?: AbortSignal): Promise<Connector[]> {
+    return request("/connectors", { signal });
+  },
+  createConnector(input: {
+    name: string;
+    dashboardUrl?: string;
+  }): Promise<CreatedConnector> {
+    return request("/connectors", json("POST", input));
+  },
+  revokeConnector(id: string): Promise<void> {
+    return request(`/connectors/${resourceId(id)}`, { method: "DELETE" });
+  },
+  detectorSettings(signal?: AbortSignal): Promise<DetectorSettings> {
+    return request("/detector-settings", { signal });
+  },
+  saveDetectorSettings(
+    input: Omit<DetectorSettings, "updatedAt">,
+  ): Promise<DetectorSettings> {
+    return request("/detector-settings", json("PUT", input));
   },
   classifierConfig(signal?: AbortSignal): Promise<ConfigVersion> {
     return request("/classifier-config", { signal });

@@ -38,6 +38,7 @@ import {
 import { Trend, MetricTree, ServiceChart, PolicyChart } from "./charts";
 import { MetricSettings } from "./MetricSettings";
 import { JevSettings } from "./JevSettings";
+import { MonitoringSettings } from "./MonitoringSettings";
 import { SavedSearches, SavedSearchDetail } from "./SavedSearches";
 import type { Person, Filters } from "./types";
 const navigation: {
@@ -101,9 +102,6 @@ function Shell() {
             >
               <Icon name={n.icon} size={19} />
               <span>{n.label}</span>
-              {n.to === "/settings/monitoring" && (
-                <span className="nav-soon">준비 중</span>
-              )}
             </NavLink>
           ))}
         </nav>
@@ -894,100 +892,6 @@ function EventDetail() {
           </Panel>
         </div>
       )}
-    </>
-  );
-}
-function MonitoringSettings() {
-  const { versions } = useWorkspace();
-  const active = versions.find((v) => v.isActive);
-  const r = useResource(
-    (signal) =>
-      active ? api.version(active.id, signal) : Promise.resolve(null),
-    [active?.id],
-  );
-  return (
-    <>
-      <PageTitle
-        title="감시 연동"
-        description="외부 감지 엔진의 연동 설정을 위한 화면입니다."
-        action={
-          <span className="badge preparing">
-            <Icon name="lock" size={13} />
-            준비 중
-          </span>
-        }
-      />
-      <div className="settings-notice">
-        <span className="notice-icon">
-          <Icon name="lock" size={22} />
-        </span>
-        <div>
-          <h2>감지 엔진 설정은 준비 중입니다</h2>
-          <p>
-            태그와 정책 상태는 메트릭 설정에서 관리할 수 있습니다. 외부 분류기는
-            활성 설정 API를 읽고 감지 결과를 전송합니다.
-          </p>
-          <Link className="text-link" to="/settings/metrics">
-            메트릭 설정으로 이동
-            <Icon name="arrow" size={14} />
-          </Link>
-        </div>
-      </div>
-      <Panel
-        title="활성 버전의 수집 항목"
-        description={
-          active
-            ? active.name + " · " + (r.data?.tags.length ?? 0) + "개 태그"
-            : "활성 버전 없음"
-        }
-      >
-        {r.data ? (
-          <div
-            className="monitoring-catalog"
-            role="region"
-            tabIndex={0}
-            aria-label="활성 버전의 수집 태그 목록"
-          >
-            <fieldset disabled className="settings-fields">
-              {r.data.tags.map((t) => (
-                <label className="setting-row" key={t.id}>
-                  <span>
-                    <span className="setting-label">{t.name}</span>
-                    <span className="setting-description">{t.description}</span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    className="checkbox"
-                    checked
-                    readOnly
-                    aria-label={t.name + " 감시"}
-                  />
-                </label>
-              ))}
-              {!r.data.tags.length && (
-                <p className="compact-empty">
-                  활성 버전에 등록된 태그가 없습니다.
-                </p>
-              )}
-            </fieldset>
-          </div>
-        ) : (
-          <EmptyState
-            icon="tree"
-            title="활성 설정을 먼저 준비하세요"
-            description="메트릭 버전을 발행·활성화하면 여기에서 수집 항목을 확인할 수 있습니다."
-          />
-        )}
-        <div className="settings-save panel-save">
-          <span>
-            <Icon name="lock" size={14} />이 화면에서 감지 엔진의 동작은 변경할
-            수 없습니다.
-          </span>
-          <button className="button button-primary" disabled>
-            연동 설정 저장
-          </button>
-        </div>
-      </Panel>
     </>
   );
 }

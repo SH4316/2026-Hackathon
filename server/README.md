@@ -114,12 +114,21 @@ python -m prompt_guard inspect                                  # 대화형 입�
 
 | | 로컬 | 조직 관리 |
 |---|---|---|
-| 조건 | `PG_DASHBOARD_URL` 없음, 또는 확장이 등록 코드로 연결되지 않음 | `PG_DASHBOARD_URL` 이 있는 서버에 대시보드 사람 ID 로 등록 |
+| 조건 | `PG_DASHBOARD_CONNECTION` 없음, 또는 확장이 등록 코드로 연결되지 않음 | 대시보드 연결 URL(`PG_DASHBOARD_CONNECTION`)이 있는 서버에 대시보드 사람 ID 로 등록 |
 | 자체 판단 | 내장 규칙 + 사용자 규칙 + 문맥 탐지기(서버), 기기 내 AI·개인 정규식(확장) | 같음 |
 | 대시보드 규칙 | 없음 | 대시보드 활성 설정의 태그 `pythonRegex`, Jev 프롬프트(`jevThreshold`)를 모든 검사에 적용 |
 | 기록 | 서버 감사 이벤트(원문 없음)만 | + 전송 시점 검사를 대시보드 `/api/v1/detector-events` 로 전송 |
 
 조직 서버는 대시보드 계약(dashboard/CONTRACT.md)의 "연결된 탐지기" 역할을 합니다.
+
+### 대시보드 연결
+
+1. 대시보드 **감시 연동** → **연결 URL 만들기**. `http://대시보드/api/v1/connectors/c_…#sk_…` 가 한 번만 표시됩니다.
+2. 이 서버를 `PG_DASHBOARD_CONNECTION=<연결 URL>` 로 실행합니다. `#` 뒤 비밀값은 `Authorization: Bearer` 로만 보냅니다.
+3. `POST /v1/admin/org/refresh`(관리 키)로 연결과 활성 설정을 확인합니다. `/v1/admin/org/status` 의 `connector_id`, `settings_source` 로 상태를 봅니다.
+4. 대시보드에서 연결을 해지하면 401 이 되어 조직 규칙을 적용할 수 없으므로 검사는 회색(전송 보류)입니다.
+
+대시보드 기록의 `source_id` 는 연결 ID 입니다. `PG_DASHBOARD_URL`(주소만, 인증 없음)은 대시보드가 아직 연결을 발급하지 않았을 때만 동작하는 이전 방식입니다.
 
 - **태그 정규식:** Python `re` 로 실행합니다. 4000자 이하, 빈 문자열 일치·중첩 수량자(`(a+)+`)는 건너뜁니다(`/v1/admin/org/status` 의 `skipped_regex`).
 - **Jev:** 프롬프트마다 로컬 모델(decider)이 출력 태그별 점수(0~1)와 근거 구간을 냅니다. 태그의 `jevThreshold` 가 설정된 경우에만
@@ -131,7 +140,11 @@ python -m prompt_guard inspect                                  # 대화형 입�
   Jev 모델이 꺼져 있거나 실패해도 회색(`org_jev_model_disabled`, `org_jev_failed`, 모델 필수면 error)이며 allow 하지 않습니다.
 - 활성 설정은 `PG_DASHBOARD_REFRESH_S`(기본 30초)마다 다시 받습니다. 바로 반영하려면 `POST /v1/admin/org/refresh`.
 
-### 조직 설정 (`GET·PUT /v1/admin/org/settings`, 관리 키)
+### 조직 설정
+
+대시보드 **감시 연동 → 검사 서버 설정**이 기준입니다(대시보드 `GET /api/v1/detector-settings` 를 활성 설정과 함께 받음).
+대시보드 설정을 받을 수 없을 때만 이 서버의 `GET·PUT /v1/admin/org/settings`(관리 키) 값을 쓰고,
+대시보드 설정을 따르는 중에는 서버 PUT 이 409 입니다. 항목은 같습니다.
 
 ```json
 { "report_text": "masked", "tag_map": {"email": "pii-3", "phone": "pii-2"},

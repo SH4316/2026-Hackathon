@@ -31,7 +31,10 @@ def config(revision=1, version="v1"):
 
 
 class FakeDashboard:
-    def __init__(self):
+    def __init__(self, secret=None):
+        self.secret = secret          # 있으면 검사 서버 엔드포인트에 Bearer 요구(연결 URL)
+        self.settings = None          # 있으면 /api/v1/detector-settings 응답
+        self.auth_headers: list[str | None] = []
         self.config = config()
         self.people = {"person-1": {"id": "person-1", "name": "홍길동"}}
         self.events: list[dict] = []
@@ -42,6 +45,16 @@ class FakeDashboard:
         if self.down:
             raise httpx.ConnectError("down")
         path = request.url.path
+        auth = request.headers.get("Authorization")
+        self.auth_headers.append(auth)
+        guarded = path in ("/api/v1/classifier-config", "/api/v1/detector-events") or path.startswith(
+            "/api/v1/connectors/")
+        if self.secret and guarded and auth != f"Bearer {self.secret}":
+            return httpx.Response(401, json={"code": "CONNECTOR_AUTH_REQUIRED"})
+        if path.startswith("/api/v1/connectors/"):
+            return httpx.Response(200, json={"id": path.rsplit("/", 1)[1], "connected": True})
+        if path == "/api/v1/detector-settings":
+            return httpx.Response(200, json=self.settings) if self.settings else httpx.Response(404)
         if path == "/api/v1/classifier-config":
             return httpx.Response(200, json=self.config) if self.config else httpx.Response(
                 404, json={"code": "NO_ACTIVE_VERSION"})
@@ -73,9 +86,9 @@ class FakeModel:
         return [s(text) if callable(s) else s for s in self.scores]
 
 
-def org_client(dash=None, model=None, mode=ModelMode.OPTIONAL):
+def org_client(dash=None, model=None, mode=ModelMode.OPTIONAL, url="http://dash"):
     dash = dash or FakeDashboard()
-    c = make_client(dashboard=DashboardClient("http://dash", refresh_s=0, transport=httpx.MockTransport(dash.handler)),
+    c = make_client(dashboard=DashboardClient(url, refresh_s=0, transport=httpx.MockTransport(dash.handler)),
                     model_mode=mode)
     c.app.state.org.model = model
     c.app.state.org.model_mode = mode
@@ -239,3 +252,55 @@ def test_stage_is_accepted(client, stage):
     if stage:
         b["context"]["stage"] = stage
     assert client.post("/v1/inspect", json=b).status_code == 200
+
+
+CONNECTION = "http://dash/api/v1/connectors/c_abc123#sk_secretvalue"
+
+
+def test_parse_connection_url():
+    from app.org.dashboard import parse_connection
+    c = parse_connection("https://dash.example/ctx/api/v1/connectors/c_x1#sk_y")
+    assert (c.base_url, c.connector_id, c.secret) == ("https://dash.example/ctx", "c_x1", "sk_y")
+    assert parse_connection("http://dash:8080/").connector_id is None  # 이전 방식(주소만)
+    for bad in ["http://dash/api/v1/connectors/c_x1", "ftp://dash/api/v1/connectors/c#sk_y",
+                "http://dash/api/v1/connectors/#sk_y"]:
+        with pytest.raises(ValueError):
+            parse_connection(bad)
+
+
+def test_connection_url_sends_bearer_and_never_the_secret_in_paths():
+    dash = FakeDashboard(secret="sk_secretvalue")
+    c, _ = org_client(dash, model=FakeModel(), url=CONNECTION)
+    tok, _ = enroll(c)
+    r = c.post("/v1/inspect", json=body("사번 EMP-123456"), headers=tok).json()
+    assert r["detector_versions"]["org"] == "v1@1"
+    [ev] = dash.events
+    assert ev["source_id"] == "c_abc123"  # 기록의 source_id 는 연결 ID
+    assert set(dash.auth_headers) == {"Bearer sk_secretvalue"}
+    status = c.post("/v1/admin/org/refresh", headers=ADMIN).json()
+    assert status["connector_id"] == "c_abc123" and status["dashboard_error"] is None
+
+
+def test_revoked_connection_holds():
+    dash = FakeDashboard(secret="sk_other")
+    c, _ = org_client(dash, model=FakeModel(), url=CONNECTION)
+    r = c.post("/v1/inspect", json=body("평범한 문장")).json()
+    assert r["signal"] == "gray" and "org_config_unavailable" in r["notices"]
+    assert c.get("/v1/admin/org/status", headers=ADMIN).json()["dashboard_error"] == "CONNECTOR_AUTH_REQUIRED"
+    assert c.post("/v1/admin/org/refresh", headers=ADMIN).status_code == 503
+
+
+def test_dashboard_settings_take_precedence():
+    dash = FakeDashboard(secret="sk_secretvalue")
+    dash.settings = {"reportText": "full", "tagMap": {"email": "pii-email"}, "tagAction": "block",
+                     "jevEnabled": False, "revision": 3, "updatedAt": "2026-10-31T00:00:00Z"}
+    c, _ = org_client(dash, model=FakeModel(fail=True), url=CONNECTION)
+    tok, _ = enroll(c)
+    r = c.post("/v1/inspect", json=body("사번 EMP-123456 kim@example.com"), headers=tok).json()
+    assert {f["type"]: f["action"] for f in r["findings"]}["emp-id"] == "block"  # tagAction
+    assert r["status"] == "complete"  # jevEnabled=false → 실패하는 모델을 부르지 않음
+    [ev] = dash.events
+    assert "kim@example.com" in ev["text"] and ev["tag_map"]["email"] == "pii-email"  # reportText=full
+    s = c.get("/v1/admin/org/settings", headers=ADMIN).json()
+    assert (s["source"], s["version"], s["report_text"]) == ("dashboard", 3, "full")
+    assert c.put("/v1/admin/org/settings", json={"report_text": "off"}, headers=ADMIN).status_code == 409

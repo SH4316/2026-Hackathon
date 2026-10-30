@@ -42,7 +42,7 @@ GET /api/v1/events + filters/page -> Page<Event>; GET /events/{id} -> Event. Kee
 
 ## Detector HTTP ingestion
 
-The detector adapter adds endpoints alongside the existing public API; `/events` and its camelCase request/response contract remain unchanged. Preserve the existing empty initial configuration, registered people, published tree structure and local no-auth runtime. Do not change the detector or extension to call this endpoint as part of this implementation. Producer reference: `origin/main` commit `e2021df`, `docs/rule-formats.md`, `server/app/schemas.py` and `server/docs/api-contract.md`.
+The detector adapter adds endpoints alongside the existing public API; `/events` and its camelCase request/response contract remain unchanged. Preserve the existing empty initial configuration, registered people, published tree structure and local no-auth runtime. The inspection server (`server/`) calls it when connected through a connection URL (see Detector connections and settings). Producer reference: `origin/main` commit `e2021df`, `docs/rule-formats.md`, `server/app/schemas.py` and `server/docs/api-contract.md`.
 
 `POST /api/v1/detector-events` accepts JSON with snake_case envelope fields:
 
@@ -88,6 +88,16 @@ POST returns the same shape as `GET /api/v1/detector-events/{id}`:
 Invalid spans, Base64 or names return400 `INVALID_INPUT`; malformed JSON, unknown fields and invalid enum values return400 `INVALID_JSON`. Explicit unknown tag mappings return422 `TAG_NOT_IN_VERSION`, stale active versions return409 `VERSION_MISMATCH`, and changed replay metadata/files/image bytes return409 `EVENT_CONFLICT`. Existing safe error envelopes remain `{code,message,fieldErrors?}`.
 
 These records represent inspection decisions. They do not assert that a prompt was transmitted, blocked by a client, or accepted by an external AI. Confidence describes detection certainty; severity describes risk; action and decision are policy outcomes. Keep these values separate.
+
+## Detector connections and settings
+
+The monitoring screen (`/settings/monitoring`) issues inspection-server connections and edits the settings connected servers follow. V8 adds `detector_connectors` and the singleton `detector_settings` without changing existing data.
+
+- POST /api/v1/connectors {name, dashboardUrl?} ->201 {connector:Connector, connectionUrl}. `connectionUrl` is `<dashboardUrl or request context URL>/api/v1/connectors/<id>#<secret>` and is shown only in this response. IDs are `c_` + 12 URL-safe characters; secrets are `sk_` + 43 URL-safe characters. Only the SHA-256 hash of the secret is stored. `dashboardUrl` must be http(s) without user info, query or fragment; trailing slashes are removed.
+- GET /api/v1/connectors -> Connector[] = {id,name,createdAt,lastUsedAt,revokedAt}, newest first, never including secrets. DELETE /api/v1/connectors/{id} ->204; already revoked or unknown ->404 `CONNECTOR_NOT_FOUND`.
+- GET /api/v1/connectors/{id} with that connection's `Authorization: Bearer <secret>` ->200 {id,connected:true} (connection check).
+- Once any connection has been issued (including later revoked ones), GET /api/v1/classifier-config and every /api/v1/detector-events path require a valid unrevoked connection's `Authorization: Bearer <secret>`; otherwise 401 `CONNECTOR_AUTH_REQUIRED` with `WWW-Authenticate: Bearer`. Before the first connection they keep the previous local no-auth behavior. Endpoints used by the dashboard UI remain local no-auth. `lastUsedAt` is updated at most once per minute.
+- GET /api/v1/detector-settings -> DetectorSettings={reportText:'masked'|'full'|'off',tagMap:{detectorType:tagId},tagAction:'warn'|'mask'|'block',jevEnabled:boolean,revision:number,updatedAt:string|null}. Initial value masked/{}/mask/true/0/null. PUT with the same fields (without updatedAt) increments revision; stale revision409 `REVISION_CONFLICT`; invalid enum, ID-pattern violations or more than500 map entries400. Connected servers fetch these with the classifier configuration: `reportText` controls the prompt text they send (masked replaces every detected span with a token), `tagAction` is the policy action for tag regex/Jev detections, `tagMap` maps their built-in finding types to tags, and `jevEnabled` turns Jev execution off.
 
 ## Filters / aggregates
 
