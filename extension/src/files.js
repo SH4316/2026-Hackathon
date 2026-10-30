@@ -1,9 +1,11 @@
 // 파일 첨부 검사. 입력창 텍스트와 달리 첨부는 사이트가 곧바로 업로드하므로,
-// 이벤트를 먼저 멈추고 검사한 뒤 통과한 경우에만 같은 이벤트를 다시 보낸다.
-//  - 텍스트·코드 파일: 내용을 검사 서버에서 확인, 민감정보가 있으면 첨부를 막는다.
-//  - PDF: pdf.js 로 글자를 뽑아 같은 방식으로 검사한다(스캔본처럼 글자가 없으면 '검사 불가').
-//  - 음성·영상·이미지 등: 브라우저만으로는 내용을 분석할 수 없다고 알린다(설정에서 막기로 바꿀 수 있다).
+// 이벤트를 먼저 멈추고 검사한 뒤 사용자가 허락한 경우에만 같은 이벤트를 다시 보낸다.
+//  - 텍스트·코드 파일과 PDF(pdf.js 로 글자를 뽑음): 내용을 서버에서 검사한다.
+//    민감정보가 있으면 어디에 있는지(PDF 는 쪽, 텍스트는 줄) 보여 주고 "그래도 진행할지" 묻는다.
+//  - 읽을 수 없는 파일(음성·영상·이미지·스캔본 PDF 등): "읽을 수 없는 파일이라 안전한지 알 수 없다, 그래도 진행할지" 묻는다.
+//    (설정에서 '묻지 않고 막기'로 바꿀 수 있다)
 //  - 서버 글자 수 제한(50,000자)을 넘는 내용은 나눠서 모두 검사한다.
+//  - 검사 서버가 응답하지 못하면 묻지 않고 막는다(자동 폴백 없음).
 var PG = (globalThis.PG = globalThis.PG || {});
 
 PG.files = (() => {
@@ -12,13 +14,15 @@ PG.files = (() => {
   const MAX_BYTES = 1_000_000; // 텍스트 파일 상한(PDF 는 pdf.js 쪽 상한)
   const MAX_CHARS = 50_000; // 서버 PG_MAX_TEXT_CHARS 기본값
   const MAX_CHUNKS = 6; // 한 파일에서 최대 30만 자까지 검사
+  const MAX_SHOWN = 30; // 확인 창에 보여 줄 민감 위치 수
+  const CONTEXT = 28; // 민감 값 앞뒤로 보여 줄 글자 수
   let reentry = false;
   let settings = { enabled: true, blockUnscannableFiles: false };
 
   const isText = (f) => (f.type.startsWith("text/") || TEXT_EXT.test(f.name)) && f.size <= MAX_BYTES;
   const isMedia = (f) => f.type.startsWith("audio/") || f.type.startsWith("video/") || MEDIA_EXT.test(f.name);
 
-  // 서버 한도에 맞게 줄바꿈·공백 근처에서 나눈다.
+  // 서버 한도에 맞게 줄바꿈·공백 근처에서 나눈다. 각 조각이 전체 글자에서 시작하는 위치도 함께 돌려준다.
   function chunk(text) {
     const parts = [];
     let i = 0;
@@ -28,7 +32,7 @@ PG.files = (() => {
         const cut = Math.max(text.lastIndexOf("\n", end), text.lastIndexOf(" ", end));
         if (cut > i + MAX_CHARS - 2000) end = cut + 1;
       }
-      parts.push(text.slice(i, end));
+      parts.push({ text: text.slice(i, end), start: i });
       i = end;
     }
     return { parts, truncated: i < text.length };
@@ -41,67 +45,96 @@ PG.files = (() => {
     return res?.ok ? res.data : null;
   }
 
-  // 반환: { state: "ok" | "blocked" | "failed", types?, truncated? }
+  // 반환: { state: "ok" | "failed", hits: [{ type, action, start, end }], truncated }
+  // hits 는 전체 글자 기준 위치. 모든 조각을 끝까지 검사해서 민감한 곳을 빠짐없이 센다.
   async function inspectAll(name, text) {
     const { parts, truncated } = chunk(text);
+    const hits = [];
     for (let i = 0; i < parts.length; i++) {
-      const result = await inspectPart(`${name}#${i + 1}`, parts[i]);
-      if (!result || result.status !== "complete") return { state: "failed" };
-      if (result.decision === "block" || result.findings.some((x) => x.action === "mask")) {
-        const types = [...new Set(result.findings.filter((x) => x.action !== "allow")
-          .map((x) => PG.TYPE_LABELS[x.type] || x.type))];
-        return { state: "blocked", types };
+      const result = await inspectPart(`${name}#${i + 1}`, parts[i].text);
+      if (!result || result.status !== "complete") return { state: "failed", hits: [], truncated };
+      for (const f of result.findings) {
+        if (f.action !== "mask" && f.action !== "block") continue;
+        hits.push({ type: f.type, action: f.action,
+                    start: parts[i].start + f.span.start_utf16, end: parts[i].start + f.span.end_utf16 });
       }
     }
-    return { state: "ok", truncated };
+    return { state: "ok", hits, truncated };
   }
 
-  // 모두 통과하면 true. 하나라도 막히면 false.
-  async function vet(files) {
-    const done = []; // 실제로 내용을 검사해 통과한 파일 설명
-    let warned = false;
+  const lineOf = (text, pos) => {
+    let n = 1;
+    for (let i = text.indexOf("\n"); i !== -1 && i < pos; i = text.indexOf("\n", i + 1)) n++;
+    return n;
+  };
 
-    // 내용을 분석할 수 없는 파일: 설정에 따라 막거나 경고만 한다.
-    const unscannable = (f, reason) => {
+  // starts: PDF 쪽 시작 위치 배열. pos 가 속한 쪽 번호(1부터)
+  const pageOf = (starts, pos) => {
+    let page = 1;
+    for (let i = 0; i < starts.length; i++) if (starts[i] <= pos) page = i + 1;
+    return page;
+  };
+
+  // 민감 값 앞뒤 글자를 잘라 "…앞글자 [값] 뒷글자…" 로 보여 준다.
+  function excerpt(text, start, end) {
+    const flat = (t) => t.replace(/\s+/g, " ");
+    const value = flat(text.slice(start, Math.min(end, start + 80))) + (end - start > 80 ? "…" : "");
+    return {
+      before: (start > CONTEXT ? "…" : "") + flat(text.slice(Math.max(0, start - CONTEXT), start)),
+      value,
+      after: flat(text.slice(end, end + CONTEXT)) + (end + CONTEXT < text.length ? "…" : ""),
+    };
+  }
+
+  // 모든 파일을 검사해 "묻지 않고 통과 / 물어볼 것 / 막을 것"으로 나눈다.
+  // 반환: true 면 첨부 진행, false 면 첨부 안 함
+  async function vet(files) {
+    const asks = []; // 사용자에게 확인받을 파일들
+    const done = []; // 내용을 검사해 민감정보가 없던 파일
+    let partial = false;
+
+    // 읽을 수 없는 파일: 설정에 따라 바로 막거나 사용자에게 묻는다.
+    const unreadable = (f, reason) => {
       if (settings.blockUnscannableFiles) {
-        PG.hooks.notice(`${f.name}: ${reason} 첨부를 막았습니다.`, "warn");
+        PG.hooks.notice(`${f.name}: ${reason} 읽을 수 없는 파일이라 첨부를 막았습니다.`, "warn");
         PG.hooks.stat("blocked");
         return false;
       }
-      PG.hooks.notice(`${f.name}: ${reason} 민감한 내용이 없는지 직접 확인하세요.`, "warn");
-      warned = true;
+      asks.push({ name: f.name, kind: "unreadable", reason });
       return true;
     };
 
     for (const f of files) {
       let text = null;
       let label = "";
+      let starts = null; // PDF 일 때만
 
       if (PG.pdf.isPdf(f)) {
         let r;
         try {
           r = await PG.pdf.extractText(f);
         } catch {
-          if (!unscannable(f, "PDF 를 읽지 못했습니다.")) return false;
+          if (!unreadable(f, "PDF 를 읽지 못했습니다(암호가 걸렸거나 손상된 파일일 수 있습니다).")) return false;
           continue;
         }
         if (!r.text.trim()) {
-          if (!unscannable(f, "글자 정보가 없는 PDF(스캔본)라 내용을 분석할 수 없습니다.")) return false;
+          if (!unreadable(f, "글자 정보가 없는 PDF(스캔본)입니다.")) return false;
           continue;
         }
         text = r.text;
+        starts = r.starts;
         label = `PDF ${r.pages}쪽${r.truncated ? " 중 앞부분" : ""}`;
       } else if (isText(f)) {
         text = await f.text();
         label = "텍스트";
       } else if (isMedia(f)) {
-        if (!unscannable(f, "음성·영상 파일은 이 브라우저만으로는 내용을 분석할 수 없습니다(음성 인식 서버가 필요합니다).")) return false;
+        if (!unreadable(f, "음성·영상 파일은 내용을 분석할 수 없습니다(음성 인식 서버가 필요합니다).")) return false;
         continue;
       } else if (f.type.startsWith("image/")) {
-        if (!unscannable(f, "이미지는 글자를 읽을 수 없어 내용을 분석할 수 없습니다(글자 인식 서버가 필요합니다).")) return false;
+        if (!unreadable(f, "이미지는 글자를 읽을 수 없습니다(글자 인식 서버가 필요합니다).")) return false;
         continue;
       } else {
-        if (!unscannable(f, "이 형식은 내용을 분석할 수 없습니다.")) return false;
+        if (!unreadable(f, f.size > MAX_BYTES ? "파일이 너무 커서 분석하지 못했습니다." : "이 형식은 내용을 분석할 수 없습니다.")) return false;
         continue;
       }
 
@@ -110,20 +143,37 @@ PG.files = (() => {
         PG.hooks.notice(`${f.name}: 검사를 완료하지 못해 첨부를 막았습니다. 서버 연결을 확인하세요.`, "warn");
         return false;
       }
-      if (r.state === "blocked") {
-        PG.hooks.notice(`${f.name}: 민감정보(${r.types.join(", ")})가 있어 첨부를 막았습니다.`, "warn");
-        PG.hooks.stat("blocked");
-        return false;
-      }
-      if (r.truncated) {
-        PG.hooks.notice(`${f.name}: 내용이 너무 길어 앞쪽 ${(MAX_CHARS * MAX_CHUNKS).toLocaleString()}자까지만 검사했습니다.`, "warn");
-        warned = true;
+      if (r.truncated) partial = true;
+      if (r.hits.length) {
+        const items = r.hits.slice(0, MAX_SHOWN).map((h) => ({
+          where: starts ? `${pageOf(starts, h.start)}쪽` : `${lineOf(text, h.start)}줄`,
+          label: PG.TYPE_LABELS[h.type] || h.type,
+          action: h.action,
+          ...excerpt(text, h.start, h.end),
+        }));
+        asks.push({ name: f.name, kind: "sensitive", total: r.hits.length, items });
       } else {
         done.push(`${f.name}(${label})`);
       }
     }
-    // 경고가 없을 때만 "검사했다"고 알려 준다(검사가 됐는지 사용자가 알 수 있게).
-    if (!warned && done.length) PG.hooks.notice(`검사 완료, 민감정보 없음: ${done.join(", ")}`, "info");
+
+    if (asks.length) {
+      const proceed = await PG.ui.reviewFiles(asks);
+      if (!proceed) {
+        PG.hooks.notice("첨부를 취소했습니다.", "info");
+        PG.hooks.stat("blocked");
+        return false;
+      }
+      if (asks.some((a) => a.kind === "sensitive")) PG.hooks.stat("forced");
+      PG.hooks.notice(`확인하고 진행했습니다: ${asks.map((a) => a.name).join(", ")}`, "warn");
+      return true;
+    }
+    if (partial) {
+      PG.hooks.notice(`내용이 너무 길어 앞쪽 ${(MAX_CHARS * MAX_CHUNKS).toLocaleString()}자까지만 검사했습니다.`, "warn");
+    } else if (done.length) {
+      // 검사가 실제로 됐다는 것을 사용자가 알 수 있게 알려 준다.
+      PG.hooks.notice(`검사 완료, 민감정보 없음: ${done.join(", ")}`, "info");
+    }
     return true;
   }
 

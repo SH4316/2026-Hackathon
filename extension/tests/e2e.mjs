@@ -233,23 +233,44 @@ await forceBtn.click();
 await page.waitForTimeout(1000);
 check("force send sends original once", (await logCount()) === n12 + 1 && (await lastLog()).includes("AKIA"));
 
-// 13. 파일 첨부: 비밀이 든 텍스트 파일은 막고, 평범한 파일·이미지는 통과
+// 13. 파일 첨부(텍스트): 민감정보가 있으면 위치를 보여 주고 '그래도 진행할지' 묻는다. 깨끗하면 묻지 않는다.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pg-files-"));
-const secret = path.join(tmp, "secret.env"); fs.writeFileSync(secret, "AWS_KEY=AKIAIOSFODNN7EXAMPLE\n");
+const secret = path.join(tmp, "secret.env"); fs.writeFileSync(secret, "DB_HOST=db.local\nAWS_KEY=AKIAIOSFODNN7EXAMPLE\n");
 const clean = path.join(tmp, "notes.txt"); fs.writeFileSync(clean, "회의록: API 문서 정리\n");
 const png = path.join(tmp, "pic.png"); fs.writeFileSync(png, Buffer.from("iVBORw0KGgo=", "base64"));
 const logsBefore = await logCount();
+const ackBox = page.locator(".ack input");
 await page.setInputFiles("#file", secret);
-await page.waitForFunction(() => /첨부를 막았습니다/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 8000 });
-check("secret text file blocked", (await logCount()) === logsBefore);
+await modal.waitFor({ timeout: 10000 });
+const fileModal = await modal.innerText();
+check("secret file: asks, shows file name, line and the sensitive value",
+  fileModal.includes("secret.env") && fileModal.includes("2줄") && fileModal.includes("AKIAIOSFODNN7EXAMPLE"), fileModal.replace(/\s+/g, " ").slice(0, 110));
+check("nothing is attached while asking", (await logCount()) === logsBefore);
+await page.screenshot({ path: `${OUT}/10-file-review.png` });
+await page.getByRole("button", { name: "첨부 취소" }).click();
+await page.waitForTimeout(600);
+check("cancel keeps the file out", (await logCount()) === logsBefore && !(await modal.isVisible()));
+await page.setInputFiles("#file", secret);
+await modal.waitFor({ timeout: 10000 });
+const goBtn = page.getByRole("button", { name: "그래도 진행" });
+check("proceed needs acknowledgement", await goBtn.isDisabled());
+await ackBox.check();
+await goBtn.click();
+await page.waitForTimeout(1200);
+check("proceed attaches the file", (await logCount()) === logsBefore + 1 && (await lastLog()).includes("secret.env"));
 await page.setInputFiles("#file", clean);
-await page.waitForTimeout(1200);
-check("clean text file attached", (await logCount()) === logsBefore + 1 && (await lastLog()).includes("notes.txt"));
+await page.waitForTimeout(1500);
+check("clean text file attached without asking", !(await modal.isVisible()) && (await logCount()) === logsBefore + 2 && (await lastLog()).includes("notes.txt"));
 await page.setInputFiles("#file", png);
+await modal.waitFor({ timeout: 10000 });
+const imgModal = await modal.innerText();
+check("unreadable image: says it is unreadable and unknown-safety, asks",
+  imgModal.includes("읽을 수 없는 파일") && imgModal.includes("안전한지 알 수 없습니다") && imgModal.includes("pic.png"), imgModal.replace(/\s+/g, " ").slice(0, 100));
+check("unreadable file needs no acknowledgement", !(await goBtn.isDisabled()));
+await page.screenshot({ path: `${OUT}/10b-file-unreadable.png` });
+await goBtn.click();
 await page.waitForTimeout(1200);
-const note = await badge.locator(".wnotice").textContent();
-check("image warned but attached", note.includes("분석할 수 없습니다") && (await logCount()) === logsBefore + 2, note.slice(0, 40));
-await page.screenshot({ path: `${OUT}/10-file-notice.png` });
+check("unreadable image attached after confirming", (await logCount()) === logsBefore + 3);
 
 // 14. 붙여넣기를 직접 처리하는 편집기(input 이벤트 없음): 다른 입력이 없어도 신호등이 갱신된다
 await page.click("#cq");
@@ -265,18 +286,23 @@ await page.screenshot({ path: `${OUT}/11-paste-updated.png` });
 await page.locator("#cq").evaluate((el) => { el.textContent = ""; });
 await page.waitForTimeout(500);
 
-// 15. PDF: 글자를 뽑아 검사한다. 비밀이 있으면 막고, 깨끗하면 통과, 글자 없는 스캔본은 경고
-function makePdf(lines) {
-  const body = lines.length
-    ? `BT /F1 12 Tf 14 TL 72 720 Td ${lines.map((l) => `(${l}) Tj T*`).join(" ")} ET`
-    : "0.8 g 100 100 200 200 re f";
-  const objs = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
-    `<< /Length ${body.length} >>\nstream\n${body}\nendstream`,
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-  ];
+// 15. PDF: 글자를 뽑아 검사한다. 민감한 쪽을 알려 주고 묻는다, 깨끗하면 통과, 글자 없는 스캔본·음성은 '읽을 수 없는 파일' 질문
+function makePdf(pages) {
+  // pages: 쪽마다 줄 배열. 빈 배열이면 글자 없는(스캔본 같은) 쪽
+  const objs = ["<< /Type /Catalog /Pages 2 0 R >>", ""];
+  const font = 3;
+  objs.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const kids = [];
+  pages.forEach((lines, i) => {
+    const pid = 4 + i * 2, cid = 5 + i * 2;
+    const body = lines.length
+      ? `BT /F1 12 Tf 14 TL 72 720 Td ${lines.map((l) => `(${l}) Tj T*`).join(" ")} ET`
+      : "0.8 g 100 100 200 200 re f";
+    kids.push(`${pid} 0 R`);
+    objs[pid - 1] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${cid} 0 R /Resources << /Font << /F1 ${font} 0 R >> >> >>`;
+    objs[cid - 1] = `<< /Length ${body.length} >>\nstream\n${body}\nendstream`;
+  });
+  objs[1] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${pages.length} >>`;
   let out = "%PDF-1.4\n";
   const offs = [];
   objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
@@ -285,28 +311,52 @@ function makePdf(lines) {
   out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
   return Buffer.from(out, "latin1");
 }
-const secretPdf = path.join(tmp, "report.pdf"); fs.writeFileSync(secretPdf, makePdf(["Deploy notes", "aws_access_key_id = AKIAIOSFODNN7EXAMPLE"]));
-const cleanPdf = path.join(tmp, "minutes.pdf"); fs.writeFileSync(cleanPdf, makePdf(["Weekly meeting minutes", "Goal: finish API documentation"]));
-const scanPdf = path.join(tmp, "scan.pdf"); fs.writeFileSync(scanPdf, makePdf([]));
+const secretPdf = path.join(tmp, "report.pdf");
+fs.writeFileSync(secretPdf, makePdf([["Weekly report", "Everything is fine"], ["Deploy notes", "aws_access_key_id = AKIAIOSFODNN7EXAMPLE"]]));
+const cleanPdf = path.join(tmp, "minutes.pdf"); fs.writeFileSync(cleanPdf, makePdf([["Weekly meeting minutes", "Goal: finish API documentation"]]));
+const scanPdf = path.join(tmp, "scan.pdf"); fs.writeFileSync(scanPdf, makePdf([[]]));
 const mp3 = path.join(tmp, "voice.mp3"); fs.writeFileSync(mp3, Buffer.from("SUQzBAAAAAAA", "base64"));
 const base15 = await logCount();
+
 await page.setInputFiles("#file", secretPdf);
-await page.waitForFunction(() => /첨부를 막았습니다/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 15000 }).catch(() => {});
-const pdfNote = await badge.locator(".wnotice").textContent().catch(() => "");
-check("PDF with a secret is blocked", pdfNote.includes("report.pdf") && pdfNote.includes("첨부를 막았습니다") && (await logCount()) === base15, pdfNote.slice(0, 70));
+await modal.waitFor({ timeout: 20000 });
+const pdfModal = await modal.innerText();
+check("PDF with a secret: shows the page number and the sensitive value",
+  pdfModal.includes("report.pdf") && pdfModal.includes("2쪽") && !pdfModal.includes("1쪽") && pdfModal.includes("AKIAIOSFODNN7EXAMPLE"), pdfModal.replace(/\s+/g, " ").slice(0, 110));
+check("PDF is not attached while asking", (await logCount()) === base15);
+await page.screenshot({ path: `${OUT}/12-pdf-review.png` });
+await page.getByRole("button", { name: "첨부 취소" }).click();
+await page.waitForTimeout(600);
+check("PDF cancel keeps it out", (await logCount()) === base15);
+
 await page.setInputFiles("#file", cleanPdf);
-await page.waitForFunction(() => /검사 완료/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 15000 }).catch(() => {});
+await page.waitForFunction(() => /검사 완료/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 20000 }).catch(() => {});
 const okNote = await badge.locator(".wnotice").textContent().catch(() => "");
-check("clean PDF is analyzed and attached", okNote.includes("검사 완료") && okNote.includes("PDF") && (await logCount()) === base15 + 1, okNote.slice(0, 70));
-await page.screenshot({ path: `${OUT}/12-pdf-analyzed.png` });
+check("clean PDF: analyzed, attached without asking", okNote.includes("PDF") && !(await modal.isVisible()) && (await logCount()) === base15 + 1, okNote.slice(0, 70));
+
 await page.setInputFiles("#file", scanPdf);
-await page.waitForFunction(() => /스캔본/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 15000 }).catch(() => {});
-const scanNote = await badge.locator(".wnotice").textContent().catch(() => "");
-check("scanned PDF warned (no text layer)", scanNote.includes("스캔본") && (await logCount()) === base15 + 2, scanNote.slice(0, 70));
+await modal.waitFor({ timeout: 20000 });
+const scanModal = await modal.innerText();
+check("scanned PDF: unreadable question", scanModal.includes("스캔본") && scanModal.includes("안전한지 알 수 없습니다") && scanModal.includes("그래도 진행"), scanModal.replace(/\s+/g, " ").slice(0, 100));
+await page.getByRole("button", { name: "그래도 진행" }).click();
+await page.waitForTimeout(1200);
+check("scanned PDF attached after confirming", (await logCount()) === base15 + 2);
+
 await page.setInputFiles("#file", mp3);
-await page.waitForFunction(() => /음성/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 8000 }).catch(() => {});
-const mediaNote = await badge.locator(".wnotice").textContent().catch(() => "");
-check("audio file: clear message, attached", mediaNote.includes("음성") && mediaNote.includes("음성 인식") && (await logCount()) === base15 + 3, mediaNote.slice(0, 70));
+await modal.waitFor({ timeout: 10000 });
+const mp3Modal = await modal.innerText();
+check("audio file: says it cannot be read, asks", mp3Modal.includes("음성") && mp3Modal.includes("읽을 수 없는 파일") && mp3Modal.includes("안전한지 알 수 없습니다"), mp3Modal.replace(/\s+/g, " ").slice(0, 100));
+await page.keyboard.press("Escape");
+await page.waitForTimeout(800);
+check("closing the question (Esc) means cancel", !(await modal.isVisible()) && (await logCount()) === base15 + 2);
+
+// 옵션을 켜면 읽을 수 없는 파일은 묻지 않고 바로 막는다
+await sw0.evaluate(() => chrome.storage.local.set({ blockUnscannableFiles: true }));
+await page.waitForTimeout(400);
+await page.setInputFiles("#file", mp3);
+await page.waitForFunction(() => /막았습니다/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .wnotice")?.textContent || ""), null, { timeout: 8000 }).catch(() => {});
+check("block-unreadable option: blocked without asking", !(await modal.isVisible()) && (await logCount()) === base15 + 2);
+await sw0.evaluate(() => chrome.storage.local.set({ blockUnscannableFiles: false }));
 
 // 팝업 확인은 서버가 꺼진 상태를 기준으로 하므로 다시 닫힌 포트로 돌려 둔다
 await sw0.evaluate(() => chrome.storage.local.set({ serverUrl: "http://127.0.0.1:9" }));
