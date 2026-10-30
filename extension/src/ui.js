@@ -146,6 +146,14 @@ button.danger { color: var(--red); border-color: var(--red); }
 button:disabled { opacity: .45; cursor: not-allowed; }
 button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .loading { padding: 28px 20px; text-align: center; color: var(--muted); }
+.fileblock { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; }
+.fileblock h4 { margin: 0; font-size: 14px; word-break: break-all; }
+.fileblock .why { margin: 0; font-size: 13px; color: var(--muted); }
+ul.hits { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 240px; overflow: auto; }
+ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline; padding: 6px 8px; background: var(--soft); border-radius: 8px; }
+.where { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.hitname { font-weight: 600; }
+.snippet { grid-column: 1 / -1; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
 .diag {
   position: fixed; top: 12px; right: 12px; z-index: 2147483646; width: 340px;
   background: var(--bg); color: var(--fg); border: 2px dashed #f2a600; border-radius: 10px;
@@ -302,9 +310,13 @@ button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   function hideWidget() { if (W) W.root.hidden = true; }
 
   // ── 모달 공통 ──
-  function openModal(card) {
+  // onClose: 사용자가 Esc 등으로 창을 닫았을 때(결정 없이) 한 번 불린다. 결정을 기다리는 창에서 쓴다.
+  let closeCb = null;
+
+  function openModal(card, onClose) {
     ensureRoot();
     closeModal();
+    closeCb = onClose || null;
     lastFocus = document.activeElement;
     overlayEl = h("div", { class: "overlay", role: "dialog", "aria-modal": "true" }, card);
     overlayEl.addEventListener("keydown", (e) => {
@@ -316,8 +328,11 @@ button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   }
 
   function closeModal() {
+    const cb = closeCb;
+    closeCb = null;
     overlayEl?.remove();
     overlayEl = null;
+    cb?.();
     if (lastFocus?.isConnected) lastFocus.focus();
     lastFocus = null;
   }
@@ -534,6 +549,64 @@ button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         confirmBtn)));
   }
 
-  PG.ui = { setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showSanitized, showForce,
+  // ── 첨부 파일 확인 ──
+  // files: [{ name, kind: "sensitive" | "unreadable", reason?, total?, items?: [{ where, label, action, before, value, after }] }]
+  // 반환: Promise<boolean> — true 면 그래도 진행, false 면 첨부 취소(Esc 포함)
+  function reviewFiles(files) {
+    return new Promise((resolve) => {
+      let decided = false;
+      const decide = (v) => {
+        if (decided) return;
+        decided = true;
+        closeCb = null;
+        closeModal();
+        resolve(v);
+      };
+      const hasSensitive = files.some((f) => f.kind === "sensitive");
+      const unreadable = files.filter((f) => f.kind === "unreadable");
+
+      const blocks = files.map((f) => {
+        if (f.kind === "unreadable") {
+          return h("div", { class: "fileblock" },
+            h("h4", null, f.name),
+            h("p", { class: "why" }, f.reason),
+            h("p", { class: "why" }, "읽을 수 없는 파일이라 안전한지 알 수 없습니다."));
+        }
+        const hits = f.items.map((it) => h("li", null,
+          h("span", { class: "where" }, it.where),
+          h("span", { class: "hitname" }, it.label),
+          h("span", { class: "snippet" }, it.before, h("mark", { dataset: { action: it.action } }, it.value), it.after)));
+        return h("div", { class: "fileblock" },
+          h("h4", null, f.name),
+          h("p", { class: "why" }, `민감정보 ${f.total}건이 있습니다.${f.total > f.items.length ? ` (앞쪽 ${f.items.length}건만 표시)` : ""}`),
+          h("ul", { class: "hits" }, hits));
+      });
+
+      const proceed = h("button", { class: "danger", disabled: hasSensitive, onclick: () => decide(true) }, "그래도 진행");
+      const ack = hasSensitive
+        ? h("label", { class: "ack" },
+            h("input", { type: "checkbox", onchange: (e) => { proceed.disabled = !e.target.checked; } }),
+            "민감정보가 든 파일이 외부 AI 서비스에 업로드되는 것을 이해했고, 그래도 진행하겠습니다.")
+        : null;
+
+      const title = hasSensitive ? "첨부하려는 파일에 민감정보가 있습니다" : "읽을 수 없는 파일이지만, 그래도 진행할까요?";
+      const sub = hasSensitive
+        ? "아래 위치를 확인하고, 그래도 올릴지 선택하세요."
+        : "내용을 분석할 수 없어 안전한지 알 수 없습니다.";
+      const card = h("div", { class: "card" },
+        header(hasSensitive ? "red" : "gray", hasSensitive ? "✕" : "!", title, sub),
+        h("div", { class: "body" }, blocks,
+          hasSensitive && unreadable.length
+            ? h("div", { class: "notice" }, h("p", null, "읽을 수 없는 파일은 안전한지 알 수 없습니다.")) : null,
+          ack),
+        h("div", { class: "foot" },
+          h("p", { class: "fine" }, "취소하면 이 파일은 첨부되지 않습니다. " + FINE),
+          h("button", { class: "primary", onclick: () => decide(false) }, "첨부 취소"),
+          proceed));
+      openModal(card, () => decide(false));
+    });
+  }
+
+  PG.ui = { reviewFiles, setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showSanitized, showForce,
             showLoading, closeModal, setDiag, hideDiag, toast, isOpen: () => !!overlayEl };
 })();

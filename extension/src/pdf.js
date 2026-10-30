@@ -22,7 +22,7 @@ PG.pdf = (() => {
 
   const isPdf = (f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name);
 
-  // 반환: { text, pages, truncated } — 읽지 못하면 throw
+  // 반환: { text, pages, truncated, starts } — 읽지 못하면 throw
   async function extractText(file) {
     if (file.size > MAX_BYTES) throw new Error("too_large");
     const pdfjs = await load();
@@ -42,7 +42,11 @@ PG.pdf = (() => {
         parts.push(content.items.map((it) => it.str + (it.hasEOL ? "\n" : "")).join(""));
         page.cleanup();
       }
-      return { text: parts.join("\n\n"), pages: doc.numPages, truncated: doc.numPages > MAX_PAGES };
+      // 쪽 사이는 빈 줄로 잇는다. starts[i] 는 i+1 쪽이 합친 글자에서 시작하는 위치(민감 위치 → 쪽 번호 계산용).
+      const starts = [];
+      let at = 0;
+      for (const part of parts) { starts.push(at); at += part.length + 2; }
+      return { text: parts.join("\n\n"), pages: doc.numPages, truncated: doc.numPages > MAX_PAGES, starts };
     } finally {
       await doc.destroy();
     }
