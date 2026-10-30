@@ -7,6 +7,7 @@ CASES = [
     ("연락처 010-1234-5678", "phone"),
     ("메일 hong.gildong@example.com 로", "email"),
     ("주민번호 900101-1234567", "rrn"),
+    ("주민번호 900101 1234567", "rrn"),  # 공백 구분자(과거 검증기 예외로 500)
     ("카드 4111 1111 1111 1111", "credit_card"),
     ("key AKIAIOSFODNN7EXAMPLE", "aws_access_key_id"),
     ("ghp_" + "a" * 36, "github_token"),

@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 
 from app.audit.events import AuditEvent, AuditStore, count
 from app.config import ModelMode, Settings
@@ -41,12 +43,14 @@ def utf16_index(text: str, idx: int) -> int:
 
 class Pipeline:
     def __init__(self, settings: Settings, policy: Policy, audit: AuditStore,
-                 rules: RuleDetector | None = None, model: OllamaDetector | None = None) -> None:
+                 rules: RuleDetector | None = None, model: OllamaDetector | None = None,
+                 today: Callable[[], date] = date.today) -> None:
         self.settings = settings
         self.policy = policy
         self.audit = audit
         self.rules = rules or RuleDetector()
         self.model = model
+        self.today = today  # 목적지 근거 만료 판단용(테스트·골든 벡터에서 고정)
 
     @property
     def detector_versions(self) -> dict[str, str]:
@@ -57,7 +61,8 @@ class Pipeline:
 
     def resolve_destination(self, req: InspectRequest) -> tuple[Destination, list[str]]:
         d = req.context.destination
-        return self.policy.destinations.resolve(d.provider if d else None, d.channel if d else None)
+        return self.policy.destinations.resolve(d.provider if d else None, d.channel if d else None,
+                                                today=self.today())
 
     async def analyze(self, text: str, tier: Tier) -> Analysis:
         candidates: list[Candidate] = self.rules.detect(text)
