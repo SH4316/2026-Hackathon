@@ -33,7 +33,7 @@ function mount() {
 it("saves shared organization settings and policy mapping through the dashboard API", async () => {
   mount();
   await screen.findAllByRole("option", { name: "검토 (review)" });
-  expect(screen.getByRole("radio", { name: /원문 검사한 원문/ }).matches(":checked")).toBe(true);
+  expect(screen.getByRole("radio", { name: /검사한 원문과/ }).matches(":checked")).toBe(true);
   fireEvent.change(screen.getByRole("combobox", { name: "warn 정책 상태" }), { target: { value: "review" } });
   fireEvent.click(screen.getByRole("checkbox", { name: /Jev 판정 사용/ }));
   fireEvent.click(screen.getByRole("button", { name: "설정 저장" }));

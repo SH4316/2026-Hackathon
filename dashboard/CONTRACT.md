@@ -65,7 +65,7 @@ The detector adapter adds endpoints alongside the existing public API; `/events`
 | `service` | no | Existing service normalization; otherwise `result.destination.provider`. |
 | `model` | no | Explicit destination LLM model name; otherwise null. Detector model versions do not identify it. |
 | `policy_state_id` | no | `version_id`에 있는 정책 상태 ID. 검사 서버는 `policy_state_map`의 명시적 매핑만 사용하고 활성 버전에 없는 ID는 생략. 대시보드는 `decision`으로 추론하지 않음. |
-| `send_action` | no | `normal`·`confirmed`·`forced` 또는 null. V9 nullable 열에 저장하며 전송 전 선택을 나타냄. |
+| `send_action` | no | `normal`·`confirmed`·`forced` 또는 null. V11 nullable 열에 저장하며 전송 전 선택을 나타냄. |
 | `tag_map` | no | Object mapping detector `finding.type` to an existing tag ID in `version_id`. |
 | `files` | no | At most 100 `{name}` entries; filename metadata only. |
 | `images` | no | At most 20 `{name,media_type,data_base64}` entries; `image/*` MIME type, canonical padded standard Base64 without whitespace or a data URI prefix. |
@@ -96,7 +96,7 @@ POST returns the same shape as `GET /api/v1/detector-events/{id}`:
 
 Invalid spans, Base64 or names return400 `INVALID_INPUT`; malformed JSON, unknown fields and invalid enum values return400 `INVALID_JSON`. Explicit unknown tag mappings return422 `TAG_NOT_IN_VERSION`, stale active versions return409 `VERSION_MISMATCH`, and changed replay metadata/files/image bytes return409 `EVENT_CONFLICT`. Existing safe error envelopes remain `{code,message,fieldErrors?}`.
 
-이 기록은 검사 판정과 전송 전 선택을 나타냅니다. `send_action`은 외부 AI 수신 성공이나 클라이언트 최종 차단의 증거가 아닙니다. V9는 `security_events.send_action VARCHAR(16) NULL`을 추가하며 과거 이벤트는 null로 보존합니다. 이벤트 목록·상세·저장 검색의 `Event`는 `sendAction`·`fileCount`·`imageCount`를 반환합니다. 일반 이벤트의 첨부 수는 0이며 `forced`는 화면에서 "강행 전송" 배지로 표시합니다. 상세는 기존 detector 상세·이미지 API로 파일 이름과 미리보기·다운로드를 제공합니다. 다운로드가 `application/octet-stream`이므로 프런트엔드는 blob과 저장된 `media_type`으로 미리보기를 만듭니다. Confidence describes detection certainty; severity describes risk; action and decision are policy outcomes. Keep these values separate.
+이 기록은 검사 판정과 전송 전 선택을 나타냅니다. `send_action`은 외부 AI 수신 성공이나 클라이언트 최종 차단의 증거가 아닙니다. V11는 `security_events.send_action VARCHAR(16) NULL`을 추가하며 과거 이벤트는 null로 보존합니다. 이벤트 목록·상세·저장 검색의 `Event`는 `sendAction`·`fileCount`·`imageCount`를 반환합니다. 일반 이벤트의 첨부 수는 0이며 `forced`는 화면에서 "강행 전송" 배지로 표시합니다. 상세는 기존 detector 상세·이미지 API로 파일 이름과 미리보기·다운로드를 제공합니다. 다운로드가 `application/octet-stream`이므로 프런트엔드는 blob과 저장된 `media_type`으로 미리보기를 만듭니다. Confidence describes detection certainty; severity describes risk; action and decision are policy outcomes. Keep these values separate.
 
 ## 검사 서버 관리 프록시
 
@@ -159,4 +159,4 @@ API models live in `person.model`, `configuration.model`, `event.model`, `detect
 
 `DashboardQueryService` resolves the interpretation version, checks tag membership, assembles events with detections, merges policy counts with the configured policy list and calculates time buckets. `DashboardRepository` owns the corresponding SQL, JDBC reads and aggregates. `SavedSearchService` controls snapshot creation in one transaction: `SavedSearchRepository` stores frozen filters and counts, while `DashboardQueryService.captureSnapshotMembers` requires that caller transaction and delegates complete matching-event membership insertion to `DashboardRepository`. Query SQL fragments stay inside the query feature.
 
-`InputValidation` centralizes the shared ID pattern and Unicode, text, time and service checks. `JdbcRows` owns shared JDBC row/time conversion. Unit tests live with feature internals; HTTP and migration integration tests remain in the root test package for Spring Boot discovery. The feature packages retain the controller/service/repository boundaries above. Existing V1..V6 migration files remain immutable; V7 adds the Jev configuration model, V8 adds enabled flags defaulting existing records to true, and V9 adds nullable event `send_action`. 검사 서버·확장프로그램·ai-proxy와 현재 수집·관리 계약으로 연동합니다.
+`InputValidation` centralizes the shared ID pattern and Unicode, text, time and service checks. `JdbcRows` owns shared JDBC row/time conversion. Unit tests live with feature internals; HTTP and migration integration tests remain in the root test package for Spring Boot discovery. The feature packages retain the controller/service/repository boundaries above. Existing V1..V6 migration files remain immutable; V7 adds the Jev configuration model, V8 adds enabled flags defaulting existing records to true, V9 and V10 add connector, settings and enrollment storage, V11 adds nullable event `send_action`, and V12 adds the policy state map. 검사 서버·확장프로그램·ai-proxy와 현재 수집·관리 계약으로 연동합니다.

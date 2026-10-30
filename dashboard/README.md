@@ -75,7 +75,7 @@ docker compose -f compose-dev.yml up --build --force-recreate -d --wait backend
 docker compose -f compose-dev.yml logs --tail=100 backend
 ```
 
-로그에서 `Successfully validated 9 migrations`와 V2·V3·V4·V5·V6·V7·V8·V9 적용 또는 현재 스키마 버전 `9`를 확인합니다. V3는 탐지 결과 메타데이터·파일 이름·이미지 원본 바이트를 보관하는 테이블을 추가하고 기존 데이터를 보존합니다. V4는 태그별 Jev 판단 프롬프트, V5는 Python 정규식 저장 필드를 추가하며 기존 태그의 값은 각각 빈 문자열입니다. V6는 감지 태그에 수집 시점의 이름·색을 보관하고, 기존 감지에는 해당 수집 버전의 이름·색을 채워 이력을 유지합니다. V7은 기존 태그의 비어 있지 않은 Jev 프롬프트를 독립 설정으로 옮기고 태그 임계값을 `null`로 초기화하며, 태그·이벤트·정책을 보존합니다. V8은 태그와 독립 Jev 판단에 `enabled`를 추가하고 기존 값을 모두 `true`로 보존하며 이벤트·저장 검색을 유지합니다. V9는 `security_events.send_action`을 nullable로 추가하고 기존 기록을 보존합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
+로그에서 `Successfully validated 12 migrations`와 V2~V12 적용 또는 현재 스키마 버전 `12`를 확인합니다. V3는 탐지 결과 메타데이터·파일 이름·이미지 원본 바이트를 보관하는 테이블을 추가하고 기존 데이터를 보존합니다. V4는 태그별 Jev 판단 프롬프트, V5는 Python 정규식 저장 필드를 추가하며 기존 태그의 값은 각각 빈 문자열입니다. V6는 감지 태그에 수집 시점의 이름·색을 보관하고, 기존 감지에는 해당 수집 버전의 이름·색을 채워 이력을 유지합니다. V7은 기존 태그의 비어 있지 않은 Jev 프롬프트를 독립 설정으로 옮기고 태그 임계값을 `null`로 초기화하며, 태그·이벤트·정책을 보존합니다. V8은 태그와 독립 Jev 판단에 `enabled`를 추가하고 기존 값을 모두 `true`로 보존하며 이벤트·저장 검색을 유지합니다. V9·V10은 연결·설정·등록 코드 저장소를 추가하고, V11은 `security_events.send_action`을 nullable로 추가해 기존 기록을 보존하며, V12는 정책 상태 매핑을 추가합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
 
 SQL은 게시 버전 `demo-v1`, `demo-v2`, 14개 원본 분류와 개인정보 하위 태그, 사용자 정의 정책 3종, 이름에 `데모`가 붙은 가상 사람 6명, 서울 기준 최근 완료된 30일의 이벤트를 만듭니다. V2는 같은 태그 ID를 기술정보·업무정보 묶음으로 재구성합니다. 각 분류의 하위 예시와 판단 지침을 포함하며 초안으로 복제한 뒤 모두 편집할 수 있습니다. 프롬프트는 합성 자료로 표시되고 이름·전화번호·이메일도 가상 값입니다. 시간대·날짜별 이벤트 수, 서비스, 정책, 감지 0건, 여러 태그를 가진 동일 구간과 같은 텍스트의 서로 다른 구간을 포함합니다.
 
@@ -195,7 +195,7 @@ V7은 기존 태그의 비어 있지 않은 `jev_prompt`를 원문 그대로 독
 
 `POST /api/v1/detector-events`는 검사 서버가 호출하는 수집 엔드포인트입니다. `result`에는 검사 응답에서 클라이언트 전용 `report_status`를 제외한 JSON을 넣고, `text`에는 조직의 `report_text` 설정에 따라 원문(기본 `full`) 또는 치환문을 전달합니다. 현재 [서버 스키마](../server/app/schemas.py)와 [서버 API 계약](../server/docs/api-contract.md)을 기준으로 하며 대시보드는 알 수 없는 `result` 필드를 거부합니다.
 
-필수 봉투 필드는 `source_id`, `person_id`, `version_id`, `text`, `result`입니다. 선택 필드 `send_action`은 `normal`·`confirmed`·`forced` 또는 null이며 V9의 nullable 열에 저장합니다. 목록·상세의 `Event`에는 `sendAction`·`fileCount`·`imageCount`를 반환하고 `forced`를 **강행 전송** 배지로 표시합니다. 상세에서는 파일 이름과 이미지 미리보기·다운로드를 제공합니다. 다운로드는 `application/octet-stream`이므로 프런트엔드는 저장된 `media_type`으로 blob을 만들어 미리보기합니다. 사람은 먼저 등록하고, `version_id`는 대시보드의 현재 활성 게시 버전을 사용합니다. 탐지기의 `policy_version`·`detector_versions.ruleset`과 대시보드 설정 버전은 별개입니다. 수집은 초기 태그·정책·사용자·버전을 자동 생성하지 않습니다.
+필수 봉투 필드는 `source_id`, `person_id`, `version_id`, `text`, `result`입니다. 선택 필드 `send_action`은 `normal`·`confirmed`·`forced` 또는 null이며 V11의 nullable 열에 저장합니다. 목록·상세의 `Event`에는 `sendAction`·`fileCount`·`imageCount`를 반환하고 `forced`를 **강행 전송** 배지로 표시합니다. 상세에서는 파일 이름과 이미지 미리보기·다운로드를 제공합니다. 다운로드는 `application/octet-stream`이므로 프런트엔드는 저장된 `media_type`으로 blob을 만들어 미리보기합니다. 사람은 먼저 등록하고, `version_id`는 대시보드의 현재 활성 게시 버전을 사용합니다. 탐지기의 `policy_version`·`detector_versions.ruleset`과 대시보드 설정 버전은 별개입니다. 수집은 초기 태그·정책·사용자·버전을 자동 생성하지 않습니다.
 
 `finding.type`과 같은 ID의 태그가 활성 버전에 있으면 연결합니다. 다른 ID를 쓰려면 `tag_map: {"email":"my_email_tag"}`처럼 지정합니다. 연결할 태그가 없는 탐지도 구간과 메타데이터를 보존하고 미매핑으로 집계합니다. 명시한 매핑 대상이 활성 버전에 없으면 `422`입니다. `policy_state_id`도 명시한 경우에만 정책 목록과 연결하며, `decision`으로 사용자 정책 상태를 추론하지 않습니다.
 
