@@ -64,6 +64,17 @@
     if (changes.testMode) setTestMode(!!changes.testMode.newValue);
   });
 
+  // A model/account/route change invalidates both text results and one-shot approvals.
+  PG.siteContext.read();
+  PG.siteContext.subscribe(() => {
+    settingsVersion++;
+    version++;
+    latest = null; localEntry = null; bypass = null; prepared = null;
+    PG.ui.closeModal();
+    if (editor?.isConnected) scheduleInspect(editor);
+    else refresh();
+  });
+
   // ── 입력창 ──
   const EDITOR_SEL = 'textarea, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]';
 
@@ -190,11 +201,15 @@
       } else lamp = "checking";
     }
 
+    const siteContext = PG.siteContext.current();
+    const contextWarning = siteContext?.uncertain;
+    if (contextWarning && lamp === "idle") lamp = "yellow";
     const sum = summary(result?.findings);
     let chip = "";
     if (lamp === "checking") chip = "검사 중…";
     else if (lamp === "red") chip = `Tier 1 차단${sum ? ` · ${sum}` : ""}`;
-    else if (lamp === "yellow") chip = `Tier 2 주의${sum ? ` · ${sum}` : ""}`;
+    else if (lamp === "yellow") chip = contextWarning && !sum && (!result?.ai_assessment || result.ai_assessment.decision === "allow")
+      ? "이용 환경 확인 필요" : `Tier 2 주의${sum ? ` · ${sum}` : ""}`;
     else if (lamp === "green") chip = prep ? "안전: 정제 완료 (Safe to Send)" : "Tier 3 안전 · 검사 통과";
     else if (lamp === "gray") chip = latest?.error ? "검사 불가 · 전송 보류" : "검사 미완료 · 전송 보류";
     if (provisional) chip += " (검사 확인 중)";
@@ -209,7 +224,8 @@
       && findings.some((f) => f.action === "mask" || f.action === "warn");
 
     PG.ui.renderWidget({
-      visible: hasText || !!notice,
+      visible: hasText || !!notice || !!contextWarning,
+      siteContext: PG.isTestHost() ? null : siteContext,
       lamp,
       chip,
       reason: lamp === "idle" ? "" : [destinationText(result?.destination),
@@ -234,7 +250,7 @@
   function localInspect(text) {
     if (!PG.local || text.length > MAX_LOCAL_CHARS) return null;
     try {
-      return { text, result: PG.local.inspect(text, { destination: PG.resolveDestination() }) };
+      return { text, result: PG.siteContext.apply(PG.local.inspect(text, { destination: PG.resolveDestination() })) };
     } catch {
       return null;
     }
@@ -242,11 +258,13 @@
 
   // stage: draft(입력 중) | submit(전송 직전). 조직 서버는 submit 만 대시보드에 기록한다.
   async function inspect(text, stage = "draft") {
+    const context = PG.siteContext.read();
     const v = ++version;
     const res = await chrome.runtime.sendMessage({
       type: "inspect", text, inputVersion: v, destination: PG.resolveDestination(), stage,
     }).catch(() => ({ ok: false, error: "network" }));
-    const entry = { version: v, text, result: res?.ok ? res.data : null, error: res?.ok ? null : res?.error };
+    PG.siteContext.read(); // Catch a page change even before the observer callback runs.
+    const entry = { version: v, text, result: res?.ok ? PG.siteContext.apply(res.data, context) : null, error: res?.ok ? null : res?.error };
     // 응답이 늦게 와서 더 새로운 요청이 있으면 버린다
     if (v !== version) return null;
     if (entry.result && String(entry.result.input_version) !== String(v)) return null;
@@ -309,7 +327,7 @@
 
   window.addEventListener("focusin", (e) => {
     const ed = editorFrom(e.target);
-    if (ed) trackEditor(ed);
+    if (ed) { trackEditor(ed); PG.siteContext.read(); refresh(); }
   }, true);
 
   // 붙여넣기·잘라내기·끌어놓기·조합 입력이 끝난 직후 편집기가 내용을 바꾸는 시점이 사이트마다 달라서 여러 번 확인한다.
@@ -335,6 +353,7 @@
   }
 
   function triggerSend(ed, text, approvedSettings = settingsVersion) {
+    PG.siteContext.read();
     if (approvedSettings !== settingsVersion) return;
     if (testMode) { dryRun(ed, "승인 후 전송"); return; }
     const wait = SETTLE_MS - (Date.now() - lastProgrammaticSet);
@@ -384,13 +403,15 @@
     try {
       const entry = latest && latest.text === text && latest.result ? latest : await inspect(text);
       if (!entry?.result) { setNotice(`정제하지 못했습니다. ${PG.errorLabel(entry?.error || "network")}`, "warn"); return; }
+      const context = PG.siteContext.read();
       const v = ++version;
       const res = await chrome.runtime.sendMessage({
         type: "sanitize", text, inputVersion: v, destination: PG.resolveDestination(),
       }).catch(() => ({ ok: false, error: "network" }));
       if (!res?.ok) { setNotice(`정제하지 못했습니다. ${PG.errorLabel(res?.error)}`, "warn"); return; }
+      PG.siteContext.read();
       if (getText(ed) !== text || version !== v) return; // 입력·검사 설정이 바뀐 정제 결과는 폐기
-      const result = res.data;
+      const result = PG.siteContext.apply(res.data, context);
       if (result.sanitized_text == null) { setNotice("정제하지 못했습니다.", "warn"); return; }
       const built = PG.restore.buildTokenMap(text, entry.result.findings, result.sanitized_text);
       prepared = { original: text, sanitized: result.sanitized_text, result, entries: built.entries, verified: built.verified };
@@ -435,6 +456,7 @@
     const text = getText(ed);
     const result = latest && latest.text === text ? latest.result : null;
     if (!result || result.status !== "complete") return;
+    if (result.decision === "warn") { openWarning(ed, latest); return; }
     const approvedSettings = settingsVersion;
     PG.ui.showForce({
       aiAssessment: result.ai_assessment,
@@ -460,6 +482,7 @@
 
   // 전송 허용 여부. true 면 원래 이벤트를 그대로 둔다.
   function gateSync(ed, text) {
+    PG.siteContext.read();
     if (!enabled || !text.trim()) return true;
     if (consumeBypass(text)) return true;
     const ok = !!latest && latest.text === text && passed(latest.result);
