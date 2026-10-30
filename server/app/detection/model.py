@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
-from collections.abc import Collection
+from collections.abc import Collection, Iterator
 from dataclasses import dataclass
 
 import httpx
@@ -46,6 +46,9 @@ _DECIDER_RULES = (
     "일반 지식·공개 정보와 탐지하지 않음 예시는 제외합니다."
 )
 DECIDER_CONTEXT_THRESHOLD = 0.5
+# Keep these wire limits aligned with decider/serve.py.
+_DECIDER_MAX_QUESTIONS = 256
+_DECIDER_MAX_BODY_BYTES = 262144
 
 
 def render_detectors(detectors: list[ContextDetector]) -> str:
@@ -154,16 +157,21 @@ class ContextModelDetector:
     async def _decide(self, text: str, questions: dict) -> dict[str, float]:
         if not self.model:
             raise ModelUnavailable("model name not configured")
-        payload = {"state": {"document": text}, "questions": questions, "independent": True}
+        batches = _decider_batches(text, questions)
+        scores = {}
         try:
-            async with self._sem, httpx.AsyncClient(timeout=self.timeout_s, headers=self._headers(),
-                                                   transport=self._transport) as client:
-                r = await client.post(self.base_url + "/v1/systemone", json=payload)
-                r.raise_for_status()
-                data = r.json()
+            async with httpx.AsyncClient(timeout=self.timeout_s, headers=self._headers(),
+                                         transport=self._transport) as client:
+                for body, expected in batches:
+                    async with self._sem:
+                        r = await client.post(self.base_url + "/v1/systemone", content=body,
+                                              headers={"Content-Type": "application/json"})
+                        r.raise_for_status()
+                        data = r.json()
+                    scores.update(parse_decider_output(data, expected))
         except (httpx.HTTPError, ValueError) as exc:
             raise ModelUnavailable(type(exc).__name__) from None
-        return parse_decider_output(data, questions)
+        return scores
 
     async def _chat(self, system: str, text: str) -> str:
         if not self.model:
@@ -194,6 +202,35 @@ class ContextModelDetector:
         if not isinstance(content, str):
             raise ModelUnavailable("invalid model output")
         return content
+
+
+def _decider_batches(text: str, questions: dict) -> Iterator[tuple[bytes, dict]]:
+    """Split independent questions, preserving the complete state in every request."""
+    def encode(value: dict) -> bytes:
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+
+    payload = {"state": {"document": text}, "questions": {}, "independent": True}
+    base_size = len(encode(payload))
+    batches = []
+    batch = {}
+    size = base_size
+    for tag, question in questions.items():
+        # Encode exactly as sent: include escaped keys/values, exclude only outer braces.
+        entry_size = len(encode({tag: question})) - 2
+        if base_size + entry_size > _DECIDER_MAX_BODY_BYTES:
+            raise ModelUnavailable("decider question exceeds request body limit")
+        if batch and (len(batch) >= _DECIDER_MAX_QUESTIONS
+                      or size + 1 + entry_size > _DECIDER_MAX_BODY_BYTES):
+            batches.append(batch)
+            batch = {}
+            size = base_size
+        size += entry_size + bool(batch)  # comma between question entries
+        batch[tag] = question
+    if batch:
+        batches.append(batch)
+    # Validate every single-question payload before sending, then encode one batch at a time.
+    for batch in batches:
+        yield encode({**payload, "questions": batch}), batch
 
 
 def parse_decider_output(data: object, expected: Collection[str]) -> dict[str, float]:

@@ -148,3 +148,127 @@ def test_existing_chat_adapters_keep_extracted_spans(api, path, body):
 
     [score] = asyncio.run(detector(handler, api=api).judge("새 연구", "기준", {"research": "연구"}))
     assert score.spans == ((2, 4),) and score.whole_input is False
+
+
+@pytest.fixture
+def runtime_detector(monkeypatch):
+    """실제 Decider HTTP 검증/본문 제한을 사용하고 추론 가중치만 대체한다."""
+    from pathlib import Path
+    from types import ModuleType, SimpleNamespace
+    import sys
+
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "decider"))
+    import serve
+
+    sdk = ModuleType("decider")
+    systemone = ModuleType("decider.systemone")
+    systemone.render_state = json.dumps
+    monkeypatch.setitem(sys.modules, "decider", sdk)
+    monkeypatch.setitem(sys.modules, "decider.systemone", systemone)
+    model = SimpleNamespace(m=SimpleNamespace(tok=SimpleNamespace(encode=lambda *a, **kw: [1])))
+    model.system_one = lambda state, questions, **kw: response({tag: 0.9 for tag in questions})
+    app = serve.create_app()
+    app.state.model = model
+    transport = httpx.ASGITransport(app=app)
+    calls = []
+
+    async def handler(request):
+        calls.append(request)
+        return await transport.handle_async_request(request)
+
+    return detector(handler), calls
+
+
+@pytest.mark.parametrize("count,expected_batches", [(256, 1), (257, 2), (1000, 4)])
+def test_judge_batches_question_count_against_runtime(runtime_detector, count, expected_batches):
+    model, calls = runtime_detector
+    outputs = {f"tag_{i}": f"태그 {i}" for i in range(count)}
+    scores = asyncio.run(model.judge("전체 입력😀", "판정 기준", outputs))
+    assert len(calls) == expected_batches
+    assert [score.tag_id for score in scores] == list(outputs)
+    assert all(score.score == 0.9 and score.whole_input for score in scores)
+    assert all(len(json.loads(call.content)["questions"]) <= 256 for call in calls)
+    assert all(json.loads(call.content)["state"] == {"document": "전체 입력😀"} for call in calls)
+
+
+@pytest.mark.parametrize("text,prompt", [
+    ("입력 전체😀", "판" * 12000),
+    ('문서😀"\\\n\x00' * 3000, '기준😀"\\\n\x00' * 1500),
+], ids=["korean_12000", "json_escaping"])
+def test_judge_batches_actual_utf8_json_bytes_without_truncation(runtime_detector, text, prompt):
+    model, calls = runtime_detector
+    outputs = {f'tag_{i}😀"\\\n': f"태그 {i}" for i in range(8)}
+    scores = asyncio.run(model.judge(text, prompt, outputs))
+    assert len(calls) > 1
+    assert [score.tag_id for score in scores] == list(outputs)
+    seen = []
+    for call in calls:
+        assert len(call.content) <= 262144
+        assert call.headers["content-type"] == "application/json"
+        payload = json.loads(call.content)
+        assert payload["state"] == {"document": text}
+        assert payload["independent"] is True
+        for tag, question in payload["questions"].items():
+            seen.append(tag)
+            assert question["instructions"].startswith(prompt + "\n")
+            assert question["criteria"]["true"] == outputs[tag]
+    assert seen == list(outputs)
+
+
+def test_context_detection_also_batches_large_criteria(runtime_detector):
+    model, calls = runtime_detector
+    contexts = [ContextDetector(id=f"context_{i}", label="기준", token="CONTEXT", criteria="비공개 자료 검사",
+                                examples=["예" * 300] * 20, counter_examples=["아" * 300] * 20)
+                for i in range(5)]
+    hits = asyncio.run(model.detect("연구😀 결과", contexts))
+    assert len(calls) > 1
+    assert [hit.type for hit in hits] == [item.id for item in contexts]
+    assert all((hit.start, hit.end) == (0, len("연구😀 결과")) for hit in hits)
+
+
+@pytest.mark.parametrize("text,questions", [
+    ("\x00" * 50000, {"research": {"type": "noul"}}),
+    ("private document", {"small": {"type": "noul"}, "large": {"instructions": "private" * 50000}}),
+], ids=["escaped_state", "large_second_question"])
+def test_single_oversized_question_fails_before_http_without_echo(text, questions):
+    def unexpected(_):
+        pytest.fail("oversized single question must be rejected before any HTTP")
+
+    with pytest.raises(ModelUnavailable, match="request body limit") as exc:
+        asyncio.run(detector(unexpected)._decide(text, questions))
+    assert "private" not in str(exc.value)
+
+
+def test_exact_body_limit_is_accepted_and_one_extra_byte_rejected(runtime_detector):
+    model, calls = runtime_detector
+    questions = {"limit": {"type": "noul", "instructions": ""}}
+    payload = {"state": {"document": "문서😀"}, "questions": questions, "independent": True}
+    overhead = len(httpx.Request("POST", "http://decider/v1/systemone", json=payload).content)
+    questions["limit"]["instructions"] = "x" * (262144 - overhead)
+    assert asyncio.run(model._decide("문서😀", questions)) == {"limit": 0.9}
+    assert len(calls) == 1 and len(calls[0].content) == 262144
+    questions["limit"]["instructions"] += "x"
+    with pytest.raises(ModelUnavailable, match="request body limit"):
+        asyncio.run(model._decide("문서😀", questions))
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("failure", ["http", "missing", "timeout"])
+def test_later_batch_failure_does_not_return_partial_scores(failure):
+    calls = []
+
+    def handler(request):
+        questions = json.loads(request.content)["questions"]
+        calls.append(questions)
+        if len(calls) == 1:
+            return httpx.Response(200, json=response({tag: 0.1 for tag in questions}))
+        if failure == "timeout":
+            raise httpx.ReadTimeout("private document", request=request)
+        if failure == "http":
+            return httpx.Response(503, json={"detail": "private document"})
+        return httpx.Response(200, json=response({}))
+
+    with pytest.raises(ModelUnavailable) as exc:
+        asyncio.run(detector(handler).judge("private document", "기준", {f"tag_{i}": "태그" for i in range(257)}))
+    assert len(calls) == 2
+    assert "private" not in str(exc.value)
