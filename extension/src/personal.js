@@ -9,7 +9,7 @@ import { codePointIndex, pyRegExp } from "../vendor/prompt-guard-rules/src/pyre.
 
 export const STORAGE_KEY = "personalRules";
 export const MAX_RULES = 50;
-export const MAX_PATTERN_LEN = 300;
+export const MAX_PATTERN_LEN = 4000;
 // 서버 토큰([EMAIL_1] 등)과 겹치지 않도록 개인 규칙 토큰에는 항상 붙인다.
 export const TOKEN_PREFIX = "MY_";
 export const ACTIONS = ["warn", "mask", "block"];
@@ -78,9 +78,22 @@ export function toCustomRules(rules) {
 }
 
 /** 기본 규칙 + 대시보드 기본 ruleset + 개인 규칙으로 만든 브라우저 규칙 엔진(입력 즉시 표시용) */
-export function localGuard(rules) {
-  const base = defaultBundle.ruleset;
-  return createGuard({ ruleset: { ...base, custom_rules: [...base.custom_rules, ...toCustomRules(rules)] } });
+export function localGuard(rules, bundle = null) {
+  const base = bundle || defaultBundle.ruleset;
+  const org = bundle?.org_rules;
+  const organization = (org?.regex || []).map((r) => ({
+    id: r.type || r.tag_id, label: r.name, category: "organization", severity: "high",
+    action: org.tag_action || "mask", token: r.token, enabled: true, kind: "regex",
+    pattern: r.pattern, case_sensitive: true, reason: `${r.name}(조직 규칙)`,
+  }));
+  const guard = createGuard({ ruleset: { ...base, modules: { ...base.modules, custom_rules: true },
+    context_detectors: base.context_detectors || [],
+    custom_rules: [...(base.modules?.custom_rules === false ? [] : base.custom_rules || []),
+      ...organization, ...toCustomRules(rules)] } });
+  // pyre.js를 쓰는 엔진이 Python 전용 문법을 컴파일하지 못하면 건너뛴다.
+  // 규칙 본문이나 검사 원문은 기록하지 않는다. 최종 판정은 계속 서버가 담당한다.
+  if (guard.skippedRules.length) console.warn("Prompt Guard: 로컬 규칙 컴파일 생략", guard.skippedRules.map(({ id }) => id));
+  return guard;
 }
 
 /** 시험: 일치 구간(UTF-16 위치) */

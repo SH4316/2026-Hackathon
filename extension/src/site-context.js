@@ -93,6 +93,14 @@ PG.siteContext = (() => {
     }
     return unique(values);
   }
+  function optIn() {
+    const values = [];
+    for (const el of collect(['[role="switch"]', '[role="checkbox"]', 'input[type="checkbox"]'])) {
+      const name = label(el);
+      if (/^(?:training opt-in|opt[ -]in to (?:model )?training|학습 (?:동의|opt-in))$/i.test(name)) values.push(checked(el));
+    }
+    return unique(values);
+  }
   function temporary() {
     const controls = collect(['button[aria-pressed]', '[role="button"][aria-pressed]', '[role="status"]', '[role="alert"]']);
     const values = [];
@@ -111,10 +119,10 @@ PG.siteContext = (() => {
     const fixture = !!PG.isTestHost();
     const result = fixture ? {
       provider, model: observed("Local test fixture"), account: observed("Local test fixture"), plan: observed("Local test fixture"),
-      training: observed(false), temporary: observed(false), policy: observed("Local test fixture"), uncertain: false, reasons: [],
+      training: observed(false), optIn: unknown(), temporary: observed(false), policy: observed("Local test fixture"), uncertain: false, reasons: [],
     } : {
       provider, model: provider ? model(provider) : unknown(), account: provider ? account("account") : unknown(), plan: provider ? account("plan") : unknown(),
-      training: provider ? training() : unknown(), temporary: provider ? temporary() : unknown(),
+      training: provider ? training() : unknown(), optIn: provider ? optIn() : unknown(), temporary: provider ? temporary() : unknown(),
       policy: { value: policyText, status: "unknown" }, uncertain: true,
       reasons: ["모델별 정책이 확인되지 않았습니다."],
     };
@@ -138,10 +146,7 @@ PG.siteContext = (() => {
   function schedule() { clearTimeout(timer); timer = setTimeout(refresh, 150); }
   function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
   function apply(result, snapshot = read()) {
-    const notices = [...(result.notices || [])];
-    if (snapshot.uncertain && !notices.includes("site_context_uncertain")) notices.push("site_context_uncertain");
-    const downgrade = snapshot.uncertain && result.status === "complete" && result.decision === "allow";
-    return { ...result, ...(downgrade ? { decision: "warn", signal: "yellow" } : {}), notices, site_context: snapshot };
+    return { ...result, site_context: snapshot };
   }
   if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") {
     new MutationObserver(schedule).observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });

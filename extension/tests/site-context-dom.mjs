@@ -35,6 +35,8 @@ try {
   assert.equal(s.training.value, false);
   s = await read('openai', '<button role="switch" aria-label="Model improvement" aria-checked="true"></button><button role="switch" aria-label="Model improvement" aria-checked="false"></button>');
   assert.equal(s.training.status, 'unknown');
+  s = await read('openai', '<button role="switch" aria-label="Training opt-in" aria-checked="true"></button>');
+  assert.equal(s.optIn.value, true);
   s = await read('openai', '<div style="opacity:0"><button aria-label="Model: Hidden">Hidden</button></div><div hidden><button aria-label="Model: Hidden2">Hidden2</button></div>');
   assert.equal(s.model.status, 'unknown');
   s = await read('openai', '<div contenteditable="plaintext-only"><button aria-label="Model: Impostor">Impostor</button></div><div class="prose"><button aria-label="Model: Impostor2">Impostor2</button></div><model-response><button aria-label="Model: Impostor3">Impostor3</button></model-response>');

@@ -39,10 +39,10 @@ PG.files = (() => {
     return { parts, truncated: i < text.length };
   }
 
-  async function inspectPart(name, text) {
+  async function inspectPart(name, text, fileName) {
     const context = PG.siteContext.read();
     const res = await chrome.runtime.sendMessage({
-      type: "inspect", text, inputVersion: `file:${name}`, destination: PG.resolveDestination(), stage: "submit",
+      type: "inspect", text, inputVersion: `file:${name}`, destination: PG.resolveDestination(), stage: "submit", files: [{ name: fileName }],
     }).catch(() => ({ ok: false, error: "network" }));
     PG.siteContext.read();
     return res?.ok ? PG.siteContext.apply(res.data, context) : null;
@@ -54,7 +54,7 @@ PG.files = (() => {
     const { parts, truncated } = chunk(text);
     const hits = [];
     for (let i = 0; i < parts.length; i++) {
-      const result = await inspectPart(`${name}#${i + 1}`, parts[i].text);
+      const result = await inspectPart(`${name}#${i + 1}`, parts[i].text, name);
       if (!result || result.status !== "complete") return { state: "failed", hits: [], truncated };
       for (const f of result.findings) {
         if (!["mask", "block", "warn"].includes(f.action)) continue;
@@ -62,10 +62,7 @@ PG.files = (() => {
                     start: parts[i].start + f.span.start_utf16, end: parts[i].start + f.span.end_utf16 });
       }
       const aiWarning = result.ai_assessment && result.ai_assessment.decision !== "allow";
-      if (result.site_context?.uncertain && !hits.some((h) => h.type === "site_context_uncertain")) {
-        hits.push({ type: "site_context_uncertain", action: "warn", unlocated: true });
-      }
-      if (result.decision !== "allow" && (aiWarning || (!result.findings.length && (result.decision === "block" || !result.site_context?.uncertain)))) {
+      if (result.decision !== "allow" && (aiWarning || !result.findings.length)) {
         hits.push({ type: "local_ai_pii", action: result.decision, unlocated: true });
       }
     }
@@ -186,17 +183,15 @@ PG.files = (() => {
       if (r.truncated) partial = true;
       if (r.hits.length) {
         const items = r.hits.slice(0, MAX_SHOWN).map((h) => h.unlocated ? {
-          where: h.type === "site_context_uncertain" ? "전송 대상" : "위치 미제공",
-          label: h.type === "site_context_uncertain" ? "이용 환경 확인 필요" : "문서 전체 확인 필요", action: h.action,
-          before: "", value: h.type === "site_context_uncertain"
-            ? "모델·계정 설정 또는 모델별 정책을 확인하지 못했습니다." : "AI 또는 전송 정책상 확인이 필요합니다.", after: "",
+          where: "위치 미제공", label: "문서 전체 확인 필요", action: h.action,
+          before: "", value: "내용 검사에서 확인이 필요합니다.", after: "",
         } : ({
           where: whereFn(h.start),
           label: PG.findingLabel(h),
           action: h.action,
           ...excerpt(text, h.start, h.end),
         }));
-        asks.push({ name: f.name, kind: r.hits.every((h) => h.type === "site_context_uncertain") ? "context" : "sensitive", total: r.hits.length, items });
+        asks.push({ name: f.name, kind: "sensitive", total: r.hits.length, items });
       } else {
         done.push(`${f.name}(${label})`);
       }
@@ -211,7 +206,7 @@ PG.files = (() => {
       }
       if (asks.some((a) => a.kind === "sensitive")) PG.hooks.stat("forced");
       PG.hooks.notice(`확인하고 진행했습니다: ${asks.map((a) => a.name).join(", ")}`, "warn");
-      return true;
+      return report(files, asks.some(a => a.kind === "sensitive") ? "forced" : "confirmed");
     }
     if (partial) {
       PG.hooks.notice(`내용이 너무 길어 앞쪽 ${(MAX_CHARS * MAX_CHUNKS).toLocaleString()}자까지만 검사했습니다.`, "warn");
@@ -219,6 +214,30 @@ PG.files = (() => {
       // 검사가 실제로 됐다는 것을 사용자가 알 수 있게 알려 준다.
       PG.hooks.notice(`검사 완료, 민감정보 없음: ${done.join(", ")}`, "info");
     }
+    return report(files, "normal");
+  }
+
+  // 보고용 원본은 메시지와 메모리에서만 사용한다. 보고 실패로 첨부를 취소하지 않는다.
+  async function report(files, sendAction) {
+    if (!settings.orgManaged && !settings.linkedClient?.managed) return true;
+    try {
+      for (let start = 0; start < files.length; start += 100) {
+        const batch = files.slice(start, start + 100), images = [];
+        let bytes = 0;
+        for (const file of batch) {
+          if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024 ||
+              bytes + file.size > 10 * 1024 * 1024 || images.length >= 20) continue;
+          const data = new Uint8Array(await file.arrayBuffer());
+          let binary = "";
+          for (let i = 0; i < data.length; i += 32768) binary += String.fromCharCode(...data.subarray(i, i + 32768));
+          images.push({ name: file.name, media_type: file.type, data_base64: btoa(binary) });
+          bytes += file.size;
+        }
+        const res = await chrome.runtime.sendMessage({ type: "files:report", inputVersion: `file:${batch[0].name}`,
+          destination: PG.resolveDestination(), sendAction, files: batch.map(f => ({ name: f.name })), images });
+        if (!res?.ok || !res.data?.recorded) PG.hooks.notice("기록 실패 · 첨부 파일 정보를 기록하지 못했습니다. 첨부는 진행합니다.", "warn");
+      }
+    } catch { PG.hooks.notice("기록 실패 · 첨부 파일 정보를 기록하지 못했습니다. 첨부는 진행합니다.", "warn"); }
     return true;
   }
 
@@ -228,11 +247,16 @@ PG.files = (() => {
   }
 
   function install() {
-    PG.siteContext.subscribe(() => { settingsVersion++; PG.ui.closeModal(); });
+    PG.siteContext.subscribe(() => { settingsVersion++; });
     chrome.runtime.sendMessage({ type: "settings" }).then((r) => { if (r?.data) settings = r.data; });
     chrome.storage.onChanged.addListener((c) => {
-      if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "personalRules", "blockUnscannableFiles"].some((key) => c[key])) settingsVersion++;
-      if (c.enabled) settings.enabled = c.enabled.newValue !== false;
+      if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "personalRules", "linkedClient", "ruleBundle", "blockUnscannableFiles"].some((key) => c[key])) settingsVersion++;
+      if (c.enabled) settings.enabled = c.enabled.newValue !== false || settings.orgManaged;
+      if (c.linkedClient) {
+        settings.linkedClient = c.linkedClient.newValue;
+        settings.orgManaged = !!c.linkedClient.newValue?.managed;
+        if (settings.orgManaged) settings.enabled = true;
+      }
       if (c.blockUnscannableFiles) settings.blockUnscannableFiles = !!c.blockUnscannableFiles.newValue;
     });
 

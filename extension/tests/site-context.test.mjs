@@ -48,13 +48,13 @@ test('context changes revision and fixture is explicitly known', () => {
   assert.equal(fixture.policy.value, 'Local test fixture');
 });
 
-test('apply conservatively downgrades only complete allow and never mutates result', () => {
+test('uncertain site context never changes content decision or signal', () => {
   const api = setup();
   const result = { status: 'complete', decision: 'allow', signal: 'green', notices: [] };
   const applied = api.apply(result);
-  assert.equal(applied.decision, 'warn');
-  assert.equal(applied.signal, 'yellow');
-  assert.ok(applied.notices.includes('site_context_uncertain'));
+  assert.equal(applied.decision, 'allow');
+  assert.equal(applied.signal, 'green');
+  assert.equal(applied.notices.length, 0);
   assert.equal(result.decision, 'allow');
   assert.equal(api.apply({ status: 'complete', decision: 'block', signal: 'red' }).decision, 'block');
   assert.equal(api.apply({ status: 'incomplete', decision: 'allow', signal: 'gray' }).signal, 'gray');

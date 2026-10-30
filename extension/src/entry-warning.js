@@ -1,45 +1,58 @@
-// 진입 정책 + 화면에서 확인된 학습 ON 안내. 서버·AI 다운로드와 독립적으로 동작한다.
+// 접속과 선택 모델 변경마다 안내한다. 기존 전송·첨부 확인이 끝난 뒤에 표시한다.
 (() => {
   const PG = globalThis.PG;
-  let enabled = false, ready = false, retry = null;
-  const shown = new Set(), accounts = new Map();
-  const observed = field => field?.status === "observed" ? field.value : null;
-  function check() {
+  let enabled = false, ready = false, retry = null, destinations = null;
+  let managed = false, userEnabled = true, lastKey = null, generation = 0;
+  function check(update = false) {
     clearTimeout(retry);
     if (!ready) return;
-    const snapshot = PG.siteContext.current() || PG.siteContext.read();
-    const trainingKey = `training-enabled:${snapshot.provider}`;
-    // 불명확해졌다는 이유로 다시 경고하지 않는다. 실제 OFF/임시 대화 ON을 관측하면 재무장한다.
-    if (observed(snapshot.training) === false || observed(snapshot.temporary) === true) shown.delete(trainingKey);
-    const account = observed(snapshot.account);
-    if (account !== null) {
-      if (accounts.has(snapshot.provider) && accounts.get(snapshot.provider) !== account) shown.delete(trainingKey);
-      accounts.set(snapshot.provider, account);
+    if (!enabled) {
+      if (PG.ui.entryPolicyKey()) PG.ui.closeModal();
+      return;
     }
-    const policy = enabled ? PG.entryPolicy.evaluate(snapshot) : null;
-    const active = PG.ui.entryPolicyKey();
-    if (active && active !== policy?.key) PG.ui.closeModal();
-    if (!policy || shown.has(policy.key)) return;
-    // 이미 열린 전송/파일 확인창을 덮어쓰지 않는다.
-    if (PG.ui.isOpen()) { retry = setTimeout(check, 500); return; }
-    shown.add(policy.key);
+    const snapshot = PG.siteContext.current() || PG.siteContext.read();
+    const policy = PG.entryPolicy.evaluate(snapshot, destinations);
+    if (!policy) return;
+    if (policy.key === lastKey) {
+      if (update && PG.ui.entryPolicyKey() === policy.key) PG.ui.showEntryPolicy(policy);
+      return;
+    }
+    // 닫힌 뒤 현재 모델을 다시 읽는다. 기존 확인창이나 승인에는 손대지 않는다.
+    if (PG.ui.isOpen()) { retry = setTimeout(check, 200); return; }
+    lastKey = policy.key;
     PG.ui.showEntryPolicy(policy);
   }
+  async function loadPolicy() {
+    const stamp = ++generation;
+    const request = chrome.runtime.sendMessage({ type: "rules:bundle" }).catch(() => null);
+    const vendor = await import(chrome.runtime.getURL("vendor/prompt-guard-rules/data/policy.js")).catch(() => null);
+    // 서버가 응답하지 않아도 접속 안내를 먼저 표시한다.
+    const response = await Promise.race([request, new Promise(resolve => setTimeout(() => resolve(null), 300))]);
+    if (stamp !== generation) return;
+    destinations = response?.data?.destinations || vendor?.default?.destinations || null;
+    ready = true;
+    check(true);
+    if (!response?.data?.destinations) void request.then(result => {
+      if (stamp !== generation || !result?.data?.destinations) return;
+      destinations = result.data.destinations;
+      check(true);
+    });
+  }
+
   chrome.runtime.sendMessage({ type: "settings" }).then(response => {
     if (!response?.ok) return;
-    ready = true;
-    enabled = response.data?.enabled !== false;
-    check();
+    managed = !!(response.data?.orgManaged || response.data?.linkedClient?.managed);
+    userEnabled = response.data?.enabled !== false;
+    enabled = userEnabled || managed;
+    void loadPolicy();
   }).catch(() => {});
   chrome.storage.onChanged.addListener(changes => {
-    if (changes.enabled) {
-      enabled = changes.enabled.newValue !== false;
-      check();
-    }
+    if (changes.enabled) userEnabled = changes.enabled.newValue !== false;
+    if (changes.linkedClient) managed = !!changes.linkedClient.newValue?.managed;
+    enabled = userEnabled || managed;
+    if (["ruleBundle", "serverEnabled", "serverUrl", "apiKey", "linkedClient"].some(key => changes[key])) void loadPolicy();
+    check();
   });
-  PG.siteContext.subscribe(() => {
-    // 다른 구독자의 기존 승인 취소가 끝난 뒤 진입 안내를 평가한다.
-    queueMicrotask(check);
-  });
+  PG.siteContext.subscribe(() => queueMicrotask(() => check(true)));
   addEventListener("pagehide", () => clearTimeout(retry));
 })();

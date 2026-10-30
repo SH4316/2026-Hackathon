@@ -58,8 +58,8 @@ PG.PROVIDER_LABELS = {
 };
 
 PG.NOTICE_LABELS = {
-  site_context_uncertain: "모델·계정 설정 또는 모델별 정책을 확인하지 못했습니다. 전송 전에 이용 환경을 확인하세요.",
-  server_unavailable_local_check: "서버에 연결되지 않아 기기 내 AI와 기본 규칙으로 검사했습니다. 서버의 사용자 규칙은 적용되지 않습니다.",
+  site_context_uncertain: "모델·계정 설정 또는 모델별 정책을 확인하지 못했습니다.",
+  server_unavailable_local_check: "서버에 연결되지 않아 기기 내 AI와 캐시된 규칙으로 검사했습니다. 최종 서버 판정은 확인하지 못했습니다.",
   local_ai_pii_without_location: "기기 내 AI가 개인정보 가능성을 감지했습니다. 위치를 찾는 모델이 아니므로 해당 내용은 직접 확인·수정해 주세요.",
   local_ai_not_ready: "AI 모델을 준비하고 있습니다. 팝업에서 진행 상태를 확인하세요.",
   local_ai_timeout: "기기 내 AI 검사 시간이 초과되었습니다. 내용을 줄이거나 모델을 다시 준비해 주세요.",
@@ -72,10 +72,11 @@ PG.NOTICE_LABELS = {
   local_ai_output: "AI 결과를 확인하지 못했습니다. 다시 검사하세요.",
   local_ai_encoding: "AI 입력을 변환하지 못했습니다. 다시 검사하세요.",
   local_ai_download: "모델 다운로드에 실패했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-  destination_unknown: "전송 대상 AI를 알 수 없어 강화 기준을 적용했습니다.",
-  destination_channel_unknown: "접근 경로를 알 수 없어 강화 기준을 적용했습니다.",
-  destination_channel_unverified: "조직 계약이 확인되지 않은 경로라 강화 기준을 적용했습니다.",
-  destination_policy_stale: "제공사 정책 근거가 오래되어 강화 기준을 적용했습니다.",
+  destination_unknown: "전송 대상 AI를 확인하지 못했습니다.",
+  destination_channel_unknown: "접근 경로를 확인하지 못했습니다.",
+  destination_channel_unverified: "접근 경로의 조직 계약을 확인하지 못했습니다.",
+  destination_policy_stale: "제공사 정책 근거가 오래되었습니다.",
+  model_endpoint_unset: "Jev 모델 엔드포인트가 설정되지 않아 기능이 비활성화되어 있습니다.",
   model_check_failed: "문맥 검사(로컬 모델)를 완료하지 못했습니다.",
   model_check_required_but_disabled: "정책상 필요한 문맥 검사(로컬 모델)가 꺼져 있습니다.",
   org_config_unavailable: "조직 대시보드 규칙을 받을 수 없어 검사를 끝내지 못했습니다.",

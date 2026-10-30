@@ -1,28 +1,45 @@
-// Installed extension on a routed production host, with a local rules API; no external traffic.
+// 실제 확장 + 합성 페이지/API만 사용한다. 외부 서비스나 실제 개인정보는 사용하지 않는다.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createGuard } from '../vendor/prompt-guard-rules/src/index.js';
-const ext = path.resolve(import.meta.dirname, '..'), shots = path.join(ext, 'tests/shots/site-context');
-mkdirSync(shots, { recursive: true });
-const guard = createGuard();
-let fail = false, forceBlock = false, delay = 0, calls = 0;
+import vendor from '../vendor/prompt-guard-rules/data/policy.js';
+const ext = path.resolve(import.meta.dirname, '..'), guard = createGuard();
+const requests = [], reports = [], etags = [];
+let fail = false, failReport = false, delay = 0, decision = null, revision = 1;
+const bundle = () => ({ ...vendor.ruleset, ruleset_version: revision,
+  destinations: { openai: { consumer: { tier: 'elevated', basis: '합성 제공사 정책', verified_at: '2026-10-30' } } },
+  org_rules: { version_id: 'synthetic-v1', revision, tag_action: 'mask', regex: [
+    { tag_id: 'employee', type: 'employee', name: '합성 사번', token: 'ORG_EMP', pattern: `ORG${revision}-\\d{4}` },
+    { tag_id: 'python', type: 'python', name: 'Python 전용', token: 'PY', pattern: '(?P<python>secret)' },
+  ] } });
 const api = createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*'); res.setHeader('Access-Control-Allow-Headers', '*');
   if (req.method === 'OPTIONS') { res.writeHead(204).end(); return; }
   if (req.url === '/readyz') { res.end('{}'); return; }
+  if (req.url === '/v1/rules/bundle') {
+    etags.push(req.headers['if-none-match']);
+    const etag = `"v${revision}"`; res.setHeader('ETag', etag);
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304).end(); return; }
+    res.end(JSON.stringify(bundle())); return;
+  }
   let raw = ''; for await (const chunk of req) raw += chunk;
-  calls++;
-  if (delay) await new Promise(r => setTimeout(r, delay));
-  if (fail) { res.writeHead(500).end('{}'); return; }
   try {
     const input = JSON.parse(raw);
-    res.setHeader('Content-Type', 'application/json');
+    if (req.url === '/v1/files/report') {
+      reports.push(input);
+      if (failReport) { res.writeHead(503).end('{}'); return; }
+      res.writeHead(202).end(JSON.stringify({ recorded: true, reason: null })); return;
+    }
+    requests.push(input);
+    if (delay && input.context.stage === 'submit') await new Promise(r => setTimeout(r, delay));
+    if (fail && input.context.stage === 'submit') { res.writeHead(503).end('{}'); return; }
     const result = req.url.endsWith('sanitize') ? guard.sanitizeRequest(input) : guard.inspectRequest(input);
-    if (forceBlock) Object.assign(result, { decision: 'block', signal: 'red', findings: [] });
+    if (decision) Object.assign(result, { decision, signal: { allow: 'green', warn: 'yellow', block: 'red' }[decision],
+      findings: decision === 'block' ? [{ finding_id: 'f1', type: 'synthetic', action: 'block', span: { start: 0, end: 2, start_utf16: 0, end_utf16: 2 } }] : [] });
     res.end(JSON.stringify(result));
   } catch { res.writeHead(400).end('{}'); }
 });
@@ -30,100 +47,124 @@ await new Promise(r => api.listen(0, '127.0.0.1', r));
 const profile = mkdtempSync(path.join(tmpdir(), 'pg-context-'));
 const ctx = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true,
   viewport: { width: 1100, height: 900 }, args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`] });
-const fixture = `<!doctype html><html lang="ko"><meta charset="utf-8"><title>Site context fixture</title>
-<style>body{font:16px system-ui;margin:32px;background:#f5f5f7}main{max-width:700px;margin:auto}header{display:flex;gap:12px;flex-wrap:wrap}button{padding:8px}form{margin-top:430px}textarea{box-sizing:border-box;width:100%;height:110px;font:inherit}</style>
-<main><h1>사이트 상태 감지 테스트</h1><header>
-<button id="model" data-testid="model-switcher-dropdown-button">GPT-6.1 Sol</button>
+const fixture = `<!doctype html><html lang="ko"><meta charset="utf-8"><title>합성 컨텍스트</title>
+<style>body{font:16px system-ui;margin:32px}main{max-width:700px;margin:auto}button{padding:8px}form{margin-top:430px}textarea{width:100%;height:110px}</style>
+<main><button id="model" data-testid="model-switcher-dropdown-button">가상 모델 A</button>
 <button aria-label="Current workspace: Personal">Personal</button><span data-testid="current-plan">Plus</span>
 <button role="switch" aria-label="Improve the model for everyone" aria-checked="false">학습 OFF</button>
-<button aria-label="Temporary chat" aria-pressed="false">임시 대화 OFF</button>
-</header><form><textarea aria-label="메시지" id="prompt"></textarea><button data-testid="send-button" type="submit">전송</button><input id="file" type="file" multiple></form></main>
-<script>window.sent=0;window.uploads=0; const form=document.querySelector('form'),ta=document.querySelector('textarea');form.addEventListener('submit',e=>{e.preventDefault();window.sent++;ta.value='';ta.dispatchEvent(new Event('input',{bubbles:true}));});ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit();}});document.querySelector('#file').addEventListener('change',()=>window.uploads++);</script></html>`;
+<form><textarea id="prompt"></textarea><button data-testid="send-button" type="submit">전송</button><input id="file" type="file" multiple></form></main>
+<script>window.sent=0;window.uploads=0;const form=document.querySelector('form'),ta=document.querySelector('textarea');form.addEventListener('submit',e=>{e.preventDefault();window.sent++;ta.value='';ta.dispatchEvent(new Event('input',{bubbles:true}));});ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit();}});document.querySelector('#file').addEventListener('change',e=>{if(e.target.files.length)window.uploads++;});</script></html>`;
 await ctx.route('https://chatgpt.com/**', route => route.fulfill({ contentType: 'text/html', body: fixture }));
 const page = await ctx.newPage(), errors = [];
 page.on('pageerror', e => errors.push(e.message));
 const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent('serviceworker');
-const popup = await ctx.newPage();
-await popup.goto(new URL('../popup.html', sw.url()).href);
-await popup.evaluate(port => chrome.storage.local.set({ enabled:true, serverEnabled:true, localAiEnabled:false, serverUrl:`http://127.0.0.1:${port}`, testMode:false }), api.address().port);
+const popup = await ctx.newPage(); await popup.goto(new URL('../popup.html', sw.url()).href);
+await popup.evaluate(port => chrome.storage.local.set({ enabled: true, serverEnabled: true, localAiEnabled: false,
+  serverUrl: `http://127.0.0.1:${port}`, apiKey: 'synthetic-token', linkedClient: { clientId: 'fixture', managed: true }, testMode: false }), api.address().port);
 async function eventually(fn, label) {
-  for (let end = Date.now()+7000; Date.now()<end;) { if (await fn()) return; await new Promise(r=>setTimeout(r,50)); }
+  for (let end = Date.now() + 9000; Date.now() < end;) { if (await fn()) return; await new Promise(r => setTimeout(r, 50)); }
   throw new Error(label);
 }
-const lamp=()=>page.locator('.badge').getAttribute('data-state'), sent=()=>page.evaluate(()=>window.sent), uploads=()=>page.evaluate(()=>window.uploads);
-const modal=page.locator('.overlay');
-const fill=async text=>{ await page.locator('#prompt').fill(text); await eventually(async()=> (await page.locator('.chip-w').textContent())?.includes('이용 환경 확인 필요'),'context warning'); };
+const modal = page.locator('.overlay'), entry = page.locator('[data-kind="entry-policy"]');
+const lamp = () => page.locator('.badge').getAttribute('data-state');
+const sent = () => page.evaluate(() => window.sent), uploads = () => page.evaluate(() => window.uploads);
+const fill = async (text, expected = 'green') => {
+  const count = requests.length; await page.fill('#prompt', text);
+  await eventually(async () => requests.length > count && await lamp() === expected, `draft ${expected}`);
+};
+const submitRequests = () => requests.filter(r => r.context.stage === 'submit' && !r.context.files);
+const confirm = async name => { await modal.locator('.ack input').check(); await modal.getByRole('button', { name, exact: true }).click(); };
 try {
-  await page.goto('https://chatgpt.com/'); await fill('오늘 회의 안건을 정리해 주세요.');
-  await eventually(async()=>!(await page.locator('.chip-w').textContent()).includes('검사 확인 중'),'completed check');
-  assert.equal(await lamp(),'yellow');
-  assert.equal(await page.locator('.badge .retention-summary').isVisible(), true);
-  assert.match(await page.locator('.badge [data-field=model]').textContent(),/GPT-6.1 Sol/);
-  assert.match(await page.locator('.badge [data-field=training]').textContent(),/OFF/);
-  assert.match(await page.locator('.badge [data-field=plan]').textContent(),/Plus/);
-  assert.equal(await page.locator('.badge [data-field=policy]').getAttribute('data-status'),'unknown');
-  await page.locator('.badge .site-context summary').click();
-  if (process.env.PG_CONTEXT_SHOTS === '1') await page.screenshot({path:path.join(shots,'light-expanded.png')});
-  await page.emulateMedia({colorScheme:'dark'}); if (process.env.PG_CONTEXT_SHOTS === '1') await page.screenshot({path:path.join(shots,'dark-expanded.png')});
-  await page.emulateMedia({colorScheme:'light'}); await page.setViewportSize({width:390,height:844});
-  if (process.env.PG_CONTEXT_SHOTS === '1') await page.screenshot({path:path.join(shots,'narrow-expanded.png')});
-  await eventually(()=>page.locator('.badge').evaluate(e=>e.getBoundingClientRect().right<=innerWidth),'horizontal overflow after resize');
-  await page.setViewportSize({width:1100,height:900});
-  await page.press('#prompt','Enter'); await modal.waitFor();
-  assert.equal(await modal.locator('.head').getAttribute('data-tone'),'yellow'); assert.equal(await sent(),0);
-  assert.equal(await modal.locator('.retention-notice').count(), 1);
-  assert.match(await modal.locator('.retention-notice').innerText(), /학습 OFF·임시 대화·대화 삭제/);
-  assert.match(await modal.locator('.retention-notice').innerText(), /보관 기간·삭제 조건은 확인되지/);
-  if (process.env.PG_CONTEXT_SHOTS === '1') {
-    for (const [theme,width] of [['light',1100],['dark',1100],['light',390]]) {
-      await page.emulateMedia({colorScheme:theme}); await page.setViewportSize({width,height:844});
-      assert.equal(await modal.locator('.card').evaluate(e=>e.scrollWidth<=e.clientWidth),true);
-      await page.screenshot({path:path.join(shots,`retention-${theme}-${width}.png`)});
-    }
-    await page.setViewportSize({width:1100,height:900});
-  }
-  assert.equal(await modal.getByRole('button',{name:'확인 후 전송',exact:true}).isDisabled(),true);
-  await modal.locator('.ack input').check(); await modal.getByRole('button',{name:'확인 후 전송',exact:true}).click();
-  await eventually(async()=>await sent()===1,'confirmed send');
-  await fill('다음 회의 안건을 정리해 주세요.'); await page.press('#prompt','Enter'); await modal.waitFor();
-  await modal.locator('.ack input').check();
-  // Same turn: approval must be invalidated even before MutationObserver runs.
-  await page.evaluate(()=>{document.querySelector('#model').textContent='Auto'; const root=document.querySelector('#pg-root-host').shadowRoot; [...root.querySelectorAll('.overlay button')].find(e=>e.textContent==='확인 후 전송').click();});
-  assert.equal(await sent(),1);
-  await eventually(async()=>await page.locator('.badge [data-field=model]').getAttribute('data-status')==='unknown','Auto unknown');
-  await page.press('#prompt','Enter'); await modal.waitFor();
-  await page.evaluate(()=>history.pushState({},'','/c/another')); await page.keyboard.press('Escape');
-  await page.press('#prompt','Enter'); await modal.waitFor(); assert.equal(await sent(),1); await page.keyboard.press('Escape');
-  await page.fill('#prompt','aws_access_key_id = AKIAIOSFODNN7EXAMPLE');
-  await eventually(async()=>await lamp()==='red','red precedence');
-  await page.press('#prompt','Enter'); await modal.waitFor(); assert.equal(await modal.locator('.head').getAttribute('data-tone'),'red');
-  await modal.getByRole('button',{name:'안전 다듬기',exact:true}).click();
-  await eventually(async()=>(await page.inputValue('#prompt')).includes('[AWS_KEY_1]'),'sanitize applied');
-  await page.press('#prompt','Enter'); await modal.waitFor(); assert.equal(await modal.locator('.head').getAttribute('data-tone'),'yellow'); await page.keyboard.press('Escape');
-  fail=true; await page.fill('#prompt','평범한 문장입니다.'); await eventually(async()=>await lamp()==='gray','gray precedence'); fail=false;
-  await page.fill('#prompt','');
-  const file={name:'meeting.txt',mimeType:'text/plain',buffer:Buffer.from('회의 주제를 정리합니다.')};
-  await page.setInputFiles('#file',file); await modal.waitFor();
-  assert.equal(await modal.locator('.retention-notice').count(),1);
-  assert.equal(await modal.locator('.head').getAttribute('data-tone'),'yellow'); assert.match(await modal.locator('.title').textContent(),/이용 환경/); assert.equal(await uploads(),0);
-  await page.evaluate(()=>document.querySelector('#model').textContent='GPT-6.1 Sol');
-  await eventually(async()=>!(await modal.isVisible()),'file approval invalidation'); assert.equal(await uploads(),0);
-  await page.setInputFiles('#file',file); await modal.waitFor(); await modal.locator('.ack input').check();
-  await modal.getByRole('button',{name:'그래도 진행',exact:true}).click(); await eventually(async()=>await uploads()===1,'file acknowledgement');
-  forceBlock=true; await page.setInputFiles('#file',[]); await page.setInputFiles('#file',file); await modal.waitFor();
-  assert.equal(await modal.locator('.head').getAttribute('data-tone'),'red','unlocated server block must stay red');
-  await page.keyboard.press('Escape'); forceBlock=false;
-  await page.setInputFiles('#file',[file,{name:'scan.png',mimeType:'image/png',buffer:Buffer.from('unreadable fixture')}]); await modal.waitFor();
-  assert.equal(await modal.locator('.head').getAttribute('data-tone'),'gray','unreadable file keeps gray in a mixed batch');
-  assert.match(await modal.locator('.title').textContent(),/읽을 수 없는/); await page.keyboard.press('Escape');
-  await page.evaluate(()=>document.querySelector('[role=switch]').remove()); await page.click('#prompt');
-  await eventually(async()=>await page.locator('.badge [data-field=training]').getAttribute('data-status')==='unknown','disappeared setting unknown');
-  delay=700; const before=calls;
-  await page.fill('#prompt','늦게 응답하는 검사'); await page.press('#prompt','Enter'); await eventually(()=>calls>before,'request started');
-  await page.evaluate(()=>document.querySelector('#model').textContent='GPT-6 Astra');
-  await eventually(async()=>(await page.locator('.badge [data-field=model]').textContent()).includes('GPT-6 Astra'),'model update');
-  await new Promise(r=>setTimeout(r,1000)); assert.equal(await modal.isVisible(),false); assert.equal(await sent(),1); delay=0;
-  await popup.evaluate(()=>chrome.storage.local.set({enabled:false})); await eventually(async()=>!(await page.locator('.badge').isVisible()),'disabled widget');
-  await page.press('#prompt','Enter'); await eventually(async()=>await sent()===2,'master switch'); assert.deepEqual(errors,[]);
-  console.log('PASS context UI, consent, red/gray precedence, sanitize, files, stale approval/response, master switch');
-} finally { await ctx.close(); await new Promise(r=>api.close(r)); rmSync(profile,{recursive:true,force:true}); }
+  await page.goto('https://chatgpt.com/'); await entry.waitFor();
+  assert.match(await entry.innerText(), /합성 제공사 정책/); assert.match(await entry.innerText(), /확인하지 못했습니다/);
+  await page.keyboard.press('Escape'); console.log('PASS initial entry policy');
+  await fill('회의 안건을 정리해 주세요.'); assert.equal(await lamp(), 'green', 'uncertain context does not elevate signal');
+  assert.equal(await page.locator('.badge .site-context').count(), 0, 'site policy is shown only in the information modal');
+  let before = submitRequests().length;
+  await page.press('#prompt', 'Enter'); await eventually(async () => await sent() === 1, 'managed green send');
+  assert.equal(submitRequests().length, before + 1); assert.equal(submitRequests().at(-1).context.send_action, 'normal');
+  // 같은 텍스트를 새로 전송해도 기록한다.
+  await fill('회의 안건을 정리해 주세요.'); await page.locator('[data-testid=send-button]').click();
+  await eventually(async () => await sent() === 2, 'second managed send'); assert.equal(submitRequests().length, before + 2);
+  decision = 'warn'; await fill('합성 경고 문장', 'yellow');
+  await page.press('#prompt', 'Enter'); await modal.waitFor(); assert.equal(await sent(), 2);
+  await confirm('확인 후 전송'); await eventually(async () => await sent() === 3, 'confirmed send');
+  assert.equal(submitRequests().at(-1).context.send_action, 'confirmed');
+  decision = 'block'; await fill('합성 차단 문장', 'red');
+  await page.press('#prompt', 'Enter'); await modal.waitFor();
+  assert.equal(await modal.getByRole('button', { name: '그래도 전송', exact: true }).isDisabled(), true);
+  await confirm('그래도 전송'); await eventually(async () => await sent() === 4, 'red block forced through warning');
+  assert.equal(submitRequests().at(-1).context.send_action, 'forced');
+  await fill('위젯 강행 합성 문장', 'red'); await page.locator('.badge').getByRole('button', { name: '그래도 전송', exact: true }).click();
+  await modal.waitFor(); await confirm('그래도 전송'); await eventually(async () => await sent() === 5, 'widget force recorded');
+  assert.equal(submitRequests().at(-1).context.send_action, 'forced');
+  console.log('PASS managed normal, confirmed and forced paths');
+  // 강행 기록 실패: 전송하지 않고 회색 보류.
+  await fill('기록 실패 합성 문장', 'red'); await page.locator('.badge').getByRole('button', { name: '그래도 전송', exact: true }).click();
+  await modal.waitFor(); fail = true; await confirm('그래도 전송');
+  await eventually(async () => await lamp() === 'gray', 'failed forced record holds gray'); assert.equal(await sent(), 5);
+  await page.keyboard.press('Escape'); fail = false;
+  decision = null; await fill('정상 전송 기록 실패'); fail = true; await page.press('#prompt', 'Enter');
+  await eventually(async () => await lamp() === 'gray', 'normal submit failure'); assert.equal(await sent(), 5); fail = false; await page.keyboard.press('Escape');
+  // 확인 후 기록 요청이 진행 중인 동안 입력이 바뀌면 보내지 않는다.
+  decision = 'warn'; await fill('전송 전에 바뀔 문장', 'yellow'); await page.press('#prompt', 'Enter'); await modal.waitFor();
+  delay = 500; before = submitRequests().length; await confirm('확인 후 전송');
+  await eventually(() => submitRequests().length > before, 'confirmed record started');
+  await page.evaluate(() => document.querySelector('#prompt').value = '이벤트 없이 바뀐 입력'); await page.waitForTimeout(700); assert.equal(await sent(), 5); delay = 0; decision = null;
+  // 모델 변경은 기존 확인창을 덮지 않고 안내를 기다린다. 기존 승인은 취소된다.
+  decision = 'warn'; await fill('모델 변경 합성 문장', 'yellow'); await page.press('#prompt', 'Enter'); await modal.waitFor();
+  await page.evaluate(() => document.querySelector('#model').textContent = '가상 모델 B'); await page.waitForTimeout(300);
+  assert.equal(await entry.count(), 0); await confirm('확인 후 전송'); await entry.waitFor(); assert.equal(await sent(), 5);
+  await page.keyboard.press('Escape'); decision = null; await page.fill('#prompt', '');
+  console.log('PASS submit failures and stale consent');
+  // 파일 검사에는 조각 번호 대신 전체 파일 이름을 보낸다.
+  const clean = { name: '합성 회의록 전체 이름.txt', mimeType: 'text/plain', buffer: Buffer.from('회의를 정리합니다.\n'.repeat(5000)) };
+  await page.setInputFiles('#file', clean); await eventually(async () => await uploads() === 1, 'clean attachment needs no environment consent');
+  assert.ok(requests.filter(r => r.input_version?.startsWith?.(`file:${clean.name}#`)).length >= 2, 'every text chunk inspected');
+  assert.equal(requests.at(-1).context.files[0].name, clean.name); assert.equal(reports.at(-1).files[0].name, clean.name);
+  assert.equal(reports.at(-1).send_action, 'normal');
+  const image = { name: '합성 원본 사진.png', mimeType: 'image/png', buffer: Buffer.from([137, 80, 78, 71, 7, 8, 9]) };
+  await page.setInputFiles('#file', image); await modal.waitFor(); await modal.getByRole('button', { name: '그래도 진행', exact: true }).click();
+  await eventually(async () => await uploads() === 2, 'image confirmed'); assert.equal(reports.at(-1).images[0].data_base64, image.buffer.toString('base64'));
+  assert.equal(reports.at(-1).send_action, 'confirmed');
+  const large = { name: '5MiB 초과 합성 이미지.png', mimeType: 'image/png', buffer: Buffer.alloc(5 * 1024 * 1024 + 1) };
+  await page.setInputFiles('#file', large); await modal.waitFor(); await modal.getByRole('button', { name: '그래도 진행', exact: true }).click();
+  await eventually(async () => await uploads() === 3, 'large image attaches by name'); assert.equal(reports.at(-1).images.length, 0);
+  assert.equal(reports.at(-1).files[0].name, large.name);
+  decision = 'block'; await page.setInputFiles('#file', clean); await modal.waitFor(); await confirm('그래도 진행');
+  await eventually(async () => await uploads() === 4, 'sensitive attachment forced'); assert.equal(reports.at(-1).send_action, 'forced'); decision = null;
+  failReport = true; await page.setInputFiles('#file', []); await page.setInputFiles('#file', clean);
+  await eventually(async () => await uploads() === 5, 'report failure does not block attachment');
+  await eventually(async () => /기록 실패/.test(await page.locator('.badge').innerText()), 'report failure notice'); failReport = false;
+  console.log('PASS attachment file/image reports and nonblocking failure');
+  // 5분 알람은 ETag로 재검사하고, 수정된 번들은 content에 전달된다.
+  await sw.evaluate(async () => {
+    const alarm = await chrome.alarms.get('rules-bundle-refresh'); if (alarm.periodInMinutes !== 5) throw Error('alarm period');
+    await chrome.alarms.create('rules-bundle-refresh', { when: Date.now() + 50, periodInMinutes: 5 });
+  });
+  await eventually(() => etags.includes('"v1"'), 'conditional ETag request'); revision = 2;
+  await sw.evaluate(() => chrome.alarms.create('rules-bundle-refresh', { when: Date.now() + 50, periodInMinutes: 5 }));
+  await eventually(async () => (await popup.evaluate(() => chrome.storage.local.get('ruleBundle'))).ruleBundle?.bundle?.ruleset_version === 2, 'bundle cache update');
+  await eventually(async () => await page.evaluate(() => {
+    const input = document.querySelector('#prompt'); input.value = 'ORG2-１２３４';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return /합성 사번/.test(document.querySelector('#pg-root-host').shadowRoot.querySelector('.badge').innerText);
+  }), 'distributed organization rule in immediate content feedback');
+  await page.fill('#prompt', '');
+  // 원문·이미지는 저장소에 남지 않는다.
+  const stored = JSON.stringify(await popup.evaluate(() => chrome.storage.local.get(null)));
+  assert.ok(!stored.includes(image.buffer.toString('base64'))); assert.ok(!stored.includes(clean.name)); assert.ok(!stored.includes('회의 안건을 정리해 주세요.'));
+  // 관리 상태에서는 마스터/서버 스위치로 기록을 우회할 수 없다.
+  await popup.evaluate(() => chrome.storage.local.set({ enabled: false, serverEnabled: false })); await page.waitForTimeout(200);
+  await fill('관리 상태 스위치 우회 방지'); fail = true; await page.press('#prompt', 'Enter');
+  await eventually(async () => await lamp() === 'gray', 'managed switches cannot skip submit'); assert.equal(await sent(), 5);
+  await page.keyboard.press('Escape'); fail = false;
+  await popup.evaluate(() => chrome.storage.local.set({ enabled: true, serverEnabled: true })); await page.waitForTimeout(200);
+  // 로컬 모드의 기존 동기 통과는 유지한다.
+  await popup.evaluate(() => chrome.storage.local.set({ linkedClient: null })); await page.waitForTimeout(200);
+  await fill('로컬 모드 합성 문장'); before = submitRequests().length; fail = true;
+  await page.press('#prompt', 'Enter'); await eventually(async () => await sent() === 6, 'local cached allow');
+  assert.equal(submitRequests().length, before); fail = false;
+  assert.deepEqual(errors, []);
+  console.log('PASS content-only signals, managed normal/confirmed/forced records, gray failures, stale input/model, files/images/report failure, ETag cache, local compatibility');
+} finally { await ctx.close(); await new Promise(r => api.close(r)); rmSync(profile, { recursive: true, force: true }); }
