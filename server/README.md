@@ -4,7 +4,7 @@
 브라우저 확장프로그램과 CLI가 같은 API·정책을 사용합니다.
 
 > 현재 상태: 규칙 기반 탐지·정제·재검사, API 초안, 원문 없는 감사 이벤트, CLI 초안까지 동작합니다.
-> 로컬 모델은 인터페이스(Ollama)만 연결돼 있고 **모델·양자화·하드웨어는 미정**입니다.
+> 로컬 판단 모델은 `compose.local.yaml` 의 decider(기본 Qwen3 4B Instruct)로 띄웁니다. 정확도 평가·실행 장비는 아직 미정입니다.
 
 ## 구조
 
@@ -30,19 +30,30 @@ server/
 ├─ cli/prompt_guard/      # 독립 검사 CLI
 ├─ tests/
 ├─ docs/                  # API 계약·미결 사항
-├─ Dockerfile, compose.yaml, .env.example
+├─ Dockerfile, compose.local.yaml(API+4B 모델), compose.api.yaml(API 만), .env.example
 ```
 
 ## 실행
 
 ### Docker (권장)
 
+compose 파일이 두 개입니다.
+
+| 파일 | 띄우는 것 | 모델 |
+|---|---|---|
+| `compose.local.yaml` | API + **decider**(4B 판단 모델, Ollama) | 같은 장비에서 실행. 처음 한 번 자동으로 내려받음 |
+| `compose.api.yaml` | API 만 | 규칙만(`PG_MODEL_MODE=disabled`), 또는 `.env` 의 `PG_MODEL_*` 로 지정한 조직 내부 모델 서버 |
+
 ```bash
 cd server
 cp .env.example .env          # PG_API_KEYS 에 직접 생성한 키를 넣는다
-docker compose up -d          # API 만 실행(규칙 기반)
+
+docker compose -f compose.local.yaml up -d   # API + 4B 모델
+docker compose -f compose.api.yaml up -d     # API 만
 curl http://127.0.0.1:8000/readyz
 ```
+
+`.env` 에 `COMPOSE_FILE=compose.local.yaml` 을 넣으면 `-f` 없이 `docker compose up -d` 로 실행됩니다.
 
 API는 기본적으로 `127.0.0.1:8000` 에만 바인딩됩니다. 다른 PC에서 접근해야 하면 `PG_BIND` 를 바꾸고
 반드시 TLS 리버스 프록시 뒤에 둡니다.
@@ -92,6 +103,13 @@ python -m prompt_guard inspect                                  # 대화형 입�
 | green | `status=complete` 이고 `decision=allow`. 현재 정책 통과일 뿐 절대 안전 보장이 아님 |
 | gray | `status` 가 `incomplete`/`error` — 전송 보류. 이때 `decision` 은 절대 `allow` 가 아님 |
 
+## 대시보드 ↔ 개인 연결
+
+대시보드가 사용자별 일회용 **등록 코드**(`POST /v1/admin/enrollments`)를 발급하고, 사용자가 확장프로그램 설정의
+"대시보드 연결"에 코드를 넣으면 개인 토큰(`pgc_…`)이 발급됩니다. 이후 검사 요청의 감사 이벤트에 `client_id` 가 붙어
+대시보드에서 사용자별로 조회·집계(`/v1/admin/audit/events`, `/v1/admin/audit/summary`)하고 연결을 해지할 수 있습니다.
+엔드포인트 목록은 [docs/api-contract.md](docs/api-contract.md#대시보드--개인-연결).
+
 ## 탐지 모듈·대시보드 규칙 관리
 
 내장 규칙 외에 대시보드에서 **사용자 규칙(키워드·정규식)**과 **문맥 탐지기(정규식으로 판단할 수 없는 기준을 로컬 모델로 판단)**를
@@ -133,14 +151,26 @@ python -m prompt_guard inspect                                  # 대화형 입�
 - 로컬 실행: `python tools/policy_watch/watch.py --report report.md [--only openai,google]`
 - 매번 바뀌는 문구로 거짓 변경이 생기면 `sources.yaml` 의 `ignore` 정규식에 추가합니다.
 
-## 로컬 모델(미정)
+## 로컬 모델: decider (4B)
 
-1. `.env` 에서 `PG_MODEL_MODE=optional|required`, `PG_MODEL_NAME=<모델명>` 설정
-2. `docker compose --profile model up -d`
-3. 모델 컨테이너는 `internal` 네트워크에만 붙어 **인터넷 접근이 없습니다.** 모델은 사전 반입합니다.
-   - 인터넷 가능한 PC에서 `ollama pull <모델>` 후 `~/.ollama/models` 를 `model-data` 볼륨으로 복사
-   - 또는 GGUF 파일 + Modelfile 로 `docker compose exec model ollama create <이름> -f /path/Modelfile`
-4. `/readyz` 가 `model_ready: true` 를 반환해야 준비 완료입니다(컨테이너 기동 ≠ 모델 준비).
+`compose.local.yaml` 은 문맥 탐지기(정규식으로 판단할 수 없는 기준)를 판단하는 4B 모델을 함께 띄웁니다.
+
+| 서비스 | 네트워크 | 역할 |
+|---|---|---|
+| `decider-pull` | edge(인터넷 O) | `DECIDER_MODEL` 이 `model-data` 볼륨에 없으면 내려받고 종료. 원문은 지나지 않음 |
+| `decider` | internal(인터넷 X) | Ollama 모델 서버. 호스트 포트 미공개, api 만 접근 |
+| `api` | edge + internal | `PG_MODEL_API=ollama`, `PG_MODEL_BASE_URL=http://decider:11434` 로 고정 |
+
+- 기본 모델: `qwen3:4b-instruct-2507-q4_K_M`(4B 파라미터, 약 2.5GB, 사고(thinking) 출력 없는 instruct 판).
+  `.env` 의 `DECIDER_MODEL` 로 바꿉니다(예: `qwen3:4b-instruct-2507-q8_0` 4.3GB). 모델 정확도는 아직 평가 전입니다(`eval/`).
+- 기본 `PG_MODEL_MODE=optional`(모델 실패 시 회색). 필수로 하려면 `.env` 에 `PG_MODEL_MODE=required`.
+- CPU 만 쓰면 응답이 느릴 수 있어 `PG_MODEL_TIMEOUT_S` 기본값을 60초로 둡니다. GPU 는 `decider` 의 `deploy` 주석을 해제합니다(NVIDIA Container Toolkit 필요).
+- `decider` 는 모델이 볼륨에 있어야 healthy 가 되고, api 는 그 뒤에 시작합니다. 그래도 `/readyz` 의 `model_ready: true` 로 확인하세요.
+- 폐쇄망: `.env` 에 `DECIDER_OFFLINE=true` 를 두고 모델을 볼륨에 미리 반입합니다.
+  - 인터넷 가능한 PC에서 `ollama pull <모델>` 후 `~/.ollama/models` 를 `model-data` 볼륨으로 복사
+  - 또는 GGUF 파일 + Modelfile 로 `docker compose -f compose.local.yaml exec decider ollama create <이름> -f /path/Modelfile`
+- 모델을 다른 장비에 두려면 그 장비에서 `compose.local.yaml` 을, 검사 서버에서는 `compose.api.yaml` 을 쓰고
+  `PG_MODEL_BASE_URL` 을 그 장비 주소로 지정합니다(decider 는 기본적으로 호스트 포트가 없으므로 `ports` 를 추가하되 조직 내부망에만 공개).
 
 모델 실패·시간 초과 시 `optional` 은 `incomplete`, `required` 는 `error` 로 반환하며 어느 경우에도 `allow` 하지 않습니다.
 

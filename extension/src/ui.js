@@ -166,6 +166,26 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
 .diag .ok { color: var(--green); font-weight: 600; }
 .diag .bad { color: var(--red); font-weight: 600; }
 .diag .close { position: absolute; top: 6px; right: 8px; border: 0; background: none; padding: 2px 6px; font-size: 14px; }
+.ov-frame {
+  position: fixed; z-index: 2147483645; pointer-events: none; box-sizing: border-box;
+  border: 2px solid rgba(16,163,127,.85); border-radius: 12px; box-shadow: 0 0 0 4px rgba(16,163,127,.15);
+}
+.ov-label {
+  position: absolute; top: -13px; right: 12px; pointer-events: auto; display: flex; align-items: center; gap: 8px;
+  background: var(--bg); color: var(--fg); border: 1px solid rgba(16,163,127,.85); border-radius: 999px;
+  padding: 2px 4px 2px 10px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.12); white-space: nowrap;
+}
+.ov-text { color: #0d7a5f; }
+.ov-revert {
+  border: 0; background: rgba(16,163,127,.12); color: #0d7a5f; border-radius: 999px; padding: 2px 10px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.ov-revert:hover { background: rgba(16,163,127,.22); }
+.ov-mirror {
+  position: fixed; z-index: 2147483644; pointer-events: none; overflow: hidden; color: transparent;
+  white-space: pre-wrap; overflow-wrap: break-word; border-style: solid; border-color: transparent; background: transparent;
+}
+.ov-mirror mark { color: transparent; background: rgba(16,163,127,.28); border-bottom: 2px solid rgba(16,163,127,.95); border-radius: 2px; }
 .toast {
   position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 2147483647;
   background: #1d1d1f; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px;
@@ -285,6 +305,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
 
   // 입력창 바로 위에 붙이고, 위쪽 공간이 모자라면 아래에 둔다.
   function reposition() {
+    placeOverlay();
     if (!W || !anchor || !anchor.isConnected || W.root.hidden) return;
     const r = anchor.getBoundingClientRect();
     const width = Math.min(Math.max(r.width, 340), 640, window.innerWidth - 16);
@@ -307,6 +328,112 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
   }
 
   function hideWidget() { if (W) W.root.hidden = true; }
+
+  // ── 입력창 오버레이: 다듬은 결과를 입력창 위에서 바로 보여 준다 ──
+  // - 치환된 토큰([EMAIL_1] 등)을 입력창 안에서 강조한다.
+  //   contenteditable(ChatGPT·Claude·Gemini): CSS Custom Highlight API 로 원래 글자 위치에 직접 강조
+  //   textarea: 같은 글꼴·여백의 투명 거울 층을 입력창 위에 겹쳐 토큰 부분만 칠한다
+  // - 입력창 테두리와 오른쪽 위 라벨("n건 치환됨 · 원문으로 되돌리기")로 다듬어졌다는 것을 알린다.
+  // - 사용자 텍스트는 textContent/Range 로만 다룬다(innerHTML 사용 안 함).
+  const TOKEN_RE_UI = /\[[A-Z][A-Z0-9_]*_\d+\]/g;
+  let ov = null; // { editor, frame, label, mirror, count }
+
+  function ensureHighlightStyle() {
+    if (document.getElementById("pg-token-highlight-style")) return;
+    const st = document.createElement("style");
+    st.id = "pg-token-highlight-style";
+    st.textContent = "::highlight(pg-token){background-color:rgba(16,163,127,.28);color:inherit;"
+      + "text-decoration:underline 2px rgba(16,163,127,.95);}";
+    (document.head || document.documentElement).append(st);
+  }
+
+  function highlightEditable(el) {
+    if (!globalThis.CSS?.highlights || typeof Highlight === "undefined") return;
+    const ranges = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      for (const m of n.data.matchAll(TOKEN_RE_UI)) {
+        const r = new Range();
+        r.setStart(n, m.index);
+        r.setEnd(n, m.index + m[0].length);
+        ranges.push(r);
+      }
+    }
+    CSS.highlights.set("pg-token", new Highlight(...ranges));
+  }
+
+  const MIRROR_PROPS = ["fontFamily", "fontSize", "fontWeight", "fontStyle", "letterSpacing", "lineHeight",
+    "textTransform", "wordSpacing", "textIndent", "textAlign", "paddingTop", "paddingRight", "paddingBottom",
+    "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "boxSizing",
+    "tabSize", "direction"];
+
+  function renderMirror(ta, mirror) {
+    const cs = getComputedStyle(ta);
+    for (const p of MIRROR_PROPS) mirror.style[p] = cs[p];
+    const value = ta.value;
+    const parts = [];
+    let last = 0;
+    for (const m of value.matchAll(TOKEN_RE_UI)) {
+      if (m.index > last) parts.push(value.slice(last, m.index));
+      parts.push(h("mark", null, m[0]));
+      last = m.index + m[0].length;
+    }
+    parts.push(value.slice(last) + "​"); // 마지막 줄바꿈 높이 유지
+    mirror.replaceChildren(...parts);
+  }
+
+  function placeOverlay() {
+    if (!ov || !ov.editor.isConnected) return;
+    const r = ov.editor.getBoundingClientRect();
+    Object.assign(ov.frame.style, { left: `${r.left - 3}px`, top: `${r.top - 3}px`,
+      width: `${r.width + 6}px`, height: `${r.height + 6}px` });
+    if (ov.mirror) {
+      Object.assign(ov.mirror.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+      ov.mirror.scrollTop = ov.editor.scrollTop;
+      ov.mirror.scrollLeft = ov.editor.scrollLeft;
+    }
+  }
+
+  function showTokenOverlay(editor, count) {
+    ensureRoot();
+    clearTokenOverlay();
+    const revertBtn = h("button", { type: "button", class: "ov-revert",
+      onclick: (e) => { e.stopPropagation(); handlers.revert?.(); },
+      onmousedown: (e) => e.preventDefault() }, "↺ 원문으로 되돌리기");
+    const label = h("div", { class: "ov-label", role: "status" },
+      h("span", { class: "ov-text" }, `SafePrompt · ${count}건 치환됨`), revertBtn);
+    const frame = h("div", { class: "ov-frame" }, label);
+    rootEl.append(frame);
+    let mirror = null;
+    if (editor.tagName === "TEXTAREA") {
+      mirror = h("div", { class: "ov-mirror", "aria-hidden": "true" });
+      rootEl.append(mirror);
+      renderMirror(editor, mirror);
+      editor.addEventListener("scroll", placeOverlay);
+    } else {
+      ensureHighlightStyle();
+      highlightEditable(editor);
+    }
+    ov = { editor, frame, label, mirror, count };
+    placeOverlay();
+  }
+
+  function clearTokenOverlay() {
+    if (!ov) return;
+    ov.frame.remove();
+    ov.mirror?.remove();
+    ov.editor.removeEventListener("scroll", placeOverlay);
+    globalThis.CSS?.highlights?.delete("pg-token");
+    ov = null;
+  }
+
+  // 입력창 DOM 이 다시 그려지면(편집기 재렌더) 강조를 다시 건다.
+  function refreshTokenOverlay() {
+    if (!ov) return;
+    if (ov.mirror) renderMirror(ov.editor, ov.mirror);
+    else highlightEditable(ov.editor);
+    placeOverlay();
+  }
 
   // ── 모달 공통 ──
   // onClose: 사용자가 Esc 등으로 창을 닫았을 때(결정 없이) 한 번 불린다. 결정을 기다리는 창에서 쓴다.
@@ -566,5 +693,6 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
   }
 
   PG.ui = { reviewFiles, setHandlers, renderWidget, hideWidget, shakeWidget, showWarning, showForce,
+            showTokenOverlay, clearTokenOverlay, refreshTokenOverlay, hasTokenOverlay: () => !!ov,
             closeModal, setDiag, hideDiag, toast, isOpen: () => !!overlayEl };
 })();

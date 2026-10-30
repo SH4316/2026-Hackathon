@@ -1,4 +1,5 @@
 // Browser orchestration only. The server API and its implementation are unchanged.
+import { mergeInspect, mergeSanitize } from "./personal.js";
 const rank = { allow: 0, warn: 1, block: 2 };
 const signal = { allow: "green", warn: "yellow", block: "red" };
 const disconnected = (r) => !r?.ok && ["network", "timeout"].includes(r?.error);
@@ -16,20 +17,28 @@ export function withAI(base, ai, source, fallback = false) {
       ...(ai.data.decision !== "allow" ? ["local_ai_pii_without_location"] : [])] };
 }
 
-export async function runInspection({ kind, request, settings, server, ai, guard }) {
+export async function runInspection({ kind, request, settings, server, ai, guard, personalRules = [] }) {
   if (!settings.serverEnabled && !settings.localAiEnabled) return { ok: false, error: "no_inspector" };
+  // Personal rules strengthen either inspection path. Sanitize them BEFORE AI
+  // assessment so the model checks exactly the text that will reach the editor.
+  const addPersonal = (result) => {
+    try {
+      return kind === "sanitize" ? mergeSanitize(result, personalRules, request.context?.destination)
+        : mergeInspect(result, request.text, personalRules, request.context?.destination);
+    } catch { return result; } // Preserve main's behavior for invalid personal rules.
+  };
   // Both run independently. A server failure cannot hide an unfinished AI check.
   const remoteTask = settings.serverEnabled ? server(kind, request) : Promise.resolve(null);
   const aiTask = settings.localAiEnabled && kind === "inspect" ? ai(request.text) : null;
   const remote = await remoteTask;
-  if (!settings.localAiEnabled) return remote;
+  if (!settings.localAiEnabled) return remote?.ok ? { ok: true, data: addPersonal(remote.data) } : remote;
   if (remote && !remote.ok && !disconnected(remote)) {
     if (aiTask) await aiTask;
     return remote; // Authentication / server errors are not a disconnected client.
   }
   const useServer = remote?.ok;
-  const base = useServer ? remote.data
-    : kind === "sanitize" ? guard.sanitizeRequest(request) : guard.inspectRequest(request);
+  const base = addPersonal(useServer ? remote.data
+    : kind === "sanitize" ? guard.sanitizeRequest(request) : guard.inspectRequest(request));
   if (!base || !Object.hasOwn(rank, base.decision) || !["complete", "incomplete", "error"].includes(base.status)
       || !Array.isArray(kind === "sanitize" ? base.remaining_findings : base.findings)) {
     if (aiTask) await aiTask;

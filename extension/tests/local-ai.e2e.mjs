@@ -19,6 +19,12 @@ const server = http.createServer(async (req, res) => {
     res.end(await fs.readFile(path.join(EXT, "test-page/index.html")));
     return;
   }
+  if (req.url === "/v1/auth/enroll") {
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ client_id: "synthetic-client", label: "테스트 클라이언트", token: "synthetic-test-token" }));
+    return;
+  }
+  if (req.url === "/v1/auth/logout") { res.writeHead(204); res.end(); return; }
   if (req.url === "/v1/inspect") {
     serverCalls++;
     const chunks = [];
@@ -57,7 +63,7 @@ const inspect = (text) => message({ type: "inspect", text, inputVersion: ++versi
 try {
   ctx = await launch();
   popup = await openPopup();
-  await settings({ enabled: true, localAiEnabled: false, serverEnabled: false, testMode: false });
+  await settings({ enabled: true, localAiEnabled: false, serverEnabled: false, testMode: false, personalRules: [] });
   await popup.reload();
   await popup.locator("#localAiEnabled").check();
   check("AI switch persists immediately", (await popup.evaluate(() => chrome.storage.local.get("localAiEnabled"))).localAiEnabled);
@@ -89,11 +95,20 @@ try {
   serverDecision = "allow";
   r = await inspect("내 주민번호 901023-1234567 로 등록");
   check("local AI block survives server allow", r.data.decision === "block");
+  check("dashboard enrollment survives the merge", (await message({ type: "enroll", code: "TEST-CODE" })).ok);
+  check("dashboard unlink accepts HTTP 204", (await message({ type: "unlink" })).ok);
+  check("unlink clears stored credentials", (await popup.evaluate(() => chrome.storage.local.get("apiKey"))).apiKey === "");
   await settings({ serverUrl: "http://127.0.0.1:1" });
   r = await inspect("이번 주말에 비 오는지 알려 줘");
   check("disconnected server uses completed local check", r.data.decision === "allow" && r.data.notices.includes("server_unavailable_local_check"));
 
-  await settings({ serverEnabled: false });
+  await settings({ serverEnabled: false, personalRules: [{ id: "my_emp", label: "사번", pattern: "EMP-\\d{6}",
+    action: "mask", token: "MY_EMP_ID", case_sensitive: true, enabled: true }] });
+  r = await inspect("사번 EMP-123456");
+  check("offline AI retains personal regex rules", r.data.decision === "block" && r.data.findings.some((f) => f.rule_id === "personal:my_emp"));
+  const sanitized = await message({ type: "sanitize", text: "사번 EMP-123456", inputVersion: ++version });
+  check("offline sanitize keeps personal tokens and AI assessment", sanitized.data.sanitized_text === "사번 [MY_EMP_ID_1]" && !!sanitized.data.ai_assessment);
+  await settings({ personalRules: [] });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(origin);
@@ -133,10 +148,13 @@ try {
     check(`popup fits width (${theme})`, await popup.evaluate(() => document.documentElement.scrollWidth <= 320));
   }
   const options = await ctx.newPage();
+  options.on("pageerror", (e) => errors.push(e.message));
   await options.goto(new URL("options.html", popup.url()).href);
   await options.setViewportSize({ width: 540, height: 1000 });
   await options.screenshot({ path: path.join(OUT, "options.png"), fullPage: true });
   check("settings contain both independent switches", await options.locator("#localAiEnabled").isChecked() && !(await options.locator("#serverEnabled").isChecked()));
+
+  check("settings keep dashboard linking and personal rules", await options.locator("#linkBtn").isVisible() && await options.locator("#ruleForm").isVisible());
 
   // Terminate the browser too: persistent cache must survive, not just the live session.
   await ctx.close();

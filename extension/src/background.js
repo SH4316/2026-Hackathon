@@ -4,6 +4,8 @@ import { runInspection } from "./inspection.js";
 // 서비스 워커: 서버 검사와 독립적인 기기 내 AI 검사를 조합한다.
 // content script 는 페이지 CORS 의 영향을 받으므로 서버 요청은 모두 여기서 보낸다.
 // 원문은 로그·저장소에 남기지 않는다.
+// 개인 정규식 규칙(설정 화면)은 서버가 모르므로 여기서 서버 판정에 더한다(강화만, src/personal.js).
+import { STORAGE_KEY as PERSONAL_KEY } from "./personal.js";
 
 const DEFAULTS = {
   serverUrl: "http://127.0.0.1:8000",
@@ -36,7 +38,7 @@ async function callServer(method, path, body, settings) {
       signal: ctrl.signal,
     });
     if (!res.ok) return { ok: false, error: `http_${res.status}` };
-    try { return { ok: true, data: await res.json() }; }
+    try { return { ok: true, data: res.status === 204 ? null : await res.json() }; }
     catch { return { ok: false, error: "invalid_inspection" }; }
   } catch (err) {
     return { ok: false, error: err.name === "AbortError" ? "timeout" : "network" };
@@ -56,6 +58,24 @@ function checkRequest(msg) {
   };
 }
 
+// 대시보드 연결: 등록 코드 → 개인 토큰. 토큰은 apiKey 자리에 저장해 이후 모든 검사 요청에 쓴다.
+async function enroll(code) {
+  const res = await callServer("POST", "/v1/auth/enroll", {
+    code, client_type: "browser_extension", device_name: navigator.userAgentData?.platform || null,
+  });
+  if (!res.ok) return res;
+  const { client_id: clientId, label, token } = res.data;
+  await chrome.storage.local.set({ apiKey: token, linkedClient: { clientId, label } });
+  return { ok: true, data: { clientId, label } };
+}
+
+async function unlink() {
+  const res = await callServer("POST", "/v1/auth/logout");
+  // 서버에서 이미 해지됐어도(401) 이 브라우저의 연결 정보는 지운다.
+  if (res.ok || res.error === "http_401") await chrome.storage.local.set({ apiKey: "", linkedClient: null });
+  return res.error === "http_401" ? { ok: true } : res;
+}
+
 // 이 브라우저에만 쌓는 횟수 통계. 원문은 포함하지 않으며 어디로도 전송하지 않는다.
 const STAT_NAMES = ["blocked", "sanitized", "forced"];
 async function bumpStat(name) {
@@ -64,6 +84,11 @@ async function bumpStat(name) {
   stats[name] = (stats[name] || 0) + 1;
   await chrome.storage.local.set({ stats });
   return { ok: true };
+}
+
+async function personalRules() {
+  const { [PERSONAL_KEY]: rules = [] } = await chrome.storage.local.get(PERSONAL_KEY);
+  return rules;
 }
 
 const localGuard = createGuard();
@@ -106,7 +131,8 @@ async function inspect(msg, sender) {
   const s = await getSettings();
   const generation = settingsGeneration;
   const owner = `${sender.tab?.id ?? "extension"}:${sender.frameId ?? 0}:${String(msg.inputVersion).startsWith("file:") ? "file" : "prompt"}`;
-  const res = await runInspection({ kind: msg.type, request: checkRequest(msg), settings: s,
+  const rules = await personalRules();
+  const res = await runInspection({ kind: msg.type, request: checkRequest(msg), settings: s, personalRules: rules,
     server: (kind, req) => callServer("POST", `/v1/${kind}`, req, s),
     ai: async (text) => {
       const status = await aiMessage("status");
@@ -121,7 +147,7 @@ async function inspect(msg, sender) {
 }
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
-  if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey"].some((key) => changes[key])) {
+  if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", PERSONAL_KEY].some((key) => changes[key])) {
     settingsGeneration++;
     // Release model memory and cancel in-flight work when the user turns AI off.
     serializeLifecycle(async () => {
@@ -165,6 +191,12 @@ async function handle(msg, sender) {
       return { ok: true, data: await getSettings() };
     case "stat":
       return bumpStat(msg.name);
+    case "enroll":
+      return enroll(String(msg.code || ""));
+    case "unlink":
+      return unlink();
+    case "me":
+      return callServer("GET", "/v1/auth/me");
     default:
       return { ok: false, error: "unknown_message" };
   }

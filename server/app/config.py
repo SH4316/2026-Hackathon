@@ -41,6 +41,11 @@ class Settings:
     ruleset_db_path: Path = Path("data/ruleset.sqlite3")
     # 대시보드용 관리 키(규칙·탐지기 편집). 일반 API 키와 분리한다.
     admin_keys: list[str] = field(default_factory=list)
+    # 대시보드에서 연결한 개인 클라이언트(등록 코드 → 개인 토큰)
+    clients_db_path: Path = Path("data/clients.sqlite3")
+    enrollment_ttl_minutes: int = 24 * 60
+    # 대시보드 웹 화면의 출처(브라우저에서 관리 API 를 직접 호출할 때). CORS 는 인증을 대체하지 않는다.
+    cors_origins: list[str] = field(default_factory=list)
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -60,4 +65,7 @@ class Settings:
             audit_db_path=Path(os.getenv("PG_AUDIT_DB_PATH", "data/audit.sqlite3")),
             ruleset_db_path=Path(os.getenv("PG_RULESET_DB_PATH", "data/ruleset.sqlite3")),
             admin_keys=_env_list("PG_ADMIN_KEYS"),
+            clients_db_path=Path(os.getenv("PG_CLIENTS_DB_PATH", "data/clients.sqlite3")),
+            enrollment_ttl_minutes=int(os.getenv("PG_ENROLLMENT_TTL_MINUTES", str(24 * 60))),
+            cors_origins=_env_list("PG_CORS_ORIGINS"),
         )

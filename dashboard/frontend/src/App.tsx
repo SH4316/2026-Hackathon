@@ -74,10 +74,16 @@ function Shell() {
       <aside className="sidebar">
         <Link className="brand" to="/">
           <span className="brand-symbol">
-            <Icon name="shield" size={25} />
+            <svg width="25" height="25" viewBox="0 0 48 48" fill="none">
+              <path d="M24 4L8 10V22C8 32.5 14.8 41.9 24 44C33.2 41.9 40 32.5 40 22V10L24 4Z"
+                    fill="#0F172A" stroke="#3B82F6" strokeWidth="3.2" strokeLinejoin="round"/>
+              <circle cx="24" cy="15" r="3.5" fill="#EF4444"/>
+              <circle cx="24" cy="24" r="3.5" fill="#F59E0B"/>
+              <circle cx="24" cy="33" r="3.5" fill="#10B981"/>
+            </svg>
           </span>
           <span className="brand-name">
-            AI 보안 관제<span>사용 기록 대시보드</span>
+            Safe<span className="brand-accent">Prompt</span><span>AI 보안 관제 대시보드</span>
           </span>
         </Link>
         <div className="workspace-label">워크스페이스</div>

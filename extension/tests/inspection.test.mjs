@@ -74,3 +74,40 @@ test("server sanitize rechecks server output, not original text", async () => {
     ai: async (text) => { assert.equal(text, "[EMAIL_1]"); return prediction(); } });
   assert.equal(r.data.inspection_source, "server_and_local_ai");
 });
+
+const personalRule = { id: "my_emp", label: "사번", pattern: "EMP-\\d{6}", action: "mask",
+  token: "MY_EMP_ID", case_sensitive: true, enabled: true };
+
+test("personal rules strengthen server-only, combined and offline AI inspection", async () => {
+  for (const settings of [
+    { serverEnabled: true, localAiEnabled: false },
+    { serverEnabled: true, localAiEnabled: true },
+    { serverEnabled: false, localAiEnabled: true },
+  ]) {
+    const r = await run({ settings, request: { ...request, text: "EMP-123456" }, personalRules: [personalRule] });
+    assert.equal(r.data.decision, "block");
+    assert.ok(r.data.findings.some((f) => f.rule_id === "personal:my_emp"));
+  }
+});
+
+test("AI checks the final personal-rule sanitized text on both server and offline paths", async () => {
+  for (const serverEnabled of [true, false]) {
+    const r = await run({ kind: "sanitize", request: { ...request, text: "사번 EMP-123456" },
+      settings: { serverEnabled, localAiEnabled: true }, personalRules: [personalRule],
+      server: async () => ({ ok: true, data: { ...base, sanitized_text: "사번 EMP-123456", changes: [], remaining_findings: [] } }),
+      ai: async (text) => {
+        assert.equal(text, "사번 [MY_EMP_ID_1]");
+        return prediction();
+      } });
+    assert.equal(r.data.sanitized_text, "사번 [MY_EMP_ID_1]");
+    assert.equal(r.data.changes[0].type, "my_emp");
+  }
+});
+
+test("personal rules cannot clear server errors or an AI block", async () => {
+  const r = await run({ request: { ...request, text: "EMP-123456" }, personalRules: [personalRule],
+    server: async () => ({ ok: true, data: { ...base, status: "incomplete" } }), ai: async () => prediction("block") });
+  assert.equal(r.data.decision, "block");
+  assert.equal(r.data.status, "incomplete");
+  assert.equal(r.data.signal, "gray");
+});

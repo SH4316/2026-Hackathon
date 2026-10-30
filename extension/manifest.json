@@ -51,6 +51,7 @@
         "src/ui.js",
         "src/restore.js",
         "src/pdf.js",
+        "src/office.js",
         "src/files.js",
         "src/local.js",
         "src/content.js"
@@ -66,6 +67,7 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "src/personal.js",
         "vendor/prompt-guard-rules/src/*.js",
         "vendor/prompt-guard-rules/data/*.js",
         "vendor/pdfjs/*.mjs",

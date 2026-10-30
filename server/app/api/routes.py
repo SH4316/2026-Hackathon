@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 
 from app.api.deps import get_pipeline, require_api_key
+from app.clients.store import Client
 from app.config import ModelMode
 from app.schemas import InspectRequest, InspectResponse, SanitizeResponse
 from app.services.pipeline import Pipeline
@@ -15,24 +16,27 @@ def _check_size(req: InspectRequest, request: Request) -> None:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "text too long")
 
 
-@router.post("/v1/inspect", response_model=InspectResponse, dependencies=[Depends(require_api_key)])
-async def inspect(req: InspectRequest, request: Request,
+@router.post("/v1/inspect", response_model=InspectResponse)
+async def inspect(req: InspectRequest, request: Request, client: Client | None = Depends(require_api_key),
                   pipeline: Pipeline = Depends(get_pipeline)) -> InspectResponse:
     _check_size(req, request)
-    return await pipeline.inspect(req)
+    return await pipeline.inspect(req, client_id=client.client_id if client else None)
 
 
-@router.post("/v1/sanitize", response_model=SanitizeResponse, dependencies=[Depends(require_api_key)])
-async def sanitize(req: InspectRequest, request: Request,
+@router.post("/v1/sanitize", response_model=SanitizeResponse)
+async def sanitize(req: InspectRequest, request: Request, client: Client | None = Depends(require_api_key),
                    pipeline: Pipeline = Depends(get_pipeline)) -> SanitizeResponse:
     _check_size(req, request)
-    return await pipeline.sanitize(req)
+    return await pipeline.sanitize(req, client_id=client.client_id if client else None)
 
 
-@router.get("/v1/audit/events", dependencies=[Depends(require_api_key)])
+@router.get("/v1/audit/events")
 async def audit_events(limit: int = Query(100, ge=1, le=1000), since: str | None = None,
+                       client: Client | None = Depends(require_api_key),
                        pipeline: Pipeline = Depends(get_pipeline)) -> dict:
-    return {"events": pipeline.audit.list(limit=limit, since=since)}
+    # 개인 토큰으로는 자기 이벤트만 본다. 전체·사용자별 조회는 대시보드 관리 API(/v1/admin/audit/*).
+    return {"events": pipeline.audit.list(limit=limit, since=since,
+                                          client_id=client.client_id if client else None)}
 
 
 def client_bundle(pipeline: Pipeline) -> dict:
