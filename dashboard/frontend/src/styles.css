@@ -1,25 +1,63 @@
+/* ============================================================
+   SafePrompt Design System — dashboard/styles.css
+   Brand System v1.2 | Deep Navy Dark base
+   ============================================================ */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+
 :root {
   font-family:
-    "Noto Sans KR Variable",
-    "Noto Sans KR",
+    "Pretendard",
+    "Pretendard Variable",
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  color: #243148;
-  background: #f6f8fb;
+  color: #F1F5F9;
+  background: #0B0F19;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --text: #243148;
-  --muted: #5e6c82;
-  --subtle: #f8fafc;
-  --border: #e4e9f0;
-  --blue: #365fc5;
-  --blue-hover: #274ca9;
-  --blue-wash: #edf2ff;
-  --teal: #287b6b;
-  --amber: #94631d;
+
+  /* ── 배경 토큰 ── */
+  --bg-main:   #0B0F19;
+  --bg-card:   #0F172A;
+  --bg-sub:    #1E293B;
+  --bg-input:  #0F172A;
+
+  /* ── 텍스트 토큰 ── */
+  --text:   #F1F5F9;
+  --muted:  #94A3B8;
+  --subtle: #1E293B;
+  --hint:   #64748B;
+
+  /* ── 테두리 ── */
+  --border:      #334155;
+  --border-faint:#1E293B;
+
+  /* ── 브랜드 색상 (Trust Blue) ── */
+  --blue:       #3B82F6;
+  --blue-hover: #2563EB;
+  --blue-wash:  rgba(59, 130, 246, 0.12);
+
+  /* ── 신호등 3색 (Semantic Traffic Lights) ── */
+  --signal-red:         #EF4444;
+  --signal-red-bg:      rgba(239, 68, 68, 0.12);
+  --signal-red-border:  rgba(239, 68, 68, 0.3);
+
+  --signal-yellow:        #F59E0B;
+  --signal-yellow-bg:     rgba(245, 158, 11, 0.12);
+  --signal-yellow-border: rgba(245, 158, 11, 0.3);
+
+  --signal-green:        #10B981;
+  --signal-green-bg:     rgba(16, 185, 129, 0.12);
+  --signal-green-border: rgba(16, 185, 129, 0.3);
+
+  /* ── Tech Cyan ── */
+  --cyan: #06B6D4;
+
+  /* ── 레거시 호환 (기존 코드에서 참조하는 변수명 유지) ── */
+  --teal:  #10B981;
+  --amber: #F59E0B;
   --radius: 12px;
 }
 * {
@@ -135,7 +173,7 @@ strong {
   min-height: 100vh;
 }
 .sidebar {
-  background: #fff;
+  background: var(--bg-card);
   border-right: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -155,15 +193,20 @@ strong {
   height: 41px;
   display: grid;
   place-items: center;
-  background: #20375b;
-  color: #fff;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
   border-radius: 11px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 .brand-name {
   font-size: 17px;
   letter-spacing: -0.035em;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.4;
+  color: var(--text);
+}
+.brand-name > .brand-accent {
+  color: var(--blue);
 }
 .brand-name > span {
   display: block;
@@ -190,7 +233,7 @@ strong {
   display: flex;
   gap: 12px;
   align-items: center;
-  color: #606c82;
+  color: var(--muted);
   border-radius: 7px;
   font-size: 13px;
   font-weight: 500;
@@ -199,12 +242,12 @@ strong {
     color 0.15s;
 }
 .nav-link:hover {
-  background: #f6f8fb;
-  color: #344b72;
+  background: var(--bg-sub);
+  color: var(--text);
 }
 .nav-link.active {
-  background: #edf2fc;
-  color: #365fc5;
+  background: var(--blue-wash);
+  color: var(--blue);
   font-weight: 650;
 }
 .nav-soon {
@@ -258,7 +301,7 @@ strong {
   justify-content: space-between;
   align-items: center;
   padding: 0 36px;
-  background: #fff;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--border);
 }
 .breadcrumb,
@@ -335,10 +378,10 @@ main:focus {
   gap: 7px;
   padding: 9px 13px;
   min-height: 35px;
-  border: 1px solid #dce3ed;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #fff;
-  color: #465570;
+  background: var(--bg-sub);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 550;
   line-height: 1.5;
@@ -348,27 +391,29 @@ main:focus {
     border-color 0.15s;
 }
 .button:hover {
-  background: #f4f7fc;
-  border-color: #b8c7df;
+  background: #2D3748;
+  border-color: #4A5568;
+  color: var(--text);
 }
 .button-primary {
   background: var(--blue);
   border-color: var(--blue);
   color: #fff;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
 }
 .button-primary:hover {
   background: var(--blue-hover);
   border-color: var(--blue-hover);
 }
 .button:disabled {
-  background: #f0f3f7;
-  border-color: #e1e7ef;
-  color: #616c7b;
+  background: var(--bg-sub);
+  border-color: var(--border-faint);
+  color: var(--hint);
 }
 .button-primary:disabled {
-  background: #c7d3ec;
-  border-color: #c7d3ec;
-  color: #465e8c;
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: rgba(255,255,255,0.5);
 }
 .button-small {
   min-width: 31px;
@@ -421,7 +466,7 @@ main:focus {
 .filter-bar {
   margin-bottom: 24px;
   padding: 14px 20px 18px;
-  background: #fff;
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
@@ -478,27 +523,27 @@ select {
   width: 100%;
   height: 35px;
   padding: 7px 9px;
-  background: #fff;
-  color: #3d4b64;
-  border: 1px solid #dfe5ee;
+  background: var(--bg-sub);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 5px;
   font-size: 12px;
   min-width: 0;
   transition: border-color 0.15s;
 }
 input::placeholder {
-  color: #616d7e;
+  color: var(--hint);
   opacity: 1;
 }
 input:hover,
 select:hover {
-  border-color: #b8c5d9;
+  border-color: #4A5568;
 }
 input:focus,
 select:focus {
-  outline: 2px solid #d3dffb;
+  outline: 2px solid rgba(59, 130, 246, 0.25);
   outline-offset: 0;
-  border-color: #7090d4;
+  border-color: var(--blue);
 }
 input[type="date"] {
   font-variant-numeric: tabular-nums;
@@ -543,7 +588,7 @@ select {
 .stat-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  background: #fff;
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 21px 0 19px;
@@ -599,7 +644,7 @@ select {
 .panel {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--bg-card);
   min-width: 0;
 }
 .panel-header {
@@ -686,20 +731,21 @@ select {
   color: #636d7c;
   margin-left: 4px;
 }
+/* 신호등 3색을 카테고리 심각도에 매핑 */
 .category-PERSONAL_DATA {
-  --category: #5776c6;
-  --category-wash: #eef2fc;
-  --category-ink: #3f5b9f;
+  --category: #F59E0B;
+  --category-wash: rgba(245, 158, 11, 0.12);
+  --category-ink: #F59E0B;
 }
 .category-CREDENTIAL {
-  --category: #9782b6;
-  --category-wash: #f4f0f8;
-  --category-ink: #75618d;
+  --category: #EF4444;
+  --category-wash: rgba(239, 68, 68, 0.12);
+  --category-ink: #EF4444;
 }
 .category-CONFIDENTIAL {
-  --category: #ca9673;
-  --category-wash: #fbf3ed;
-  --category-ink: #865b38;
+  --category: #06B6D4;
+  --category-wash: rgba(6, 182, 212, 0.12);
+  --category-ink: #06B6D4;
 }
 .category-dot {
   display: inline-block;
@@ -795,21 +841,26 @@ select {
   border-radius: 50%;
   background: currentColor;
 }
+/* 정책 뱃지 — 신호등 3색 매핑 */
 .policy-TRAINING_ALLOWED {
-  background: #fbf5e9;
-  color: #8c6425;
+  background: var(--signal-yellow-bg);
+  color: var(--signal-yellow);
+  border: 1px solid var(--signal-yellow-border);
 }
 .policy-TRAINING_DISABLED {
-  background: #edf6f2;
-  color: #377765;
+  background: var(--signal-green-bg);
+  color: var(--signal-green);
+  border: 1px solid var(--signal-green-border);
 }
 .policy-UNKNOWN {
-  background: #eff2f7;
-  color: #5e6b81;
+  background: var(--bg-sub);
+  color: var(--muted);
+  border: 1px solid var(--border);
 }
 .policy-NONE {
-  background: #f6f7f9;
-  color: #606b7a;
+  background: var(--bg-sub);
+  color: var(--hint);
+  border: 1px solid var(--border-faint);
 }
 .panel-footnote {
   display: flex;
@@ -949,9 +1000,9 @@ a.person-cell:hover .cell-primary {
   white-space: nowrap;
 }
 .data-table thead {
-  background: #f9fafc;
-  border-top: 1px solid #eaf0f6;
-  border-bottom: 1px solid #eaf0f6;
+  background: var(--bg-sub);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 .data-table th {
   font-size: 11px;
@@ -961,7 +1012,7 @@ a.person-cell:hover .cell-primary {
 }
 .data-table td {
   padding: 16px 13px;
-  border-bottom: 1px solid #edf1f6;
+  border-bottom: 1px solid var(--border-faint);
   font-size: 12px;
 }
 .data-table tr:last-child td {
@@ -976,7 +1027,7 @@ a.person-cell:hover .cell-primary {
   padding-right: 20px;
 }
 .data-table tbody tr:hover {
-  background: #fbfcff;
+  background: var(--bg-sub);
 }
 .sort-indicator {
   font-size: 12px;
@@ -1091,7 +1142,7 @@ a.person-cell:hover .cell-primary {
   background: #fff;
 }
 .skeleton {
-  background: #edf1f6;
+  background: var(--bg-sub);
   border-radius: 6px;
   animation: skeleton-pulse 1.5s ease-in-out infinite alternate;
 }
@@ -1113,10 +1164,10 @@ a.person-cell:hover .cell-primary {
 }
 @keyframes skeleton-pulse {
   from {
-    background-color: #edf1f6;
+    background-color: #1E293B;
   }
   to {
-    background-color: #f7f9fc;
+    background-color: #2D3748;
   }
 }
 .error-state {
@@ -1124,10 +1175,10 @@ a.person-cell:hover .cell-primary {
   align-items: center;
   gap: 14px;
   padding: 22px;
-  border: 1px solid #eadce0;
-  background: #fff;
+  border: 1px solid var(--signal-red-border);
+  background: var(--signal-red-bg);
   border-radius: var(--radius);
-  color: #9b5261;
+  color: var(--signal-red);
 }
 .error-state h3 {
   font-size: 13px;
