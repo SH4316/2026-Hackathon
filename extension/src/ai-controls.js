@@ -1,4 +1,4 @@
-const defaults = { enabled: true, serverEnabled: true, localAiEnabled: false };
+const defaults = { enabled: true, serverEnabled: true, localAiEnabled: false, linkedClient: null };
 
 export async function initAIControls() {
   const server = document.getElementById("serverEnabled");
@@ -11,7 +11,9 @@ export async function initAIControls() {
   let current = { phase: "idle" };
 
   function render() {
-    server.checked = settings.serverEnabled;
+    const org = !!settings.linkedClient?.managed;
+    server.checked = settings.serverEnabled || org;
+    server.disabled = org; // 조직 관리 중에는 서버 검사(대시보드 규칙)를 끌 수 없다
     ai.checked = settings.localAiEnabled;
     const phase = !settings.localAiEnabled || !settings.enabled ? "off" : current.phase;
     const messages = {
@@ -30,6 +32,8 @@ export async function initAIControls() {
     progress.value = current.loaded || 0;
     retry.hidden = !settings.localAiEnabled || !settings.enabled || !["error", "idle"].includes(phase);
     mode.textContent = !settings.enabled ? "전체 검사가 꺼져 있어 전송을 검사하지 않습니다."
+      : org ? `조직 관리 · ${settings.linkedClient.label}: 조직 서버(대시보드 규칙)${settings.localAiEnabled
+        ? "와 기기 내 AI가 함께" : "가"} 검사합니다. 서버에 연결할 수 없으면 전송을 보류합니다.`
       : settings.serverEnabled && settings.localAiEnabled ? "서버와 기기 내 AI가 함께 검사합니다. 서버 연결 실패 시 기기 내 검사로 계속합니다."
       : settings.localAiEnabled ? "기기 내 AI와 기본 규칙으로 검사합니다. 원문을 검사 서버로 보내지 않습니다."
       : settings.serverEnabled ? "서버로 검사합니다. 서버 연결이 끊기면 전송을 보류합니다."

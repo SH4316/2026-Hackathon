@@ -77,6 +77,10 @@ PG.NOTICE_LABELS = {
   destination_policy_stale: "제공사 정책 근거가 오래되어 강화 기준을 적용했습니다.",
   model_check_failed: "문맥 검사(로컬 모델)를 완료하지 못했습니다.",
   model_check_required_but_disabled: "정책상 필요한 문맥 검사(로컬 모델)가 꺼져 있습니다.",
+  org_config_unavailable: "조직 대시보드 규칙을 받을 수 없어 검사를 끝내지 못했습니다.",
+  org_jev_failed: "조직 Jev 판정(로컬 모델)을 완료하지 못했습니다.",
+  org_jev_model_disabled: "조직 Jev 판정에 필요한 로컬 모델이 꺼져 있습니다.",
+  org_jev_unlocated: "조직 Jev 판정에서 위치를 특정하지 못한 항목이 있습니다. 전체 내용을 확인하세요.",
 };
 
 PG.ERROR_LABELS = {
@@ -91,6 +95,10 @@ PG.ERROR_LABELS = {
   http_413: "입력이 너무 길어 검사할 수 없습니다.",
   http_422: "검사 요청 형식이 올바르지 않습니다.",
 };
+
+// 탐지 항목 이름. 조직 대시보드 태그(rule_id org-…)는 서버가 reason 에 태그 이름을 넣어 보낸다.
+PG.findingLabel = (f) =>
+  PG.TYPE_LABELS[f.type] || (String(f.rule_id || "").startsWith("org-") && f.reason ? f.reason : f.type);
 
 PG.errorLabel = (code) =>
   PG.ERROR_LABELS[code] || `검사 서버 오류가 발생했습니다(${code}).`;

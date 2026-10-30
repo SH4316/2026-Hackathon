@@ -32,6 +32,11 @@ export async function runInspection({ kind, request, settings, server, ai, guard
   const aiTask = settings.localAiEnabled && kind === "inspect" ? ai(request.text) : null;
   const remote = await remoteTask;
   if (!settings.localAiEnabled) return remote?.ok ? { ok: true, data: addPersonal(remote.data) } : remote;
+  // 조직 관리: 조직 규칙(대시보드)을 적용하지 못했으면 기기 내 검사만으로 통과시키지 않는다(전송 보류).
+  if (settings.orgManaged && remote && !remote.ok) {
+    if (aiTask) await aiTask;
+    return remote;
+  }
   if (remote && !remote.ok && !disconnected(remote)) {
     if (aiTask) await aiTask;
     return remote; // Authentication / server errors are not a disconnected client.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, Response, status
 
 from app.api.deps import get_pipeline, require_api_key
 from app.clients.store import Client
@@ -17,10 +17,14 @@ def _check_size(req: InspectRequest, request: Request) -> None:
 
 
 @router.post("/v1/inspect", response_model=InspectResponse)
-async def inspect(req: InspectRequest, request: Request, client: Client | None = Depends(require_api_key),
+async def inspect(req: InspectRequest, request: Request, background: BackgroundTasks,
+                  client: Client | None = Depends(require_api_key),
                   pipeline: Pipeline = Depends(get_pipeline)) -> InspectResponse:
     _check_size(req, request)
-    return await pipeline.inspect(req, client_id=client.client_id if client else None)
+    # 대시보드 기록은 응답을 보낸 뒤 보낸다(검사 지연·실패에 영향 없음).
+    return await pipeline.inspect(req, client_id=client.client_id if client else None,
+                                  person_id=client.person_id if client else None,
+                                  schedule=background.add_task)
 
 
 @router.post("/v1/sanitize", response_model=SanitizeResponse)
@@ -85,7 +89,8 @@ async def readyz(pipeline: Pipeline = Depends(get_pipeline)) -> dict:
     if mode is not ModelMode.DISABLED and pipeline.model is not None:
         model_ready = await pipeline.model.ready()
     body = {"policy_version": pipeline.policy.version, "ruleset_version": pipeline.compiled.ruleset.version,
-            "model_mode": mode.value, "model_api": pipeline.settings.model_api, "model_ready": model_ready}
+            "model_mode": mode.value, "model_api": pipeline.settings.model_api, "model_ready": model_ready,
+            "org": pipeline.org.status() if pipeline.org else {"managed": False}}
     mandatory = mode is ModelMode.REQUIRED or pipeline.policy.model_required
     if mandatory and not model_ready:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, body)

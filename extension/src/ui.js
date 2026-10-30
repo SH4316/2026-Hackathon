@@ -483,7 +483,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       const { start_utf16: s, end_utf16: e } = f.span;
       if (s < pos) continue;
       box.append(text.slice(pos, s));
-      box.append(h("mark", { dataset: { action: f.action }, title: PG.TYPE_LABELS[f.type] || f.type },
+      box.append(h("mark", { dataset: { action: f.action }, title: PG.findingLabel(f) },
         text.slice(s, e)));
       pos = e;
     }
@@ -495,7 +495,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     return h("ul", { class: "findings" }, findings.map((f) =>
       h("li", null,
         h("span", { class: "chip", dataset: { action: f.action } }, PG.ACTION_LABELS[f.action] || f.action),
-        h("span", { class: "fname" }, PG.TYPE_LABELS[f.type] || f.type),
+        h("span", { class: "fname" }, PG.findingLabel(f)),
         h("span", { class: "fmeta" },
           [f.reason, PG.CONFIDENCE_LABELS[f.confidence]].filter(Boolean).join(" · ")))));
   }

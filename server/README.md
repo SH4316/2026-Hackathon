@@ -110,6 +110,60 @@ python -m prompt_guard inspect                                  # 대화형 입�
 대시보드에서 사용자별로 조회·집계(`/v1/admin/audit/events`, `/v1/admin/audit/summary`)하고 연결을 해지할 수 있습니다.
 엔드포인트 목록은 [docs/api-contract.md](docs/api-contract.md#대시보드--개인-연결).
 
+## 로컬 모드와 조직 관리 모드
+
+| | 로컬 | 조직 관리 |
+|---|---|---|
+| 조건 | `PG_DASHBOARD_URL` 없음, 또는 확장이 등록 코드로 연결되지 않음 | `PG_DASHBOARD_URL` 이 있는 서버에 대시보드 사람 ID 로 등록 |
+| 자체 판단 | 내장 규칙 + 사용자 규칙 + 문맥 탐지기(서버), 기기 내 AI·개인 정규식(확장) | 같음 |
+| 대시보드 규칙 | 없음 | 대시보드 활성 설정의 태그 `pythonRegex`, Jev 프롬프트(`jevThreshold`)를 모든 검사에 적용 |
+| 기록 | 서버 감사 이벤트(원문 없음)만 | + 전송 시점 검사를 대시보드 `/api/v1/detector-events` 로 전송 |
+
+조직 서버는 대시보드 계약(dashboard/CONTRACT.md)의 "연결된 탐지기" 역할을 합니다.
+
+- **태그 정규식:** Python `re` 로 실행합니다. 4000자 이하, 빈 문자열 일치·중첩 수량자(`(a+)+`)는 건너뜁니다(`/v1/admin/org/status` 의 `skipped_regex`).
+- **Jev:** 프롬프트마다 로컬 모델(decider)이 출력 태그별 점수(0~1)와 근거 구간을 냅니다. 태그의 `jevThreshold` 가 설정된 경우에만
+  `점수 >= 임계값` 이면 탐지입니다. 근거 구간을 원문에서 찾지 못하면 위치 없이 최소 `warn` 입니다(`org_jev_unlocated`).
+- 대시보드 태그 탐지의 조치는 조직 설정 `tag_action`(기본 `mask`, 토큰 `[ORG_<태그>_n]`)이며 목적지 등급으로 강화됩니다.
+  태그 ID 가 내장 유형과 같으면 유형 이름은 `org_<태그 ID>` 이고 기록할 때 원래 태그로 되돌립니다.
+- 기존 규칙 결과는 취소하지 않고 합쳐서 더 엄격한 쪽을 적용합니다.
+- **대시보드에 연결할 수 없거나 활성 버전이 없으면** 조직 규칙을 적용하지 못했으므로 회색(`org_config_unavailable`)입니다.
+  Jev 모델이 꺼져 있거나 실패해도 회색(`org_jev_model_disabled`, `org_jev_failed`, 모델 필수면 error)이며 allow 하지 않습니다.
+- 활성 설정은 `PG_DASHBOARD_REFRESH_S`(기본 30초)마다 다시 받습니다. 바로 반영하려면 `POST /v1/admin/org/refresh`.
+
+### 조직 설정 (`GET·PUT /v1/admin/org/settings`, 관리 키)
+
+```json
+{ "report_text": "masked", "tag_map": {"email": "pii-3", "phone": "pii-2"},
+  "tag_action": "mask", "jev_enabled": true, "source_id": "prompt-guard" }
+```
+
+| 항목 | 의미 |
+|---|---|
+| `report_text` | 대시보드로 보내는 원문 처리. `masked`(기본): 탐지 구간을 모두 `[TOKEN_n]` 으로 바꾼 문장 / `full`: 원문 그대로 / `off`: 기록 안 함 |
+| `tag_map` | 서버 탐지 유형 → 대시보드 태그 ID. 현재 활성 버전에 없는 태그는 빼고 보냄 |
+| `tag_action` | 대시보드 태그 탐지 시 조치(`warn`·`mask`·`block`) |
+| `jev_enabled` | 끄면 태그 정규식만 적용 |
+| `source_id` | 대시보드 기록의 생산자 이름공간 |
+
+### 대시보드에 기록되는 것
+
+- 대시보드 사람 ID 로 등록한 개인 토큰의 **전송 시점** 검사(`context.stage` 가 `draft` 가 아닌 것)만 보냅니다.
+  확장은 입력 중 검사를 `draft`, 전송·파일 첨부 직전 검사를 `submit` 으로 보냅니다. 정적 API 키 요청은 보내지 않습니다.
+- 응답을 돌려준 뒤 보내므로 검사 시간에 영향이 없습니다. 활성 버전이 바뀌었으면(409) 설정을 다시 받아 한 번 재시도하고,
+  실패 건수는 `/v1/admin/org/status` 의 `report_failures` 에 오류 코드별로 남습니다(원문은 로그에 남기지 않음).
+- 겹쳐서 하나로 병합된 탐지도 병합 전 후보마다 보내 각 태그가 집계되게 합니다.
+
+### 사용자 등록
+
+```bash
+# 대시보드에 등록된 사람(person_id)으로 등록 코드 발급. label 을 비우면 대시보드의 이름을 씀
+curl -X POST $SERVER/v1/admin/enrollments -H "X-Admin-Key: $ADMIN" -H "Content-Type: application/json" \
+  -d '{"person_id": "person-01"}'
+```
+
+사용자가 확장 설정의 "대시보드 연결"에 코드를 넣으면 조직 관리 모드가 됩니다. 대시보드에 없는 사람이면 422 입니다.
+
 ## 탐지 모듈·대시보드 규칙 관리
 
 내장 규칙 외에 대시보드에서 **사용자 규칙(키워드·정규식)**과 **문맥 탐지기(정규식으로 판단할 수 없는 기준을 로컬 모델로 판단)**를

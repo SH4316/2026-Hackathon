@@ -54,6 +54,7 @@ class Client:
     created_at: str
     last_seen_at: str | None
     revoked_at: str | None
+    person_id: str | None = None  # 대시보드 사람 ID(조직 관리). 있으면 이 클라이언트의 검사를 대시보드에 기록한다.
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -74,22 +75,28 @@ class ClientStore:
             " client_type TEXT NOT NULL, device_name TEXT, created_at TEXT NOT NULL,"
             " last_seen_at TEXT, revoked_at TEXT);"
         )
+        # 이전 버전 DB 에 대시보드 사람 ID 열 추가
+        for table in ("enrollments", "clients"):
+            cols = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})")}
+            if "person_id" not in cols:
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN person_id TEXT")
         self._conn.commit()
         self._seen: dict[str, float] = {}
 
     # ── 대시보드(관리자) ──
-    def create_enrollment(self, label: str, ttl: timedelta, actor: str) -> dict:
+    def create_enrollment(self, label: str, ttl: timedelta, actor: str, person_id: str | None = None) -> dict:
         raw = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(8))
         code = f"{raw[:4]}-{raw[4:]}"
         now = _now()
         with self._lock:
-            self._conn.execute("INSERT INTO enrollments VALUES (?, ?, ?, ?, ?, NULL)",
-                               (_hash(raw), label, actor, _iso(now), _iso(now + ttl)))
+            self._conn.execute("INSERT INTO enrollments (code_hash, label, created_by, created_at, expires_at,"
+                               " used_at, person_id) VALUES (?, ?, ?, ?, ?, NULL, ?)",
+                               (_hash(raw), label, actor, _iso(now), _iso(now + ttl), person_id))
             self._conn.commit()
-        return {"code": code, "label": label, "expires_at": _iso(now + ttl)}
+        return {"code": code, "label": label, "person_id": person_id, "expires_at": _iso(now + ttl)}
 
     def list_clients(self, include_revoked: bool = False) -> list[Client]:
-        sql = "SELECT client_id, label, client_type, device_name, created_at, last_seen_at, revoked_at FROM clients"
+        sql = "SELECT client_id, label, client_type, device_name, created_at, last_seen_at, revoked_at, person_id FROM clients"
         if not include_revoked:
             sql += " WHERE revoked_at IS NULL"
         with self._lock:
@@ -99,7 +106,7 @@ class ClientStore:
     def get(self, client_id: str) -> Client | None:
         with self._lock:
             row = self._conn.execute(
-                "SELECT client_id, label, client_type, device_name, created_at, last_seen_at, revoked_at"
+                "SELECT client_id, label, client_type, device_name, created_at, last_seen_at, revoked_at, person_id"
                 " FROM clients WHERE client_id = ?", (client_id,)).fetchone()
         return Client(*row) if row else None
 
@@ -122,18 +129,20 @@ class ClientStore:
         now = _now()
         with self._lock:
             row = self._conn.execute(
-                "SELECT label, expires_at FROM enrollments WHERE code_hash = ? AND used_at IS NULL",
+                "SELECT label, expires_at, person_id FROM enrollments WHERE code_hash = ? AND used_at IS NULL",
                 (_hash(normalize_code(code)),)).fetchone()
             if not row or datetime.fromisoformat(row[1]) <= now:
                 raise EnrollmentInvalid
             token = TOKEN_PREFIX + secrets.token_urlsafe(32)
             client = Client(client_id=str(uuid.uuid4()), label=row[0], client_type=client_type,
-                            device_name=device_name, created_at=_iso(now), last_seen_at=None, revoked_at=None)
+                            device_name=device_name, created_at=_iso(now), last_seen_at=None, revoked_at=None,
+                            person_id=row[2])
             self._conn.execute("UPDATE enrollments SET used_at = ? WHERE code_hash = ?",
                                (_iso(now), _hash(normalize_code(code))))
-            self._conn.execute("INSERT INTO clients VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)",
+            self._conn.execute("INSERT INTO clients (client_id, token_hash, label, client_type, device_name,"
+                               " created_at, person_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
                                (client.client_id, _hash(token), client.label, client.client_type,
-                                client.device_name, client.created_at))
+                                client.device_name, client.created_at, client.person_id))
             self._conn.commit()
         return client, token
 
@@ -143,7 +152,7 @@ class ClientStore:
             return None
         with self._lock:
             row = self._conn.execute(
-                "SELECT client_id, label, client_type, device_name, created_at, last_seen_at, revoked_at"
+                "SELECT client_id, label, client_type, device_name, created_at, last_seen_at, revoked_at, person_id"
                 " FROM clients WHERE token_hash = ? AND revoked_at IS NULL", (_hash(token),)).fetchone()
             if not row:
                 return None

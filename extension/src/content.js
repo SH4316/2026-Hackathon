@@ -133,7 +133,7 @@
     const counts = new Map();
     for (const f of findings || []) {
       if (f.action === "allow") continue;
-      const label = PG.TYPE_LABELS[f.type] || f.type;
+      const label = PG.findingLabel(f);
       counts.set(label, (counts.get(label) || 0) + 1);
     }
     return [...counts].map(([l, n]) => `${l} ${n}건`).join(", ");
@@ -240,10 +240,11 @@
     }
   }
 
-  async function inspect(text) {
+  // stage: draft(입력 중) | submit(전송 직전). 조직 서버는 submit 만 대시보드에 기록한다.
+  async function inspect(text, stage = "draft") {
     const v = ++version;
     const res = await chrome.runtime.sendMessage({
-      type: "inspect", text, inputVersion: v, destination: PG.resolveDestination(),
+      type: "inspect", text, inputVersion: v, destination: PG.resolveDestination(), stage,
     }).catch(() => ({ ok: false, error: "network" }));
     const entry = { version: v, text, result: res?.ok ? res.data : null, error: res?.ok ? null : res?.error };
     // 응답이 늦게 와서 더 새로운 요청이 있으면 버린다
@@ -469,7 +470,7 @@
   async function gate(ed, text) {
     clearTimeout(timer);
     refresh();
-    const entry = await inspect(text);
+    const entry = await inspect(text, "submit");
     if (!entry) return;
     if (getText(ed) !== text) { scheduleInspect(ed); return; } // 검사 중 입력이 바뀜 → 보내지 않음
     refresh();

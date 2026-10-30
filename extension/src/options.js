@@ -42,7 +42,9 @@ const LINK_ERRORS = {
 };
 
 function renderLink(linked) {
-  $("linkState").textContent = linked ? `연결됨 · ${linked.label}` : "연결 안 됨";
+  $("linkState").textContent = !linked ? "로컬 모드 · 대시보드에 연결되지 않았습니다."
+    : linked.managed ? `조직 관리 · ${linked.label}${linked.personId ? ` (${linked.personId})` : ""}`
+    : `연결됨 · ${linked.label}`;
   $("linkForm").hidden = !!linked;
   $("linkBtn").hidden = !!linked;
   $("unlinkBtn").hidden = !linked;
