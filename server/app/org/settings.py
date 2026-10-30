@@ -42,7 +42,21 @@ class OrgSettingsBody(BaseModel):
 
 class OrgSettings(OrgSettingsBody):
     version: int
-    updated_at: str
+    updated_at: str | None
+    # server: 이 서버의 관리 API로 정한 값 / dashboard: 연결된 대시보드의 '검사 서버 연결' 설정(우선)
+    source: Literal["server", "dashboard"] = "server"
+
+    @property
+    def key(self) -> tuple[str, int]:
+        return (self.source, self.version)
+
+
+def from_dashboard(data: dict, source_id: str) -> OrgSettings:
+    """대시보드 GET /api/v1/detector-settings 응답(camelCase) → 조직 설정."""
+    return OrgSettings(report_text=data["reportText"], tag_map=data.get("tagMap") or {},
+                       tag_action=data["tagAction"], jev_enabled=bool(data["jevEnabled"]),
+                       source_id=source_id, version=int(data["revision"]), updated_at=data.get("updatedAt"),
+                       source="dashboard")
 
 
 class OrgSettingsStore:

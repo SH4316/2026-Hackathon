@@ -90,6 +90,7 @@ def main():
         db_env, mysql_env, pg_env = (services[name]["environment"] for name in ("dashboard", "mysql", "server"))
         require(db_env["DB_URL"] == "jdbc:mysql://mysql:3306/ai_security_dashboard?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true", "DB URL must use internal MySQL")
         require(pg_env["PG_DASHBOARD_URL"] == "http://dashboard:8080", "Dashboard URL must use internal service")
+        require("PG_DASHBOARD_CONNECTION" in pg_env, "Dashboard connection URL must be passed to the server")
         require(pg_env["PG_MODEL_API"] == "decider" and pg_env["PG_MODEL_BASE_URL"] == "http://decider:8000"
                 and pg_env["PG_MODEL_NAME"] == "Mapika/decider-4b" and not pg_env["PG_MODEL_API_KEY"],
                 "Model must use internal Decider typed-decision API")

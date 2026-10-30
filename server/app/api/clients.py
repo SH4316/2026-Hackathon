@@ -45,11 +45,24 @@ class EnrollResponse(BaseModel):
 
 
 @router.post("/v1/auth/enroll", response_model=EnrollResponse, status_code=status.HTTP_201_CREATED)
-def enroll(body: EnrollRequest, request: Request, clients: ClientStore = Depends(get_clients)) -> EnrollResponse:
+async def enroll(body: EnrollRequest, request: Request,
+                 clients: ClientStore = Depends(get_clients)) -> EnrollResponse:
+    """이 서버가 발급한 코드, 또는 (조직 서버면) 대시보드 사람 화면에서 발급한 코드."""
+    invalid = HTTPException(status.HTTP_400_BAD_REQUEST, "등록 코드가 올바르지 않거나 만료되었습니다")
     try:
         client, token = clients.enroll(body.code, body.client_type.value, body.device_name)
     except EnrollmentInvalid:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "등록 코드가 올바르지 않거나 만료되었습니다") from None
+        dashboard = request.app.state.org.client
+        if dashboard is None:
+            raise invalid from None
+        try:
+            person = await dashboard.redeem(body.code)
+        except DashboardUnavailable:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "대시보드에 연결할 수 없습니다") from None
+        if person is None:
+            raise invalid from None
+        client, token = clients.create_client(str(person.get("name") or person["personId"]),
+                                              body.client_type.value, body.device_name, person["personId"])
     return EnrollResponse(client_id=client.client_id, label=client.label, token=token, person_id=client.person_id,
                           managed=request.app.state.org.enabled)
 

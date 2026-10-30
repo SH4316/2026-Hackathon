@@ -63,7 +63,7 @@ const inspect = (text) => message({ type: "inspect", text, inputVersion: ++versi
 try {
   ctx = await launch();
   popup = await openPopup();
-  await settings({ enabled: true, localAiEnabled: false, serverEnabled: false, testMode: false, personalRules: [] });
+  await settings({ enabled: true, localAiEnabled: false, serverEnabled: false, personalRules: [] });
   await popup.reload();
   await popup.locator("#localAiEnabled").check();
   check("AI switch persists immediately", (await popup.evaluate(() => chrome.storage.local.get("localAiEnabled"))).localAiEnabled);

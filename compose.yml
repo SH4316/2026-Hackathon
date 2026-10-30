@@ -73,6 +73,9 @@ services:
       PG_CORS_ORIGINS: ${PG_CORS_ORIGINS:-}
       # The server reads active rules and records events through this internal URL.
       PG_DASHBOARD_URL: http://dashboard:8080
+      # Connection URL issued on the dashboard's 검사 서버 연결 screen (dashboard address http://dashboard:8080).
+      # Takes precedence over PG_DASHBOARD_URL; required once any connection has been issued.
+      PG_DASHBOARD_CONNECTION: ${PG_DASHBOARD_CONNECTION:-}
       PG_DASHBOARD_TIMEOUT_S: ${PG_DASHBOARD_TIMEOUT_S:-5}
       PG_DASHBOARD_REFRESH_S: ${PG_DASHBOARD_REFRESH_S:-30}
     ports:

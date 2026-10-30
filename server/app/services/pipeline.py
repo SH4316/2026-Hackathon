@@ -128,7 +128,7 @@ class Pipeline:
             org = await self.org.rules(set(base.types))
         except DashboardUnavailable:
             return RequestRules(base, org_unavailable=True)
-        key = (self.compiled.ruleset.version, org.key, self.org.settings.version)
+        key = (self.compiled.ruleset.version, org.key, self.org.settings.key)
         if self._org_policy is None or self._org_policy[0] != key:
             self._org_policy = (key, base.with_custom_types(org.type_policies(self.org.settings.tag_action)))
         return RequestRules(self._org_policy[1], org)
