@@ -1,5 +1,7 @@
 package com.example.securitydashboard.detector;
 
+import com.example.securitydashboard.detector.model.CreateDetectorEvent;
+import com.example.securitydashboard.detector.model.StoredDetectorEvent;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -13,7 +15,12 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/detector-events")
@@ -37,7 +44,7 @@ class DetectorEventController {
       content =
           @Content(
               mediaType = "application/json",
-              schema = @Schema(implementation = DetectorModels.CreateDetectorEvent.class),
+              schema = @Schema(implementation = CreateDetectorEvent.class),
               examples =
                   @ExampleObject(
                       value =
@@ -55,8 +62,7 @@ class DetectorEventController {
   @ApiResponse(responseCode = "200", description = "동일한 이벤트 재전송. 기존 이벤트와 첨부 메타데이터 반환")
   @ApiResponse(responseCode = "413", description = "요청 본문이 16MiB 초과")
   @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-  ResponseEntity<DetectorModels.StoredDetectorEvent> create(
-      @Valid @RequestBody DetectorModels.CreateDetectorEvent input) {
+  ResponseEntity<StoredDetectorEvent> create(@Valid @RequestBody CreateDetectorEvent input) {
     var result = service.ingest(input);
     return result.created()
         ? ResponseEntity.created(URI.create("/api/v1/detector-events/" + result.event().id()))
@@ -68,7 +74,7 @@ class DetectorEventController {
       summary = "저장한 InspectResponse와 첨부 메타데이터",
       description = "이미지 원본은 download_path로 조회합니다. 응답에 Base64를 포함하지 않습니다.")
   @GetMapping("/{id}")
-  DetectorModels.StoredDetectorEvent get(@PathVariable long id) {
+  StoredDetectorEvent get(@PathVariable long id) {
     return service.get(id);
   }
 

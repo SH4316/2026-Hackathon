@@ -1,10 +1,15 @@
 package com.example.securitydashboard.detector;
 
-import com.example.securitydashboard.api.ApiModels;
 import com.example.securitydashboard.common.ApiException;
 import com.example.securitydashboard.common.InputValidation;
 import com.example.securitydashboard.configuration.ConfigurationService;
+import com.example.securitydashboard.detector.model.CreateDetectorEvent;
+import com.example.securitydashboard.detector.model.FileName;
+import com.example.securitydashboard.detector.model.ImageInput;
+import com.example.securitydashboard.detector.model.InspectResponse;
 import com.example.securitydashboard.event.CanonicalEvent;
+import com.example.securitydashboard.event.model.CreateDetection;
+import com.example.securitydashboard.event.model.CreateEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,7 +20,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -39,101 +51,136 @@ class DetectorEventNormalizer {
     this.clock = clock;
   }
 
-  NormalizedEvent normalize(DetectorModels.CreateDetectorEvent input) {
-    if (!validator.validate(input).isEmpty())
+  NormalizedEvent normalize(CreateDetectorEvent input) {
+    if (!validator.validate(input).isEmpty()) {
       throw ApiException.invalid("detector_event", "필수 값과 수집 봉투 형식을 확인해 주세요.");
-    var result = inspectResponse(input.result());
-    validateUnicode(input.result());
-    if (result.requestId().codePointCount(0, result.requestId().length()) > 128
-        || result.requestId().isEmpty())
-      throw ApiException.invalid("result.request_id", "요청 ID는 유니코드 문자 1~128자여야 합니다.");
-    JsonNode inputVersion = result.inputVersion();
-    if (!inputVersion.isTextual() && !inputVersion.isIntegralNumber())
-      throw ApiException.invalid("result.input_version", "입력 버전은 정수 또는 문자열이어야 합니다.");
-
+    }
+    var result = validateResponse(input.result());
     var tagMap = input.tagMap() == null ? Map.<String, String>of() : input.tagMap();
     Set<String> tags = new HashSet<>();
     configs.tags(input.versionId()).forEach(tag -> tags.add(tag.id()));
+    validateTagMap(tagMap, tags);
+    var detections = mapDetections(input.text(), result, tagMap, tags);
+    var files = input.files() == null ? List.<FileName>of() : input.files();
+    files.forEach(file -> validateName(file.name(), "files.name"));
+    var images = decodeImages(input.images());
+    var event = canonicalEvent(input, result, detections);
+    var envelope = envelope(input, files, tagMap, images);
+    String contentHash = fingerprint(event, envelope);
+    return new NormalizedEvent(event, encode(envelope), contentHash, List.copyOf(images));
+  }
+
+  private InspectResponse validateResponse(JsonNode rawResult) {
+    var result = inspectResponse(rawResult);
+    validateUnicode(rawResult);
+    if (result.requestId().codePointCount(0, result.requestId().length()) > 128
+        || result.requestId().isEmpty()) {
+      throw ApiException.invalid("result.request_id", "요청 ID는 유니코드 문자 1~128자여야 합니다.");
+    }
+    JsonNode inputVersion = result.inputVersion();
+    if (!inputVersion.isTextual() && !inputVersion.isIntegralNumber()) {
+      throw ApiException.invalid("result.input_version", "입력 버전은 정수 또는 문자열이어야 합니다.");
+    }
+    return result;
+  }
+
+  private static void validateTagMap(Map<String, String> tagMap, Set<String> tags) {
     tagMap.forEach(
         (type, tag) -> {
-          if (type == null || tag == null || InputValidation.hasUnpairedSurrogate(type))
+          if (type == null || tag == null || InputValidation.hasUnpairedSurrogate(type)) {
             throw ApiException.invalid("tag_map", "유형과 태그 ID는 문자열이어야 합니다.");
+          }
           InputValidation.validateId(tag, "tag_map");
-          if (!tags.contains(tag))
+          if (!tags.contains(tag)) {
             throw new ApiException(
                 HttpStatus.UNPROCESSABLE_ENTITY, "TAG_NOT_IN_VERSION", "설정 버전에 등록되지 않은 태그 매핑입니다.");
+          }
         });
+  }
 
-    String text = input.text();
+  private static List<CreateDetection> mapDetections(
+      String text, InspectResponse result, Map<String, String> tagMap, Set<String> tags) {
     if (InputValidation.hasUnpairedSurrogate(text)
-        || text.codePointCount(0, text.length()) > 200000)
+        || text.codePointCount(0, text.length()) > 200000) {
       throw ApiException.invalid("text", "원문은 올바른 유니코드 문자 200000자 이하여야 합니다.");
+    }
     int length = text.codePointCount(0, text.length());
-    List<ApiModels.CreateDetection> detections = new ArrayList<>();
+    List<CreateDetection> detections = new ArrayList<>();
     for (var finding : result.findings()) {
       var span = finding.span();
-      if (span.start() < 0 || span.end() <= span.start() || span.end() > length)
+      if (span.start() < 0 || span.end() <= span.start() || span.end() > length) {
         throw ApiException.invalid("result.findings.span", "탐지 범위는 원문의 유니코드 문자 범위 안에 있어야 합니다.");
+      }
       int startUtf16 = text.offsetByCodePoints(0, span.start());
       int endUtf16 = text.offsetByCodePoints(0, span.end());
-      if (span.startUtf16() != startUtf16 || span.endUtf16() != endUtf16)
+      if (span.startUtf16() != startUtf16 || span.endUtf16() != endUtf16) {
         throw ApiException.invalid("result.findings.span", "코드 포인트와 UTF-16 탐지 범위가 일치하지 않습니다.");
+      }
       String mapped = tagMap.getOrDefault(finding.type(), finding.type());
       List<String> mappedTags = tags.contains(mapped) ? List.of(mapped) : List.of();
       detections.add(
-          new ApiModels.CreateDetection(
+          new CreateDetection(
               span.start(), span.end(), text.substring(startUtf16, endUtf16), mappedTags));
     }
-    var files = input.files() == null ? List.<DetectorModels.FileName>of() : input.files();
-    files.forEach(file -> validateName(file.name(), "files.name"));
-    List<DecodedImage> images = decodeImages(input.images());
-    var identity = json.createArrayNode().add(input.sourceId()).add(result.requestId());
-    identity.add(inputVersion);
-    String eventId = "d_" + hash(encode(identity).getBytes(StandardCharsets.UTF_8));
-    var canonical =
-        CanonicalEvent.from(
-            new ApiModels.CreateEvent(
-                input.sourceId(),
-                eventId,
-                input.personId(),
-                input.versionId(),
-                text,
-                detections,
-                input.occurredAt(),
-                input.service() == null ? result.destination().provider() : input.service(),
-                input.model(),
-                input.policyStateId()),
-            clock,
-            true);
+    return detections;
+  }
 
+  private CanonicalEvent canonicalEvent(
+      CreateDetectorEvent input, InspectResponse result, List<CreateDetection> detections) {
+    var identity = json.createArrayNode().add(input.sourceId()).add(result.requestId());
+    identity.add(result.inputVersion());
+    String eventId = "d_" + hash(encode(identity).getBytes(StandardCharsets.UTF_8));
+    return CanonicalEvent.from(
+        new CreateEvent(
+            input.sourceId(),
+            eventId,
+            input.personId(),
+            input.versionId(),
+            input.text(),
+            detections,
+            input.occurredAt(),
+            input.service() == null ? result.destination().provider() : input.service(),
+            input.model(),
+            input.policyStateId()),
+        clock,
+        true);
+  }
+
+  private ObjectNode envelope(
+      CreateDetectorEvent input,
+      List<FileName> files,
+      Map<String, String> tagMap,
+      List<DecodedImage> images) {
     ObjectNode envelope = json.valueToTree(input);
     envelope.set("files", json.valueToTree(files));
     envelope.set("tag_map", json.valueToTree(tagMap));
     ArrayNode imageMetadata = json.createArrayNode();
-    for (var image : images)
+    for (var image : images) {
       imageMetadata.add(
           json.createObjectNode()
               .put("name", image.name())
               .put("media_type", image.mediaType())
               .put("size_bytes", image.data().length)
               .put("sha256", hash(image.data())));
+    }
     envelope.set("images", imageMetadata);
-    // Use normalized event fields in the replay fingerprint, retaining the raw response itself.
-    ObjectNode fingerprint = envelope.deepCopy();
-    fingerprint.put("service", canonical.service());
-    fingerprint.put("model", canonical.model());
-    fingerprint.put(
-        "occurred_at", canonical.occurredAt() == null ? null : canonical.occurredAt().toString());
-    String contentHash = hash(encode(sorted(fingerprint)).getBytes(StandardCharsets.UTF_8));
-    String storedEnvelope = encode(envelope);
-
-    return new NormalizedEvent(canonical, storedEnvelope, contentHash, List.copyOf(images));
+    return envelope;
   }
 
-  private DetectorModels.InspectResponse inspectResponse(JsonNode value) {
+  private String fingerprint(CanonicalEvent event, ObjectNode envelope) {
+    // Use normalized event fields in the replay fingerprint, retaining the raw response itself.
+    ObjectNode fingerprint = envelope.deepCopy();
+    fingerprint.put("service", event.service());
+    fingerprint.put("model", event.model());
+    fingerprint.put(
+        "occurred_at", event.occurredAt() == null ? null : event.occurredAt().toString());
+    return hash(encode(sorted(fingerprint)).getBytes(StandardCharsets.UTF_8));
+  }
+
+  private InspectResponse inspectResponse(JsonNode value) {
     if (!value.isObject()) throw ApiException.invalid("result", "InspectResponse 객체를 입력해 주세요.");
     try {
-      var result = json.treeToValue(value, DetectorModels.InspectResponse.class);
+      var result = json.treeToValue(value, InspectResponse.class);
       if (!validator.validate(result).isEmpty()
           || (value.has("notices") && value.get("notices").isNull()))
         throw ApiException.invalid("result", "InspectResponse의 필수 값과 형식을 확인해 주세요.");
@@ -144,7 +191,7 @@ class DetectorEventNormalizer {
     }
   }
 
-  private List<DecodedImage> decodeImages(List<DetectorModels.ImageInput> input) {
+  private List<DecodedImage> decodeImages(List<ImageInput> input) {
     if (input == null) return List.of();
     List<DecodedImage> result = new ArrayList<>();
     int total = 0;
@@ -245,9 +292,4 @@ class DetectorEventNormalizer {
       throw new IllegalStateException("SHA-256 unavailable");
     }
   }
-
-  record DecodedImage(String name, String mediaType, byte[] data) {}
-
-  record NormalizedEvent(
-      CanonicalEvent event, String envelope, String contentHash, List<DecodedImage> images) {}
 }

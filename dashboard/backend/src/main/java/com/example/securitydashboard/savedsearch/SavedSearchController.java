@@ -1,15 +1,27 @@
 package com.example.securitydashboard.savedsearch;
 
-import com.example.securitydashboard.api.ApiModels;
+import com.example.securitydashboard.api.model.Page;
 import com.example.securitydashboard.common.ApiException;
+import com.example.securitydashboard.event.model.Event;
 import com.example.securitydashboard.query.PageRequest;
+import com.example.securitydashboard.query.model.Metrics;
+import com.example.securitydashboard.savedsearch.model.CreateSavedSearch;
+import com.example.securitydashboard.savedsearch.model.SavedSearch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
-import java.util.*;
+import java.util.List;
+import java.util.Set;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -27,21 +39,20 @@ class SavedSearchController {
           "현재 페이지가 아닌 모든 이벤트 ID와 절대 기간, 게시한 해석 버전을 한 트랜잭션으로 저장합니다. 이후 이벤트 유입이나 활성 버전 변경으로 멤버십과 집계가"
               + " 바뀌지 않습니다.")
   @PostMapping("/saved-searches")
-  ResponseEntity<ApiModels.SavedSearch> createSaved(
-      @RequestBody ApiModels.CreateSavedSearch input) {
+  ResponseEntity<SavedSearch> createSaved(@RequestBody CreateSavedSearch input) {
     var value = saved.create(input);
     return ResponseEntity.created(URI.create("/api/v1/saved-searches/" + value.id())).body(value);
   }
 
   @Tag(name = "저장 검색")
   @GetMapping("/saved-searches")
-  List<ApiModels.SavedSearch> savedList() {
+  List<SavedSearch> savedList() {
     return saved.list();
   }
 
   @Tag(name = "저장 검색")
   @GetMapping("/saved-searches/{id}")
-  ApiModels.SavedSearch saved(@PathVariable String id) {
+  SavedSearch saved(@PathVariable String id) {
     return saved.get(id);
   }
 
@@ -54,7 +65,7 @@ class SavedSearchController {
 
   @Tag(name = "저장 검색")
   @GetMapping("/saved-searches/{id}/events")
-  ApiModels.Page<ApiModels.Event> savedEvents(
+  Page<Event> savedEvents(
       @PathVariable String id, @RequestParam MultiValueMap<String, String> parameters) {
     parameters.forEach(
         (name, values) -> {
@@ -66,7 +77,7 @@ class SavedSearchController {
 
   @Tag(name = "저장 검색")
   @GetMapping("/saved-searches/{id}/metrics")
-  ApiModels.Metrics savedMetrics(@PathVariable String id) {
+  Metrics savedMetrics(@PathVariable String id) {
     return saved.metrics(id);
   }
 }

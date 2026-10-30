@@ -1,10 +1,13 @@
 package com.example.securitydashboard.query;
 
-import com.example.securitydashboard.api.ApiModels;
 import com.example.securitydashboard.common.ApiException;
 import com.example.securitydashboard.common.InputValidation;
-import java.time.*;
-import java.util.*;
+import com.example.securitydashboard.query.model.Filters;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.Set;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -92,7 +95,7 @@ public record EventFilter(
         unmapped != null);
   }
 
-  public static EventFilter parse(ApiModels.Filters input, Clock clock) {
+  public static EventFilter parse(Filters input, Clock clock) {
     var query = new LinkedMultiValueMap<String, String>();
     if (input != null) {
       add(query, "from", input.from());
@@ -125,8 +128,8 @@ public record EventFilter(
         unmapped);
   }
 
-  public ApiModels.Filters snapshot() {
-    return new ApiModels.Filters(
+  public Filters snapshot() {
+    return new Filters(
         from.toString(),
         to.toString(),
         versionId,

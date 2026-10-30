@@ -1,19 +1,22 @@
 package com.example.securitydashboard.event;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.securitydashboard.api.ApiModels;
 import com.example.securitydashboard.common.ApiException;
-import java.time.*;
-import java.util.*;
+import com.example.securitydashboard.event.model.CreateDetection;
+import com.example.securitydashboard.event.model.CreateEvent;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CanonicalEventTest {
   private final Clock clock = Clock.fixed(Instant.parse("2026-10-30T12:00:00Z"), ZoneOffset.UTC);
 
-  private ApiModels.CreateEvent input(
-      String prompt, List<ApiModels.CreateDetection> detections, String time) {
-    return new ApiModels.CreateEvent(
+  private CreateEvent input(String prompt, List<CreateDetection> detections, String time) {
+    return new CreateEvent(
         "source",
         "event",
         "person",
@@ -33,9 +36,9 @@ class CanonicalEventTest {
             input(
                 " A😀BC ",
                 List.of(
-                    new ApiModels.CreateDetection(2, 3, "😀", List.of("b", "a")),
-                    new ApiModels.CreateDetection(2, 3, "😀", List.of("c", "a")),
-                    new ApiModels.CreateDetection(2, 4, "😀B", List.of("b"))),
+                    new CreateDetection(2, 3, "😀", List.of("b", "a")),
+                    new CreateDetection(2, 3, "😀", List.of("c", "a")),
+                    new CreateDetection(2, 4, "😀B", List.of("b"))),
                 null),
             clock);
     assertThat(value.prompt()).isEqualTo(" A😀BC ");
@@ -44,8 +47,8 @@ class CanonicalEventTest {
     assertThat(value.occurredAt()).isNull();
     assertThat(value.detections())
         .containsExactly(
-            new CanonicalEvent.Span(2, 3, "😀", List.of("a", "b", "c")),
-            new CanonicalEvent.Span(2, 4, "😀B", List.of("b")));
+            new CanonicalSpan(2, 3, "😀", List.of("a", "b", "c")),
+            new CanonicalSpan(2, 4, "😀B", List.of("b")));
   }
 
   @Test
@@ -53,19 +56,13 @@ class CanonicalEventTest {
     assertThatThrownBy(
             () ->
                 CanonicalEvent.from(
-                    input(
-                        "A😀BC",
-                        List.of(new ApiModels.CreateDetection(1, 3, "😀", List.of("a"))),
-                        null),
+                    input("A😀BC", List.of(new CreateDetection(1, 3, "😀", List.of("a"))), null),
                     clock))
         .isInstanceOf(ApiException.class);
     assertThatThrownBy(
             () ->
                 CanonicalEvent.from(
-                    input(
-                        " é ",
-                        List.of(new ApiModels.CreateDetection(1, 3, "é", List.of("a"))),
-                        null),
+                    input(" é ", List.of(new CreateDetection(1, 3, "é", List.of("a"))), null),
                     clock))
         .isInstanceOf(ApiException.class);
   }

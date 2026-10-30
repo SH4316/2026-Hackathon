@@ -1,8 +1,10 @@
 package com.example.securitydashboard.web;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.*;
-import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1")

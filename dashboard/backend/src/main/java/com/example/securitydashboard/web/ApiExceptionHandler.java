@@ -1,7 +1,6 @@
 package com.example.securitydashboard.web;
 
 import com.example.securitydashboard.common.ApiException;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.ConstraintViolationException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -103,7 +102,4 @@ class ApiExceptionHandler {
       HttpStatus status, String code, String message, Map<String, String> fields) {
     return ResponseEntity.status(status).body(new ErrorBody(code, message, fields));
   }
-
-  @JsonInclude(JsonInclude.Include.NON_EMPTY)
-  record ErrorBody(String code, String message, Map<String, String> fieldErrors) {}
 }

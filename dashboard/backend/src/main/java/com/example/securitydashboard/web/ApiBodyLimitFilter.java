@@ -65,7 +65,7 @@ class ApiBodyLimitFilter extends OncePerRequestFilter {
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     mapper.writeValue(
         response.getOutputStream(),
-        new ApiExceptionHandler.ErrorBody(
+        new ErrorBody(
             "PAYLOAD_TOO_LARGE", "요청 본문은 " + maximum / 1024 / 1024 + "MiB 이하여야 합니다.", Map.of()));
   }
 

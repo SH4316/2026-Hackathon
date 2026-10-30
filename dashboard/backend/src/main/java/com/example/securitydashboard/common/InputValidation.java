@@ -1,6 +1,5 @@
 package com.example.securitydashboard.common;
 
-import com.example.securitydashboard.api.ApiModels;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -8,10 +7,12 @@ import java.util.Locale;
 
 /** Shared input rules used by configuration, ingestion, and query parsing. */
 public final class InputValidation {
+  public static final String ID_PATTERN = "[A-Za-z0-9_-]{1,80}";
+
   private InputValidation() {}
 
   public static void validateId(String id, String field) {
-    if (id == null || !id.matches(ApiModels.ID_PATTERN))
+    if (id == null || !id.matches(ID_PATTERN))
       throw ApiException.invalid(field, "ID는 영문, 숫자, 하이픈, 밑줄로 1~80자여야 합니다.");
   }
 

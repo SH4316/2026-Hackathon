@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "checkedAt": "2026-10-30T18:40:52.764388+00:00",
+  "baselineCommit": "f03fec7",
+  "standaloneRecords": 51,
+  "repositories": 6,
+  "allMainImportsExplicit": true,
+  "servicesAndControllersContainNoJdbcImports": true,
+  "controllersContainNoRepositoryReferences": true,
+  "repositoriesContainNoServiceOrControllerImportsOrApiPaths": true,
+  "removedAggregatesAbsentFromJar": true,
+  "fullOpenApiUnchanged": true,
+  "openApiPaths": 18,
+  "openApiSchemas": 38,
+  "canonicalOpenApiSha256": "adbaf798deccd30eb47e7a0d7f071562821c74e99f0c7803ca08067c25d56406",
+  "backendTests": {
+    "tests": 50,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "jarSha256": "df9285a814b856000ff0362daae41225aac0f02b3cab2bbee9caa1ab3b40160f"
+}

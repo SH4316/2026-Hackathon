@@ -6,20 +6,27 @@
 
 `backend/`는 API·SQL 집계·마이그레이션·SPA 제공, `frontend/`는 같은 출처의 `/api/v1` 호출, `dev/sql/`은 개발용 SQL 콜백을 담당합니다. API의 전체 입출력 계약은 [CONTRACT.md](CONTRACT.md)에 있습니다.
 
-백엔드 코드는 `com.example.securitydashboard` 아래 기능·역할별 패키지로 나눕니다. 루트의 `DashboardApplication`은 실행과 컴포넌트 검색을 담당하고, 각 HTTP 컨트롤러는 해당 기능의 서비스에 요청을 전달합니다.
+백엔드 코드는 `com.example.securitydashboard` 아래 기능·역할별 패키지로 나눕니다. 루트의 `DashboardApplication`은 실행과 컴포넌트 검색을 담당합니다. 업무 기능은 HTTP 컨트롤러 → 서비스 → 저장소 → MySQL로 이어집니다. 컨트롤러는 요청·응답과 HTTP 상태를, 서비스는 업무 검증·처리 순서·트랜잭션을, 저장소는 SQL·JDBC 호출·행 매핑을 담당합니다. 컨트롤러는 저장소를 직접 호출하지 않고, 서비스에는 SQL을 두지 않으며, 저장소는 서비스나 컨트롤러에 의존하지 않습니다.
 
 | 패키지 | 책임 |
 | --- | --- |
-| `api` | 기존 대시보드 API의 입출력 DTO |
+| `api` | 공통 페이지 응답 `api.model.Page<T>` |
 | `configuration` | 태그·정책 초안, 게시·활성화와 버전 조회 |
-| `event` | 사람 등록, 프롬프트·탐지 저장, 재전송 및 트랜잭션 |
+| `person` | 사람 등록과 사람별 조회 연결 |
+| `event` | 프롬프트·탐지 저장, 재전송 검증과 원자적 수집 |
 | `detector` | 탐지기 계약 검증·구간 변환·이미지 디코딩, 원본 메타데이터 수집·조회 |
 | `query` | 검색 조건·페이지 해석, SQL 조회·집계와 스냅샷 멤버십 수집 |
 | `savedsearch` | 검색 조건과 결과 멤버십을 고정하는 저장 검색 |
 | `common` | 공통 입력 검증·안전한 오류와 JDBC 행 처리 |
 | `web` | 본문 제한·오류 응답, JSON·OpenAPI 설정, 상태 확인과 SPA 경로 |
 
-탐지기 수집은 `DetectorEventNormalizer`가 검증·변환한 결과를 `DetectorEventService`가 `EventWriter`에 전달하는 흐름입니다. 원문 이벤트와 원본 결과·첨부는 같은 트랜잭션으로 저장합니다. 저장 검색은 `DashboardQueries`에 전체 일치 이벤트의 멤버십 수집을 요청하므로 검색 서비스가 조회 SQL 조각을 직접 조립하지 않습니다.
+API 입출력 모델은 `person.model`, `configuration.model`, `event.model`, `detector.model`, `query.model`, `savedsearch.model`에 두고, 공통 페이지 응답만 `api.model`에서 공유합니다. 모든 Java `record`는 타입과 같은 이름의 파일로 분리합니다. SQL 조건을 담는 `DashboardQuery`, 행 매핑 결과 `DetectionRow`, 잠금 결과 `VersionState` 같은 내부 모델도 개별 파일로 두며 필요한 범위에서만 공개합니다.
+
+설정의 `ConfigurationService`는 버전 검증과 초안·게시·활성화 전환을 조정하고 `ConfigurationRepository`가 카탈로그와 버전을 읽고 씁니다. 사람 등록은 `person`의 `PersonController` → `PersonService` → `PersonRepository`가 처리합니다. 사람별 통계 조회는 `PersonService`에서 `DashboardQueryService`로 위임합니다.
+
+탐지기 수집은 `DetectorEventNormalizer`가 검증·변환한 결과를 `DetectorEventService`가 `EventService`에 전달하는 흐름입니다. `EventService`는 재전송과 활성 버전·등록 대상을 검증하고 `EventRepository`로 이벤트를 저장합니다. `DetectorEventRepository`의 원본 결과·첨부 저장도 같은 이벤트 트랜잭션에 참여합니다.
+
+`DashboardQueryService`는 조회 버전을 확정하고 탐지·태그 조립, 정책 목록 병합, 시간 버킷 계산을 담당합니다. `DashboardRepository`는 필터 SQL과 조회·집계·전체 일치 이벤트의 멤버십 저장을 담당합니다. 저장 검색은 `SavedSearchService`의 트랜잭션에서 `SavedSearchRepository`로 필터와 고정 집계를 저장하고 `DashboardQueryService.captureSnapshotMembers`를 통해 멤버십을 수집합니다.
 
 ## 일반 실행: 빈 DB
 

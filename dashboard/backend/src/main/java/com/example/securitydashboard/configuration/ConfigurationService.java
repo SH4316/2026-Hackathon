@@ -1,75 +1,65 @@
 package com.example.securitydashboard.configuration;
 
-import com.example.securitydashboard.api.ApiModels;
 import com.example.securitydashboard.common.ApiException;
 import com.example.securitydashboard.common.InputValidation;
-import com.example.securitydashboard.common.JdbcRows;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import com.example.securitydashboard.configuration.model.ConfigVersion;
+import com.example.securitydashboard.configuration.model.CreateVersion;
+import com.example.securitydashboard.configuration.model.PolicyDefinition;
+import com.example.securitydashboard.configuration.model.Tag;
+import com.example.securitydashboard.configuration.model.UpdateVersion;
+import com.example.securitydashboard.configuration.model.VersionSummary;
 import java.time.Clock;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
 public class ConfigurationService {
-  private final JdbcTemplate jdbc;
-  private final ObjectMapper json;
+  private final ConfigurationRepository repository;
   private final Clock clock;
 
-  ConfigurationService(JdbcTemplate jdbc, ObjectMapper json, Clock clock) {
-    this.jdbc = jdbc;
-    this.json = json;
+  ConfigurationService(ConfigurationRepository repository, Clock clock) {
+    this.repository = repository;
     this.clock = clock;
   }
 
-  List<ApiModels.VersionSummary> list() {
-    return jdbc.query(
-        "SELECT v.*, (a.version_id=v.id) AS is_active FROM config_versions v LEFT JOIN"
-            + " active_config a ON a.singleton_id=1 ORDER BY v.created_at DESC,v.id",
-        this::summary);
+  List<VersionSummary> list() {
+    return repository.listVersions();
   }
 
-  public ApiModels.ConfigVersion get(String id) {
+  public ConfigVersion get(String id) {
     InputValidation.validateId(id, "versionId");
-    var rows =
-        jdbc.query(
-            "SELECT v.*, (a.version_id=v.id) AS is_active FROM config_versions v LEFT JOIN"
-                + " active_config a ON a.singleton_id=1 WHERE v.id=?",
-            this::summary,
-            id);
-    if (rows.isEmpty())
-      throw new ApiException(HttpStatus.NOT_FOUND, "VERSION_NOT_FOUND", "설정 버전을 찾을 수 없습니다.");
-    var v = rows.getFirst();
-    return new ApiModels.ConfigVersion(
-        v.id(),
-        v.name(),
-        v.status(),
-        v.isActive(),
-        v.revision(),
-        v.createdAt(),
-        v.publishedAt(),
+    var version = repository.findVersion(id).orElseThrow(ConfigurationService::versionNotFound);
+    return new ConfigVersion(
+        version.id(),
+        version.name(),
+        version.status(),
+        version.isActive(),
+        version.revision(),
+        version.createdAt(),
+        version.publishedAt(),
         tags(id),
         policies(id));
   }
 
   String activeId() {
-    return jdbc.queryForObject(
-        "SELECT version_id FROM active_config WHERE singleton_id=1", String.class);
+    return repository.activeId();
   }
 
   public String lockActiveId() {
-    return jdbc.queryForObject(
-        "SELECT version_id FROM active_config WHERE singleton_id=1 FOR UPDATE", String.class);
+    return repository.lockActiveId();
   }
 
-  ApiModels.ConfigVersion classifier() {
+  ConfigVersion classifier() {
     String id = activeId();
     if (id == null)
       throw new ApiException(
@@ -77,7 +67,7 @@ public class ConfigurationService {
     return get(id);
   }
 
-  public ApiModels.ConfigVersion view(String requested) {
+  public ConfigVersion view(String requested) {
     String id = requested == null ? activeId() : requested;
     if (id == null) return null;
     var version = get(id);
@@ -88,177 +78,78 @@ public class ConfigurationService {
   }
 
   @Transactional
-  ApiModels.ConfigVersion create(ApiModels.CreateVersion input) {
+  ConfigVersion create(CreateVersion input) {
     String name = InputValidation.name(input.name(), "name");
     var base = input.baseVersionId() == null ? null : get(input.baseVersionId());
     String id = "v_" + UUID.randomUUID().toString().replace("-", "");
-    jdbc.update(
-        "INSERT INTO config_versions(id,name,status,revision,created_at) VALUES(?,?,'DRAFT',0,?)",
-        id,
-        name,
-        Timestamp.from(clock.instant()));
-    if (base != null) writeCatalog(id, base.tags(), base.policyStates());
+    repository.createVersion(id, name, clock.instant());
+    if (base != null) repository.insertCatalog(id, base.tags(), base.policyStates());
     return get(id);
   }
 
   @Transactional
-  ApiModels.ConfigVersion update(String id, ApiModels.UpdateVersion input) {
+  ConfigVersion update(String id, UpdateVersion input) {
     lockDraft(id, input.revision());
     String name = InputValidation.name(input.name(), "name");
-    List<ApiModels.Tag> tags = normalizeTags(input.tags());
-    List<ApiModels.PolicyDefinition> policies = normalizePolicies(input.policyStates());
-    jdbc.update("DELETE FROM config_tag_closure WHERE version_id=?", id);
-    jdbc.update("DELETE FROM config_version_tags WHERE version_id=?", id);
-    jdbc.update("DELETE FROM config_version_policies WHERE version_id=?", id);
-    writeCatalog(id, tags, policies);
-    jdbc.update("UPDATE config_versions SET name=?,revision=revision+1 WHERE id=?", name, id);
+    List<Tag> tags = normalizeTags(input.tags());
+    List<PolicyDefinition> policies = normalizePolicies(input.policyStates());
+    repository.replaceCatalog(id, tags, policies);
+    repository.updateVersionName(id, name);
     return get(id);
   }
 
   @Transactional
-  ApiModels.ConfigVersion publish(String id, long revision) {
+  ConfigVersion publish(String id, long revision) {
     lockDraft(id, revision);
     normalizeTags(tags(id));
     normalizePolicies(policies(id));
-    jdbc.update(
-        "UPDATE config_versions SET status='PUBLISHED',published_at=?,revision=revision+1 WHERE"
-            + " id=?",
-        Timestamp.from(clock.instant()),
-        id);
+    repository.publishVersion(id, clock.instant());
     return get(id);
   }
 
   @Transactional
-  ApiModels.ConfigVersion activate(String id) {
+  ConfigVersion activate(String id) {
     lockActiveId();
     var version = get(id);
     if (!version.status().equals("PUBLISHED"))
       throw new ApiException(HttpStatus.CONFLICT, "VERSION_NOT_PUBLISHED", "게시한 버전만 활성화할 수 있습니다.");
-    jdbc.update("UPDATE active_config SET version_id=? WHERE singleton_id=1", id);
+    repository.activateVersion(id);
     return get(id);
   }
 
   @Transactional
   void delete(String id) {
     lockDraft(id, null);
-    jdbc.update("DELETE FROM config_versions WHERE id=?", id);
+    repository.deleteVersion(id);
   }
 
   private void lockDraft(String id, Long revision) {
     InputValidation.validateId(id, "versionId");
-    var values =
-        jdbc.queryForList("SELECT status,revision FROM config_versions WHERE id=? FOR UPDATE", id);
-    if (values.isEmpty())
-      throw new ApiException(HttpStatus.NOT_FOUND, "VERSION_NOT_FOUND", "설정 버전을 찾을 수 없습니다.");
-    var value = values.getFirst();
-    if (!value.get("status").equals("DRAFT"))
+    var version = repository.lockVersion(id).orElseThrow(ConfigurationService::versionNotFound);
+    if (!version.status().equals("DRAFT"))
       throw new ApiException(
           HttpStatus.CONFLICT, "VERSION_IMMUTABLE", "게시한 버전은 수정하거나 삭제할 수 없습니다. 새 초안을 만들어 주세요.");
-    if (revision != null && ((Number) value.get("revision")).longValue() != revision)
+    if (revision != null && version.revision() != revision)
       throw new ApiException(
           HttpStatus.CONFLICT, "REVISION_CONFLICT", "다른 변경이 저장되었습니다. 최신 버전을 불러와 주세요.");
   }
 
-  public List<ApiModels.Tag> tags(String id) {
-    return jdbc.query(
-        "SELECT * FROM config_version_tags WHERE version_id=? ORDER BY sort_order,id",
-        (rs, n) ->
-            new ApiModels.Tag(
-                rs.getString("id"),
-                rs.getString("name"),
-                rs.getString("description"),
-                readExamples(rs.getString("examples")),
-                rs.getString("guidance"),
-                rs.getString("jev_prompt"),
-                rs.getString("python_regex"),
-                rs.getString("color"),
-                rs.getString("parent_id"),
-                rs.getInt("sort_order")),
-        id);
+  public List<Tag> tags(String id) {
+    return repository.tags(id);
   }
 
-  List<ApiModels.PolicyDefinition> policies(String id) {
-    return jdbc.query(
-        "SELECT * FROM config_version_policies WHERE version_id=? ORDER BY sort_order,id",
-        (rs, n) ->
-            new ApiModels.PolicyDefinition(
-                rs.getString("id"),
-                rs.getString("name"),
-                rs.getString("description"),
-                rs.getString("color"),
-                rs.getInt("sort_order")),
-        id);
+  List<PolicyDefinition> policies(String id) {
+    return repository.policies(id);
   }
 
-  private List<String> readExamples(String value) {
-    try {
-      return json.readValue(value, new TypeReference<List<String>>() {});
-    } catch (Exception exception) {
-      throw new IllegalStateException("Stored examples invalid");
-    }
+  private static ApiException versionNotFound() {
+    return new ApiException(HttpStatus.NOT_FOUND, "VERSION_NOT_FOUND", "설정 버전을 찾을 수 없습니다.");
   }
 
-  private String encode(Object value) {
-    try {
-      return json.writeValueAsString(value);
-    } catch (Exception e) {
-      throw new IllegalStateException("JSON encoding failed");
-    }
-  }
-
-  private void writeCatalog(
-      String id, List<ApiModels.Tag> tags, List<ApiModels.PolicyDefinition> policies) {
-    JdbcRows.insert(
-        jdbc,
-        "INSERT INTO"
-            + " config_version_tags(version_id,id,name,description,examples,guidance,jev_prompt,python_regex,color,parent_id,sort_order)"
-            + " VALUES ",
-        11,
-        tags.stream()
-            .map(
-                t ->
-                    new Object[] {
-                      id,
-                      t.id(),
-                      t.name(),
-                      t.description(),
-                      encode(t.examples()),
-                      t.guidance(),
-                      t.jevPrompt(),
-                      t.pythonRegex(),
-                      t.color(),
-                      t.parentId(),
-                      t.order()
-                    })
-            .toList());
-    Map<String, ApiModels.Tag> byId = new HashMap<>();
-    tags.forEach(t -> byId.put(t.id(), t));
-    List<Object[]> closure = new ArrayList<>();
-    for (var tag : tags) {
-      for (var parent = tag;
-          parent != null;
-          parent = parent.parentId() == null ? null : byId.get(parent.parentId()))
-        closure.add(new Object[] {id, parent.id(), tag.id()});
-    }
-    JdbcRows.insert(
-        jdbc,
-        "INSERT INTO config_tag_closure(version_id,ancestor_id,descendant_id) VALUES ",
-        3,
-        closure);
-    JdbcRows.insert(
-        jdbc,
-        "INSERT INTO config_version_policies(version_id,id,name,description,color,sort_order)"
-            + " VALUES ",
-        6,
-        policies.stream()
-            .map(p -> new Object[] {id, p.id(), p.name(), p.description(), p.color(), p.order()})
-            .toList());
-  }
-
-  static List<ApiModels.Tag> normalizeTags(List<ApiModels.Tag> input) {
+  static List<Tag> normalizeTags(List<Tag> input) {
     if (input == null || input.size() > 1000)
       throw ApiException.invalid("tags", "태그 목록은 필수이며 최대 1000개입니다.");
-    Map<String, ApiModels.Tag> values = new LinkedHashMap<>();
+    Map<String, Tag> values = new LinkedHashMap<>();
     for (var t : input) {
       if (t == null) throw ApiException.invalid("tags", "비어 있는 태그는 저장할 수 없습니다.");
       InputValidation.validateId(t.id(), "tags.id");
@@ -270,7 +161,7 @@ public class ConfigurationService {
         InputValidation.text(example, 1000, "examples");
       }
       var tag =
-          new ApiModels.Tag(
+          new Tag(
               t.id(),
               InputValidation.name(t.name(), "tags.name"),
               InputValidation.text(t.description(), 4000, "description"),
@@ -299,18 +190,17 @@ public class ConfigurationService {
     return List.copyOf(values.values());
   }
 
-  static List<ApiModels.PolicyDefinition> normalizePolicies(
-      List<ApiModels.PolicyDefinition> input) {
+  static List<PolicyDefinition> normalizePolicies(List<PolicyDefinition> input) {
     if (input == null || input.size() > 1000)
       throw ApiException.invalid("policyStates", "정책 목록은 필수이며 최대 1000개입니다.");
     Set<String> ids = new HashSet<>();
-    List<ApiModels.PolicyDefinition> result = new ArrayList<>();
+    List<PolicyDefinition> result = new ArrayList<>();
     for (var p : input) {
       if (p == null) throw ApiException.invalid("policyStates", "비어 있는 정책은 저장할 수 없습니다.");
       InputValidation.validateId(p.id(), "policyStates.id");
       if (!ids.add(p.id())) throw ApiException.invalid("policyStates.id", "정책 ID는 중복될 수 없습니다.");
       result.add(
-          new ApiModels.PolicyDefinition(
+          new PolicyDefinition(
               p.id(),
               InputValidation.name(p.name(), "policyStates.name"),
               InputValidation.text(p.description(), 4000, "description"),
@@ -325,16 +215,5 @@ public class ConfigurationService {
     if (!color.matches("#[a-fA-F0-9]{6}"))
       throw ApiException.invalid("color", "색상은 #RRGGBB 형식이어야 합니다.");
     return color.toUpperCase(Locale.ROOT);
-  }
-
-  private ApiModels.VersionSummary summary(ResultSet rs, int row) throws SQLException {
-    return new ApiModels.VersionSummary(
-        rs.getString("id"),
-        rs.getString("name"),
-        rs.getString("status"),
-        rs.getBoolean("is_active"),
-        rs.getLong("revision"),
-        JdbcRows.instant(rs, "created_at"),
-        JdbcRows.instant(rs, "published_at"));
   }
 }
