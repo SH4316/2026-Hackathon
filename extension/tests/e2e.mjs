@@ -120,42 +120,7 @@ await page.type("#ta", "첫 줄");
 await page.keyboard.press("Shift+Enter");
 check("shift+enter not intercepted", !(await modal.isVisible()));
 
-// 6-1. 테스트 모드: 통과해도 보내지 않고 진단 패널에 기록
 const sw0 = ctx.serviceWorkers()[0] || (await ctx.waitForEvent("serviceworker"));
-await sw0.evaluate(() => chrome.storage.local.set({ testMode: true }));
-await page.selectOption("#dest", "openai/consumer");
-await fill("일반 문장");
-await page.waitForTimeout(1200);
-const sentBefore = await logCount();
-const diag = page.locator(".diag");
-const countsOf = async () => JSON.parse((await diag.getAttribute("data-intercepts")) || "{}");
-const before = await countsOf();
-await page.press("#ta", "Enter");
-await page.waitForTimeout(800);
-check("test mode: clean text not sent", (await logCount()) === sentBefore);
-check("test mode: toast shown", await page.locator(".toast").isVisible());
-check("test mode: diag detects editor", (await diag.getAttribute("data-editor")).startsWith("textarea#ta"));
-check("test mode: diag detects send button", (await diag.getAttribute("data-send-button")).includes("send-button"));
-check("test mode: diag shows destination", (await diag.getAttribute("data-destination")) === "openai/consumer");
-await page.click('[data-testid="send-button"]');
-await page.waitForTimeout(800);
-check("test mode: click not sent", (await logCount()) === sentBefore);
-const after = await countsOf();
-check("test mode: intercepts counted",
-  after.enter - (before.enter ?? 0) === 1 && after.click - (before.click ?? 0) === 1, JSON.stringify(after));
-await page.screenshot({ path: `${OUT}/7-test-mode.png` });
-await fill("AWS 키");
-await page.press("#ta", "Enter");
-await modal.waitFor({ timeout: 5000 });
-await sanitizeViaWidget();
-await widgetApply();
-await page.press("#ta", "Enter");
-await page.waitForTimeout(1500);
-check("test mode: sanitized text not sent", (await logCount()) === sentBefore);
-await sw0.evaluate(() => chrome.storage.local.set({ testMode: false }));
-await page.waitForTimeout(300);
-check("test mode off: diag hidden", !(await diag.isVisible()));
-await page.selectOption("#dest", "");
 
 // 6-2. 내부 상태가 늦게 갱신되는 편집기(ChatGPT 방식): 치환 후 전송되는 것은 반드시 치환된 텍스트
 await page.locator("#pm").click();

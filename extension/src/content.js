@@ -3,7 +3,6 @@
 // - 전송 시점의 텍스트와 검사한 텍스트가 정확히 같고 '검사 완료 + allow' 일 때만 그대로 보낸다.
 // - 선택한 검사 방식의 완료 결과만 사용한다. 기기 내 AI를 켜면 서버 연결 없이도 검사한다.
 // - 브라우저 안의 규칙 엔진(PG.local)은 입력 즉시 위험을 알려 주는 '임시 표시'일 뿐, 전송 근거가 되지 않는다.
-// - 테스트 모드: 어떤 경우에도 실제로 전송하지 않고, 진단 패널에 감지·가로채기 결과를 보여 준다.
 (() => {
   const PG = globalThis.PG;
   const DEBOUNCE_MS = 300;
@@ -27,7 +26,6 @@
   let noticeTone = "info";
   let noticeTimer = null;
   let timer = null;
-  let testMode = false;
   let lastProgrammaticSet = 0;
 
   PG.hooks = PG.hooks || {};
@@ -48,7 +46,6 @@
 
   chrome.runtime.sendMessage({ type: "settings" }).then((r) => {
     enabled = r?.data?.enabled !== false;
-    setTestMode(!!r?.data?.testMode);
   });
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.enabled) enabled = changes.enabled.newValue !== false;
@@ -61,7 +58,6 @@
       else refresh();
     }
     if (changes.aiState && ["ready", "error"].includes(changes.aiState.newValue?.phase) && editor) scheduleInspect(editor);
-    if (changes.testMode) setTestMode(!!changes.testMode.newValue);
   });
 
   // A model/account/route change invalidates both text results and one-shot approvals.
@@ -355,7 +351,6 @@
   function triggerSend(ed, text, approvedSettings = settingsVersion) {
     PG.siteContext.read();
     if (approvedSettings !== settingsVersion) return;
-    if (testMode) { dryRun(ed, "승인 후 전송"); return; }
     const wait = SETTLE_MS - (Date.now() - lastProgrammaticSet);
     if (wait > 0) {
       setTimeout(() => { if (getText(ed) === text) triggerSend(ed, text, approvedSettings); }, wait);
@@ -512,17 +507,8 @@
   function intercept(e, ed, kind) {
     const text = getText(ed);
     if (!enabled || !text.trim()) return;
-    diag.intercepts[kind] = (diag.intercepts[kind] || 0) + 1;
-    diag.lastEvent = kind;
-    if (gateSync(ed, text)) {
-      if (!testMode) return; // 통과: 원래 이벤트 그대로
-      block(e);
-      dryRun(ed, "검사 통과");
-      return;
-    }
+    if (gateSync(ed, text)) return; // 통과: 원래 이벤트 그대로
     block(e);
-    diag.lastOutcome = "검사 후 판단";
-    renderDiag();
     gate(ed, text);
   }
 
@@ -546,73 +532,6 @@
     const ed = editorFrom(e.target.querySelector?.(EDITOR_SEL));
     if (ed) intercept(e, ed, "submit");
   }, true);
-
-  // ── 테스트 모드 진단 ──
-  const diag = { intercepts: {}, lastEvent: null, lastOutcome: null, dryRuns: 0, server: null };
-  let probeTimer = null;
-
-  function dryRun(ed, why) {
-    diag.dryRuns++;
-    diag.lastOutcome = `${why} → 테스트 모드라 전송하지 않음`;
-    renderDiag();
-    PG.ui.toast("테스트 모드: 실제로 전송하지 않았습니다.");
-  }
-
-  function isVisible(el) {
-    const r = el.getBoundingClientRect();
-    return r.width > 20 && r.height > 10 && getComputedStyle(el).visibility !== "hidden";
-  }
-
-  // 포커스된 입력창, 없으면 화면에 보이는 가장 큰 입력창
-  function probeEditor() {
-    const focused = editorFrom(document.activeElement);
-    if (focused) return focused;
-    const all = [...document.querySelectorAll(EDITOR_SEL)].map(editorFrom).filter((el) => el && isVisible(el));
-    const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
-    return all.sort((a, b) => area(b) - area(a))[0] || null;
-  }
-
-  function describe(el) {
-    if (!el) return null;
-    let s = el.tagName.toLowerCase();
-    if (el.id) s += `#${el.id}`;
-    const testid = el.getAttribute("data-testid");
-    if (testid) s += `[data-testid="${testid}"]`;
-    const label = el.getAttribute("aria-label");
-    if (label) s += `[aria-label="${label.slice(0, 30)}"]`;
-    if (el.isContentEditable) s += " (contenteditable)";
-    return s;
-  }
-
-  function renderDiag() {
-    if (!testMode) return;
-    const ed = probeEditor();
-    const btn = ed && PG.findSendButton(ed);
-    const dest = PG.resolveDestination();
-    PG.ui.setDiag({
-      host: location.hostname,
-      destination: dest ? `${dest.provider}/${dest.channel}` : null,
-      editor: describe(ed),
-      sendButton: btn ? `${describe(btn)} ← ${PG.matchSendSelector(btn)}` : null,
-      server: diag.server,
-      intercepts: diag.intercepts,
-      lastEvent: diag.lastEvent,
-      lastOutcome: diag.lastOutcome,
-      dryRuns: diag.dryRuns,
-    });
-  }
-
-  function setTestMode(on) {
-    testMode = on;
-    clearInterval(probeTimer);
-    if (!on) { PG.ui.hideDiag(); return; }
-    chrome.runtime.sendMessage({ type: "health" }).then((r) => {
-      diag.server = r?.ok ? `연결됨 · 정책 ${r.data.policy_version}` : `연결 안 됨(${r?.error})`;
-      renderDiag();
-    });
-    renderDiag();
-    probeTimer = setInterval(renderDiag, 1500);
-  }
 
   PG.files.install();
 })();

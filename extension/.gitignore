@@ -1,6 +1,4 @@
 node_modules/
 tests/shots/
-tests/real-sites-out/
-.real-sites-profile/
 vendor/ai/
 tests/ai-shots/
