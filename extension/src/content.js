@@ -165,6 +165,9 @@
     if (!hasText) { prepared = null; applied = null; }
     if (prepared && !activePrepared(text)) prepared = null;
     if (applied && text !== applied.sanitized) applied = null;
+    // 입력창 오버레이는 다듬은 문장이 그대로 있을 때만 보인다(사용자가 고치거나 보내면 사라짐).
+    if (applied) PG.ui.refreshTokenOverlay();
+    else PG.ui.clearTokenOverlay();
     const prep = activePrepared(text);
 
     let lamp = "idle";
@@ -201,7 +204,8 @@
       lamp,
       chip,
       reason: lamp === "idle" ? "" : destinationText(result?.destination),
-      preview: prep ? previewOf(prep, text) : null,
+      // 다듬은 결과는 입력창 오버레이로 보여 주므로, 위젯 미리보기는 아직 넣지 못한 경우에만 쓴다.
+      preview: prep && text !== prep.sanitized ? previewOf(prep, text) : null,
       busy,
       canSanitize,
       canApply: !!prep && text !== prep.sanitized,
@@ -343,7 +347,7 @@
         if (getText(ed) === entry.text) triggerSend(ed, entry.text);
       },
       // 정제는 위젯의 '안전 다듬기' 한 경로로만 한다(경고 창 → 별도 정제 창 경로는 중복이라 제거).
-      // 경고 창을 닫고 위젯에서 미리보기 → [입력창에 넣기] → 사용자가 직접 전송.
+      // 경고 창을 닫고 바로 입력창에 반영 → 오버레이로 바뀐 부분 표시 → 사용자가 직접 전송.
       onSanitize: () => {
         PG.ui.closeModal();
         editor = ed;
@@ -374,6 +378,9 @@
       const built = PG.restore.buildTokenMap(text, entry.result.findings, result.sanitized_text);
       prepared = { original: text, sanitized: result.sanitized_text, result, entries: built.entries, verified: built.verified };
       stat("sanitized");
+      // 미리보기 단계를 두지 않고 바로 입력창에 넣는다. 바뀐 부분은 입력창 위 오버레이로 보여 주고,
+      // [원문으로 되돌리기]로 언제든 되돌릴 수 있다. 전송은 여전히 사용자가 직접 한다.
+      applyPrepared();
     } finally {
       busy = false;
       refresh();
@@ -389,7 +396,9 @@
     else PG.restore.cancel();
     clearTimeout(timer);
     setText(ed, p.sanitized);
-    PG.ui.toast("정제문을 입력창에 넣었습니다. 확인한 뒤 직접 전송하세요.");
+    const count = (p.result.changes || []).reduce((a, c) => a + c.count, 0);
+    if (count) PG.ui.showTokenOverlay(ed, count);
+    PG.ui.toast("민감정보를 토큰으로 바꿨습니다. 강조된 부분을 확인하고 직접 전송하세요.");
   }
 
   function revert() {
@@ -399,6 +408,7 @@
     applied = null;
     prepared = null; // 원문으로 돌아갔으므로 정제 미리보기도 닫는다
     PG.restore.cancel();
+    PG.ui.clearTokenOverlay();
     setText(ed, original);
   }
 

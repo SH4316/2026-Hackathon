@@ -9,7 +9,7 @@ import os from "node:os";
 const EXT = path.resolve(import.meta.dirname, "..");
 const OUT = path.resolve(import.meta.dirname, "shots");
 fs.mkdirSync(OUT, { recursive: true });
-const PAGE = "http://localhost:5500/index.html";
+const PAGE = process.env.PG_E2E_PAGE || "http://localhost:5500/index.html";
 
 const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), "pg-e2e-")), {
   channel: "chromium",
@@ -34,9 +34,10 @@ async function fill(sample, target = "#ta") {
 // 경고 창에서 '안전 다듬기'를 누르면 경고 창이 닫히고 위젯이 정제 미리보기를 보여 준다(정제 경로는 위젯 하나).
 async function sanitizeViaWidget() {
   await modal.getByRole("button", { name: "안전 다듬기" }).click();
-  await page.locator(".badge").getByRole("button", { name: "입력창에 넣기" }).waitFor({ timeout: 8000 });
+  await page.locator(".ov-frame").waitFor({ timeout: 8000 }); // 입력창 오버레이가 뜨면 반영 완료
 }
-const widgetApply = () => page.locator(".badge").getByRole("button", { name: "입력창에 넣기" }).click();
+const widgetApply = async () => {}; // 안전 다듬기가 바로 입력창에 반영하므로 별도 단계 없음
+const highlightCount = () => page.evaluate(() => (globalThis.CSS?.highlights?.get("pg-token")?.size) || 0);
 
 try {
 await page.goto(PAGE);
@@ -81,6 +82,7 @@ await page.screenshot({ path: `${OUT}/3-warning-pii.png` });
 await sanitizeViaWidget();
 await widgetApply();
 await page.waitForTimeout(300);
+check("contenteditable: tokens highlighted inside the input", (await highlightCount()) === 3, String(await highlightCount()));
 const ceText = await page.locator("#ce").innerText();
 check("sanitized applied to contenteditable", ceText.includes("[PHONE_1]") && !ceText.includes("010-"), ceText);
 await page.click('[aria-label="Send message"]');
@@ -192,17 +194,20 @@ const chip = await badge.locator(".chip-w").textContent();
 check("widget shows Tier 1 with finding summary", chip.includes("Tier 1") && chip.includes("전화번호"), chip);
 await page.screenshot({ path: `${OUT}/7-widget-red.png` });
 
-// 9. 위젯에서 바로 정제 → 미리보기(토큰 칩) → 입력창은 아직 원문
+// 9. 위젯 안전 다듬기 → 입력창에 바로 반영, 바뀐 토큰은 입력창 오버레이로 강조, 원문으로 되돌리기 버튼 표시
+const n10 = await logCount();
 await badge.getByRole("button", { name: "안전 다듬기" }).click();
-await page.waitForFunction(() => /정제 완료/.test(document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge .chip-w")?.textContent || ""), null, { timeout: 8000 });
-const tokens = await badge.locator(".pbody .tk").allTextContents();
-check("preview lists replaced tokens", ["[PHONE_1]", "[EMAIL_1]", "[RRN_1]"].every((t) => tokens.includes(t)), tokens.join(","));
-check("input untouched until applied", (await page.inputValue("#ta")).includes("010-1234-5678"));
+await page.locator(".ov-frame").waitFor({ timeout: 8000 });
+const taVal = await page.inputValue("#ta");
+check("sanitize applies to the input right away", ["[PHONE_1]", "[EMAIL_1]", "[RRN_1]"].every((t) => taVal.includes(t)) && !taVal.includes("010-1234"), taVal);
+check("overlay label shows replaced count", (await page.locator(".ov-label").textContent()).includes("3건 치환됨"));
+check("overlay marks each token in the textarea", (await page.locator(".ov-mirror mark").count()) === 3);
+check("revert button shown right after sanitizing",
+  await page.locator(".ov-revert").isVisible() && await badge.getByRole("button", { name: "원문으로 되돌리기" }).isVisible());
+check("no separate preview panel", !(await badge.locator(".pbox").isVisible()));
 await page.screenshot({ path: `${OUT}/8-widget-sanitized.png` });
 
-// 10. 입력창에 넣기(자동 전송 없음) → 사용자가 직접 전송 → 사이트에는 토큰만, 답변의 토큰은 원래 값으로 복원
-const n10 = await logCount();
-await badge.getByRole("button", { name: "입력창에 넣기" }).click();
+// 10. 자동 전송 없음 → 사용자가 직접 전송 → 사이트에는 토큰만, 답변의 토큰은 원래 값으로 복원
 await page.waitForTimeout(1200); // 사이트 내부 상태 갱신 + 재검사
 check("nothing sent automatically", (await logCount()) === n10);
 check("sanitized text is in the input", (await page.inputValue("#ta")).includes("[PHONE_1]"));
@@ -210,6 +215,7 @@ await page.press("#ta", "Enter"); // 사용자가 확인 후 직접 전송
 await page.waitForTimeout(800);
 const sent10 = await lastLog();
 check("only tokens reach the AI", (await logCount()) === n10 + 1 && sent10.includes("[PHONE_1]") && !sent10.includes("010-1234"), sent10.slice(0, 80));
+check("overlay removed after sending", (await page.locator(".ov-frame").count()) === 0);
 await page.waitForTimeout(4500);
 const reply = await page.locator("[data-pg-assistant]").last().innerText();
 check("reply tokens restored to original values", reply.includes("010-1234-5678") && reply.includes("hong@example.com") && !reply.includes("[PHONE_1]"), reply.replace(/\n/g, " ").slice(0, 90));
@@ -222,12 +228,12 @@ await page.getByRole("button", { name: "AWS 키", exact: true }).click();
 await page.waitForFunction(() => document.querySelector("#pg-root-host")?.shadowRoot?.querySelector(".badge[data-state='red']"), null, { timeout: 5000 });
 await page.waitForTimeout(800);
 await badge.getByRole("button", { name: "안전 다듬기" }).click();
-await badge.getByRole("button", { name: "입력창에 넣기" }).waitFor({ timeout: 8000 });
-await badge.getByRole("button", { name: "입력창에 넣기" }).click();
+await page.locator(".ov-frame").waitFor({ timeout: 8000 });
 check("applied sanitized text to input", (await page.inputValue("#ta")).includes("[AWS_KEY_1]"));
-await badge.getByRole("button", { name: "원문으로 되돌리기" }).click();
+await page.locator(".ov-revert").click();
 await page.waitForTimeout(300);
 check("revert restores original text", (await page.inputValue("#ta")).includes("AKIAIOSFODNN7EXAMPLE"));
+check("overlay removed after revert", (await page.locator(".ov-frame").count()) === 0);
 
 // 12. 그래도 전송: 확인 체크 없이는 보낼 수 없다
 await page.waitForTimeout(800);
