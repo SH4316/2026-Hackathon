@@ -58,6 +58,7 @@ PG.PROVIDER_LABELS = {
 };
 
 PG.NOTICE_LABELS = {
+  site_context_uncertain: "모델·계정 설정 또는 모델별 정책을 확인하지 못했습니다. 전송 전에 이용 환경을 확인하세요.",
   server_unavailable_local_check: "서버에 연결되지 않아 기기 내 AI와 기본 규칙으로 검사했습니다. 서버의 사용자 규칙은 적용되지 않습니다.",
   local_ai_pii_without_location: "기기 내 AI가 개인정보 가능성을 감지했습니다. 위치를 찾는 모델이 아니므로 해당 내용은 직접 확인·수정해 주세요.",
   local_ai_not_ready: "AI 모델을 준비하고 있습니다. 팝업에서 진행 상태를 확인하세요.",
