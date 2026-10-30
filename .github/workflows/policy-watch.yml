@@ -1,0 +1,77 @@
+# 외부 AI 제공사 데이터 정책 페이지 변경 감지.
+# - 변경·신규 스냅샷: bot/policy-watch 브랜치로 PR 생성/갱신(등급은 사람이 검토 후 수정)
+# - 가져오기 실패·재확인 기한 임박: policy-watch 라벨 이슈 생성/댓글
+# 저장소 설정 → Actions → General → "Allow GitHub Actions to create and approve pull requests" 를 켜야 PR 이 열린다.
+name: policy-watch
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"   # 매주 월요일 09:00 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: policy-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: server
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: bot/policy-watch
+    steps:
+      - run: echo "REPORT=$RUNNER_TEMP/policy-watch-report.md" >> "$GITHUB_ENV"
+        working-directory: .
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install PyYAML==6.0.2
+
+      - id: watch
+        run: python tools/policy_watch/watch.py --report "$REPORT"
+
+      - name: Open or update PR with snapshot changes
+        if: steps.watch.outputs.snapshots_changed == 'true'
+        run: |
+          head -c 60000 "$REPORT" > "$REPORT.body"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$BRANCH"
+          git add tools/policy_watch/snapshots
+          git commit -m "chore(policy-watch): 제공사 정책 페이지 스냅샷 갱신"
+          git push -f origin "$BRANCH"
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -z "$pr" ]; then
+            gh pr create --base "${{ github.event.repository.default_branch }}" --head "$BRANCH" \
+              --title "제공사 데이터 정책 변경 감지" --body-file "$REPORT.body"
+          else
+            gh pr edit "$pr" --body-file "$REPORT.body"
+          fi
+
+      - name: Open or comment on issue for failures and due reviews
+        if: steps.watch.outputs.needs_attention == 'true' && steps.watch.outputs.snapshots_changed != 'true'
+        run: |
+          head -c 60000 "$REPORT" > "$REPORT.body"
+          gh label create policy-watch --color D93F0B --description "제공사 정책 감시" --force
+          issue=$(gh issue list --label policy-watch --state open --json number --jq '.[0].number')
+          if [ -z "$issue" ]; then
+            gh issue create --title "제공사 정책 수동 확인 필요" --label policy-watch --body-file "$REPORT.body"
+          else
+            gh issue comment "$issue" --body-file "$REPORT.body"
+          fi
+
+      - if: always()
+        run: cat "$REPORT" >> "$GITHUB_STEP_SUMMARY" || true

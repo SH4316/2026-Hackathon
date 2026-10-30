@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Prompt Guard</title>
+  <link rel="stylesheet" href="src/pages.css">
+</head>
+<body class="popup">
+  <h1>Prompt Guard</h1>
+  <div class="row">
+    <span>검사 서버</span>
+    <span id="status" class="pill" data-state="checking">확인 중…</span>
+  </div>
+  <p id="detail" class="muted"></p>
+  <label class="row toggle">
+    <span>이 브라우저에서 검사 사용</span>
+    <input id="enabled" type="checkbox">
+  </label>
+  <p class="muted small">끄면 프롬프트를 검사하지 않고 전송합니다. 조직 정책을 확인하세요.</p>
+  <button id="options" type="button">설정 열기</button>
+  <script src="src/popup.js"></script>
+</body>
+</html>

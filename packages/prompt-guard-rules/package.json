@@ -1,0 +1,21 @@
+{
+  "name": "@prompt-guard/rules",
+  "version": "0.1.0",
+  "description": "프롬프트 민감정보 규칙 탐지·정책·정제 라이브러리 (Prompt Guard 서버 규칙 엔진의 JS 포팅)",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./policy": "./data/policy.js"
+  },
+  "files": ["src", "data", "README.md"],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "sync": "python ../../server/scripts/export_rules_bundle.py"
+  },
+  "license": "UNLICENSED"
+}
