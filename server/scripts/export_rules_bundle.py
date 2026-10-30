@@ -158,7 +158,8 @@ def _strip(resp: dict) -> dict:
 
 
 def _pipeline(ruleset_source=None) -> Pipeline:
-    settings = Settings(auth_disabled=True, policy_path=SERVER / "policies/default.yaml")
+    settings = Settings(auth_disabled=True, policy_path=SERVER / "policies/default.yaml",
+                        model_base_url="http://model.invalid", model_name="fixture")
     return Pipeline(settings, Policy.load(settings.policy_path), AuditStore(Path(":memory:")),
                     today=lambda: VECTOR_TODAY, ruleset_source=ruleset_source)
 

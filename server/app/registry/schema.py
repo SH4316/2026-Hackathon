@@ -36,7 +36,7 @@ class CustomRule(TypePolicyFields):
 
     kind: Literal["keywords", "regex"]
     keywords: list[str] = Field(default_factory=list, max_length=200)
-    pattern: str | None = Field(default=None, max_length=300)
+    pattern: str | None = Field(default=None, max_length=4000)
     case_sensitive: bool = False
     reason: str = Field(default="", max_length=100)
     # false 면 서버에서만 쓰고 클라이언트 배포 묶음에서 뺀다(예: 키워드 자체가 기밀인 코드명 목록).

@@ -23,11 +23,12 @@ def memory_store() -> RuleSetStore:
     return RuleSetStore(Path(":memory:"), policy.detectors_seed_path, set(policy.types))
 
 
-def make_client(dashboard=None, **overrides) -> TestClient:
+def make_client(dashboard=None, org_settings=None, **overrides) -> TestClient:
     opts = {"api_keys": [API_KEY], "admin_keys": [ADMIN_KEY], "policy_path": ROOT / "policies/default.yaml"}
     settings = Settings(**{**opts, **overrides})
     app = create_app(settings, audit=AuditStore(Path(":memory:")), ruleset_store=memory_store(),
-                     clients=ClientStore(Path(":memory:")), org_settings=OrgSettingsStore(Path(":memory:")),
+                     clients=ClientStore(Path(":memory:")),
+                     org_settings=org_settings or OrgSettingsStore(Path(":memory:")),
                      dashboard=dashboard)
     return TestClient(app, headers={"X-API-Key": API_KEY})
 

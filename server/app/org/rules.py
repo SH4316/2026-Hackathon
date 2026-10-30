@@ -35,6 +35,7 @@ class OrgRules:
     tag_names: dict[str, str]
     thresholds: dict[str, float]          # 설정된 태그만
     type_of: dict[str, str]               # 태그 ID → 탐지 유형
+    policy_state_ids: set[str] = field(default_factory=set)
     regex: list[tuple[str, re.Pattern[str]]] = field(default_factory=list)  # (태그 ID, 패턴)
     jev: list[JevPrompt] = field(default_factory=list)
     skipped: dict[str, str] = field(default_factory=dict)  # 쓸 수 없는 태그 정규식: 태그 ID → 사유
@@ -52,6 +53,12 @@ class OrgRules:
     def type_policies(self, action: Action) -> dict[str, TypePolicy]:
         return {t: TypePolicy(category="org", severity=Severity.HIGH, action=action, token=_token(tag))
                 for tag, t in self.type_of.items()}
+
+    def bundle(self, action: Action) -> dict:
+        return {"version_id": self.version_id, "revision": self.revision, "tag_action": action.value,
+                "regex": [{"tag_id": tag, "type": self.type_of[tag], "name": self.tag_names[tag],
+                           "token": _token(tag), "pattern": pattern.pattern}
+                          for tag, pattern in self.regex]}
 
     def detect_regex(self, text: str) -> list[Candidate]:
         out = []
@@ -75,7 +82,7 @@ def check_regex(source: str) -> re.Pattern[str]:
         raise ValueError("nested_quantifier")
     try:
         compiled = re.compile(source)
-    except re.error:
+    except (re.error, OverflowError, RecursionError):
         raise ValueError("syntax_error") from None
     if compiled.search("") is not None:
         raise ValueError("matches_empty")
@@ -89,7 +96,8 @@ def compile_org(config: dict, reserved_types: set[str], jev_enabled: bool = True
     type_of = {tag: (f"org_{tag}" if tag in reserved_types else tag) for tag in names}
     thresholds = {t["id"]: float(t["jevThreshold"]) for t in tags if t.get("jevThreshold") is not None}
     rules = OrgRules(version_id=config["id"], revision=int(config.get("revision", 0)), tag_names=names,
-                     thresholds=thresholds, type_of=type_of)
+                     thresholds=thresholds, type_of=type_of,
+                     policy_state_ids={s["id"] for s in config.get("policyStates") or []})
     for t in tags:
         src = t.get("pythonRegex") or ""
         if not src.strip():

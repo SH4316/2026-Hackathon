@@ -1,7 +1,7 @@
 """YAML 정책 → 탐지 후보별 위험도·조치 결정, 요청 단위 판단.
 
 탐지 신뢰도(confidence)·위험도(severity)·조치(action)는 서로 다른 필드다.
-전송 목적지 등급(destinations.yaml)은 조치를 강화만 하고 완화하지 않는다.
+전송 목적지 등급(destinations.yaml)은 안내용이며 판정에 영향을 주지 않는다.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from app.schemas import Action, Decision, Severity
 _SEVERITY_RANK = {s: i for i, s in enumerate(
     [Severity.INFO, Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL])}
 _ACTION_RANK = {a: i for i, a in enumerate([Action.ALLOW, Action.WARN, Action.MASK, Action.BLOCK])}
-_DECISION_RANK = {d: i for i, d in enumerate([Decision.ALLOW, Decision.WARN, Decision.BLOCK])}
 
 
 @dataclass(frozen=True)
@@ -32,8 +31,6 @@ class TypePolicy:
 @dataclass(frozen=True)
 class Tier:
     name: str
-    escalate: dict[Action, Action]
-    min_decision: Decision
     rank: int
 
 
@@ -61,10 +58,8 @@ class DestinationPolicy:
     def load(cls, path: Path) -> DestinationPolicy:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
         tiers = {
-            name: Tier(name=name,
-                       escalate={Action(k): Action(v) for k, v in (spec.get("escalate") or {}).items()},
-                       min_decision=Decision(spec.get("min_decision", "allow")), rank=i)
-            for i, (name, spec) in enumerate(raw["tiers"].items())
+            name: Tier(name=name, rank=i)
+            for i, name in enumerate(raw["tiers"])
         }
         raw_profiles = raw.get("profiles") or {}
         profiles = {
@@ -142,10 +137,8 @@ class Policy:
     def for_type(self, type_: str) -> TypePolicy:
         return self.types.get(type_, self.default)
 
-    def action_for(self, type_: str, tier: Tier) -> Action:
-        base = self.for_type(type_).action
-        escalated = tier.escalate.get(base, base)
-        return max(base, escalated, key=_ACTION_RANK.__getitem__)  # 강화만 허용
+    def action_for(self, type_: str) -> Action:
+        return self.for_type(type_).action
 
     def priority(self, c: Candidate) -> tuple[int, int, int, int]:
         """겹침 해결 우선순위: 조치 > 위험도 > 규칙 탐지 우선 > 긴 구간."""
@@ -163,7 +156,7 @@ def _type_policy(name: str, spec: dict) -> TypePolicy:
     )
 
 
-def decide(actions: list[Action], min_decision: Decision = Decision.ALLOW) -> Decision:
+def decide(actions: list[Action]) -> Decision:
     """원문 기준 판단. mask 대상이 남아 있으면 원문은 전송할 수 없으므로 block."""
     if any(a in (Action.BLOCK, Action.MASK) for a in actions):
         decision = Decision.BLOCK
@@ -171,4 +164,4 @@ def decide(actions: list[Action], min_decision: Decision = Decision.ALLOW) -> De
         decision = Decision.WARN
     else:
         decision = Decision.ALLOW
-    return max(decision, min_decision, key=_DECISION_RANK.__getitem__)
+    return decision

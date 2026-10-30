@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.admin import router as admin_router
+from app.api.body_limit import BodyLimitMiddleware
 from app.api.clients import router as clients_router
 from app.api.org import router as org_router
 from app.api.routes import router
@@ -16,10 +17,11 @@ from app.clients.store import ClientStore
 from app.org.dashboard import DashboardClient
 from app.org.service import OrgService
 from app.org.settings import OrgSettingsStore
-from app.config import ModelMode, Settings
+from app.config import Settings
 from app.detection.model import ContextModelDetector
 from app.policy.engine import Policy
 from app.registry.store import RuleSetStore
+from app.runtime import RuntimeState
 from app.services.pipeline import Pipeline
 
 log = logging.getLogger("prompt_guard")
@@ -32,11 +34,15 @@ def create_app(settings: Settings | None = None, audit: AuditStore | None = None
     if not settings.auth_disabled and not settings.api_keys:
         raise RuntimeError("PG_API_KEYS 가 비어 있습니다. 개발 중이면 PG_AUTH_DISABLED=true 를 사용하세요.")
 
+    org_store = org_settings or OrgSettingsStore(settings.org_db_path)
+    runtime = RuntimeState(settings, org_store)
     model = None
-    if settings.model_mode is not ModelMode.DISABLED:
+    if runtime.endpoint_set:
         model = ContextModelDetector(settings.model_api, settings.model_base_url, settings.model_name,
                                      settings.model_timeout_s, settings.model_max_concurrency,
                                      settings.model_api_key)
+    else:
+        log.warning("모델 엔드포인트가 설정되지 않아 Jev를 비활성화합니다(PG_MODEL_BASE_URL, PG_MODEL_NAME)")
 
     app = FastAPI(title="Prompt Guard", version="0.1.0",
                   docs_url="/docs", redoc_url=None)
@@ -48,17 +54,13 @@ def create_app(settings: Settings | None = None, audit: AuditStore | None = None
     app.state.clients = clients or ClientStore(settings.clients_db_path)
     if dashboard is None and settings.dashboard_url:
         dashboard = DashboardClient(settings.dashboard_url, settings.dashboard_timeout_s, settings.dashboard_refresh_s)
-    org = OrgService(dashboard, org_settings or OrgSettingsStore(settings.org_db_path), model, settings.model_mode)
+    org = OrgService(dashboard, org_store, model, runtime)
     app.state.org = org
+    app.state.runtime = runtime
     app.state.pipeline = Pipeline(settings, policy, audit or AuditStore(settings.audit_db_path),
-                                  model=model, ruleset_source=ruleset_store, org=org)
-
-    @app.middleware("http")
-    async def limit_body(request: Request, call_next):
-        length = request.headers.get("content-length")
-        if length and length.isdigit() and int(length) > settings.max_body_bytes:
-            return JSONResponse({"detail": "request body too large"}, status_code=413)
-        return await call_next(request)
+                                  model=model, ruleset_source=ruleset_store, org=org, runtime=runtime)
+    app.add_middleware(BodyLimitMiddleware, max_body_bytes=settings.max_body_bytes,
+                       max_report_body_bytes=settings.max_report_body_bytes)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(_: Request, exc: RequestValidationError):

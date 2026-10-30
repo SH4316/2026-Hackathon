@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import { Policy, createGuard, defaultPolicy, ipAddress, ipNetwork } from "../src/index.js";
 import { codePointIndex, pyInt } from "../src/pyre.js";
+import { customDetector } from "../src/custom.js";
 
 const today = () => "2026-11-01";
 const guard = createGuard({ today });
@@ -44,13 +45,40 @@ test("ipaddress port follows Python rules", () => {
   assert.equal(ipNetwork("10.1.2.3/8").isPrivate, true); // strict=False
 });
 
-test("destination tiers only escalate", () => {
+test("destination tiers are informational", () => {
   const p = new Policy(defaultPolicy);
-  const rank = ["allow", "warn", "mask", "block"];
   for (const tier of Object.values(p.tiers)) {
     for (const [name, tp] of Object.entries(p.types)) {
-      assert.ok(rank.indexOf(p.actionFor(name, tier)) >= rank.indexOf(tp.action), `${tier.name}/${name}`);
+      assert.equal(p.actionFor(name), tp.action, `${tier.name}/${name}`);
     }
+  }
+});
+
+test("destination cannot change findings, decisions, or sanitization", () => {
+  for (const text of ["평범한 문장", "CVE-2024-12345", "서버 10.1.2.3", "kim@example.com"]) {
+    for (const method of ["inspect", "sanitize"]) {
+      const baseline = guard[method](text);
+      for (const [provider, channel] of [["openai", "consumer"], ["openai", "api"], ["deepseek", "api"]]) {
+        const r = guard[method](text, { destination: { provider, channel } });
+        for (const key of ["status", "decision", "signal", "findings", "remaining_findings", "sanitized_text"]) {
+          assert.deepEqual(r[key], baseline[key]);
+        }
+      }
+    }
+  }
+});
+
+test("custom regex accepts 4000 code points, rejects longer and nested quantifiers", () => {
+  const rule = (pattern) => ({ id: "long_rule", kind: "regex", label: "긴 패턴", token: "LONG", pattern });
+  for (const pattern of ["x".repeat(301), "x".repeat(4000), "😀".repeat(4000)]) {
+    const detector = customDetector([rule(pattern)]);
+    assert.deepEqual(detector.skipped, []);
+    assert.equal(detector.detect(pattern).length, 1);
+  }
+  for (const pattern of ["x".repeat(4001), "(a+)+$", "(x{1,}){2,}"]) {
+    const detector = customDetector([rule(pattern)]);
+    assert.equal(detector.skipped.length, 1);
+    assert.deepEqual(detector.detect("x"), []);
   }
 });
 

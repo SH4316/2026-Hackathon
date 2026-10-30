@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 class ClientType(str, Enum):
     BROWSER_EXTENSION = "browser_extension"
     CLI = "cli"
+    AI_PROXY = "ai_proxy"
 
 
 class Decision(str, Enum):
@@ -63,6 +64,32 @@ class DestinationIn(BaseModel):
     channel: str | None = Field(default=None, pattern=_ID)    # consumer, enterprise, api, api_free, cloud, self_hosted
 
 
+class FileInfo(BaseModel):
+    name: str = Field(min_length=1, max_length=1000)
+
+
+SendAction = Literal["normal", "confirmed", "forced"]
+
+
+class ReportImage(FileInfo):
+    media_type: str
+    data_base64: str
+
+
+class FileReportRequest(BaseModel):
+    request_id: str = Field(min_length=1, max_length=128)
+    input_version: int | str
+    destination: DestinationIn | None = None
+    send_action: SendAction | None = None
+    files: list[FileInfo] = Field(default_factory=list, max_length=100)
+    images: list[ReportImage] = Field(default_factory=list)
+
+
+class FileReportResponse(BaseModel):
+    recorded: bool
+    reason: Literal["not_managed", "report_off", "dashboard_unavailable"] | None = None
+
+
 class RequestContext(BaseModel):
     task_type: str | None = Field(default=None, max_length=64)
     # 분류값일 뿐 권한·예외 근거가 아니다.
@@ -70,6 +97,8 @@ class RequestContext(BaseModel):
     destination: DestinationIn | None = None
     # draft: 입력 중 검사(대시보드에 기록하지 않음) / submit: 전송 직전 검사. 생략하면 submit(CLI 등).
     stage: Literal["draft", "submit"] | None = None
+    send_action: SendAction | None = None
+    files: list[FileInfo] = Field(default_factory=list, max_length=100)
 
 
 class DestinationOut(BaseModel):

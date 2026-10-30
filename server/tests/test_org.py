@@ -74,12 +74,12 @@ class FakeModel:
         return [s(text) if callable(s) else s for s in self.scores]
 
 
-def org_client(dash=None, model=None, mode=ModelMode.OPTIONAL):
+def org_client(dash=None, model=None, mode=ModelMode.OPTIONAL, **overrides):
     dash = dash or FakeDashboard()
     c = make_client(dashboard=DashboardClient("http://dash", refresh_s=0, transport=httpx.MockTransport(dash.handler)),
-                    model_mode=mode)
+                    **{"model_mode": mode, "model_name": "fake",
+                       "model_base_url": "http://model.invalid", **overrides})
     c.app.state.org.model = model
-    c.app.state.org.model_mode = mode
     # 기존 문맥 탐지 모듈(실제 모델 호출)은 끄고 조직 규칙만 본다.
     c.put("/v1/admin/modules", json={"custom_rules": True, "context_model": False}, headers=ADMIN)
     return c, dash
@@ -148,7 +148,7 @@ def test_whole_input_classification_applies_policy_and_reports_unicode_scope():
     assert finding["span"] == {"start": 0, "end": len(text), "start_utf16": 0, "end_utf16": len(text) + 1}
     assert "입력 전체 분류" in finding["reason"]
     assert dash.events[0]["result"]["findings"][0]["span"] == finding["span"]
-    c.put("/v1/admin/org/settings", json={}, headers=ADMIN)
+    c.put("/v1/admin/org/settings", json={"report_text": "masked"}, headers=ADMIN)
     c.post("/v1/inspect", json=body(text), headers=tok)
     assert dash.events[-1]["text"] == "[ORG_RESEARCH_1]"
     sanitized = c.post("/v1/sanitize", json=body(text)).json()
@@ -225,11 +225,12 @@ def test_enrollment_with_dashboard_person():
     tok, e = enroll(c)
     assert e["label"] == "홍길동" and e["person_id"] == "person-1" and e["managed"] is True
     me = c.get("/v1/auth/me", headers=tok).json()
-    assert me["managed"] and me["reporting"] and me["report_text"] == "masked"
+    assert me["managed"] and me["reporting"] and me["report_text"] == "full"
 
 
-def test_report_masked_by_default_and_only_on_submit():
+def test_report_masked_option_and_only_on_submit():
     c, dash = org_client(model=FakeModel([research_hit]))
+    c.put("/v1/admin/org/settings", json={"report_text": "masked"}, headers=ADMIN)
     tok, _ = enroll(c)
     text = "kim@example.com 사번 EMP-123456 수율 93% 공유"
     draft = body(text)
@@ -297,3 +298,77 @@ def test_stage_is_accepted(client, stage):
     if stage:
         b["context"]["stage"] = stage
     assert client.post("/v1/inspect", json=b).status_code == 200
+
+
+@pytest.mark.parametrize("action", [None, "normal", "confirmed", "forced"])
+def test_full_report_default_includes_send_action_files_and_valid_policy_state(action):
+    dash = FakeDashboard()
+    dash.config["policyStates"] = [{"id": "blocked", "name": "차단"}]
+    c, _ = org_client(dash, model=FakeModel())
+    tok, _ = enroll(c)
+    settings = c.get("/v1/admin/org/settings", headers=ADMIN).json()
+    assert settings["report_text"] == "full"
+    assert settings["policy_state_map"] == {"allow": None, "warn": None, "block": None}
+    c.put("/v1/admin/org/settings", json={"policy_state_map": {"block": "blocked", "allow": "missing"}},
+          headers=ADMIN)
+    req = body("kim@example.com", "ai_proxy")
+    req["context"].update({"send_action": action, "files": [{"name": "보고서.docx"}]})
+    c.post("/v1/inspect", json=req, headers=tok)
+    ev = dash.events[-1]
+    assert ev["text"] == req["text"] and ev["send_action"] == action
+    assert ev["files"] == [{"name": "보고서.docx"}] and ev["policy_state_id"] == "blocked"
+    c.post("/v1/inspect", json=body("평범한 문장"), headers=tok)
+    assert "policy_state_id" not in dash.events[-1]  # 활성 버전에 없는 ID는 보내지 않는다.
+    assert dash.events[-1]["result"]["decision"] == "allow"  # 통과도 조직 전송 기록에 남긴다.
+
+
+def test_policy_state_map_revalidated_after_version_mismatch():
+    dash = FakeDashboard()
+    dash.config["policyStates"] = [{"id": "old-state", "name": "이전 상태"}]
+    c, _ = org_client(dash, model=FakeModel())
+    tok, _ = enroll(c)
+    c.put("/v1/admin/org/settings", json={"policy_state_map": {"allow": "old-state"}}, headers=ADMIN)
+    c.post("/v1/inspect", json=body("평범한 문장"), headers=tok)
+    assert dash.events[-1]["policy_state_id"] == "old-state"
+    dash.config = config(version="v2")
+    dash.mismatch_once = True
+    c.post("/v1/inspect", json=body("평범한 문장"), headers=tok)
+    assert dash.events[-1]["version_id"] == "v2" and "policy_state_id" not in dash.events[-1]
+
+
+@pytest.mark.parametrize("patch", [{"send_action": "invalid"}, {"files": [{"name": "x"}] * 101}])
+@pytest.mark.parametrize("endpoint", ["inspect", "sanitize"])
+def test_extended_context_is_validated(client, patch, endpoint):
+    req = body("x", "ai_proxy")
+    req["context"].update(patch)
+    assert client.post(f"/v1/{endpoint}", json=req).status_code == 422
+
+
+def test_bundle_includes_org_regex_and_destination_information_and_etag_updates():
+    c, dash = org_client(model=FakeModel())
+    first = c.get("/v1/rules/bundle")
+    data, etag = first.json(), first.headers["ETag"]
+    org = data["org_rules"]
+    assert (org["version_id"], org["revision"], org["tag_action"]) == ("v1", 1, "mask")
+    assert next(r for r in org["regex"] if r["tag_id"] == "emp-id") == {
+        "tag_id": "emp-id", "type": "emp-id", "name": "사번", "token": "ORG_EMP_ID",
+        "pattern": r"(?i)\bEMP-\d{6}\b"}
+    assert next(r for r in org["regex"] if r["tag_id"] == "email")["type"] == "org_email"
+    assert all(r["tag_id"] != "bad" for r in org["regex"])
+    dest = data["destinations"]["openai"]["consumer"]
+    assert dest["tier"] == "elevated" and dest["basis"] and dest["verified_at"] == "2026-10-31"
+    assert c.get("/v1/rules/bundle", headers={"If-None-Match": etag}).status_code == 304
+    for key, value in [("revision", 2), ("id", "v2")]:
+        dash.config[key] = value
+        changed = c.get("/v1/rules/bundle", headers={"If-None-Match": etag})
+        assert changed.status_code == 200 and changed.headers["ETag"] != etag
+        etag = changed.headers["ETag"]
+    c.put("/v1/admin/org/settings", json={"tag_action": "warn"}, headers=ADMIN)
+    changed = c.get("/v1/rules/bundle", headers={"If-None-Match": etag})
+    assert changed.status_code == 200 and changed.json()["org_rules"]["tag_action"] == "warn"
+    dash.down = True
+    assert c.get("/v1/rules/bundle").json()["org_rules"] is None
+
+
+def test_unmanaged_bundle_has_null_org_rules(client):
+    assert client.get("/v1/rules/bundle").json()["org_rules"] is None

@@ -1,7 +1,7 @@
 """검사·정제 오케스트레이션.
 
 내장 규칙 + 사용자 규칙 모듈 + 문맥(로컬 모델) 모듈 (+ 조직 서버면 대시보드 태그 정규식·Jev)
-→ 병합 → 정책(목적지 등급으로 강화) → 판단.
+→ 병합 → 내용 기반 정책 → 판단. 목적지는 안내용이다.
 사용자 규칙·문맥 탐지기·모듈 조합은 대시보드에서 편집하는 ruleset 에서 온다(버전별로 컴파일해 캐시).
 검사 오류·모델 오류·시간 초과는 절대 allow 로 귀결되지 않는다.
 """
@@ -21,16 +21,17 @@ from app.detection.custom import CustomRuleDetector
 from app.detection.model import ContextModelDetector, ModelUnavailable
 from app.detection.rules import RuleDetector
 from app.org.dashboard import DashboardUnavailable
-from app.org.report import build_event
+from app.org.report import build_event, file_attachments
 from app.org.rules import OrgRules
 from app.org.service import OrgService
-from app.policy.engine import Destination, Policy, Tier, TypePolicy, decide
+from app.policy.engine import Destination, Policy, TypePolicy, decide
 from app.registry.schema import ContextDetector, RuleSet, RuleSetBody
 from app.registry.store import StaticRuleSet, load_seed
+from app.runtime import RuntimeState
 from app.sanitize.replacer import Replacement, apply, assign_tokens
 from app.schemas import (
-    Action, Change, Decision, DestinationOut, Finding, InspectRequest, InspectResponse,
-    SanitizeResponse, Signal, Span, Status,
+    Action, Change, Decision, DestinationOut, FileReportRequest, FileReportResponse, Finding,
+    InspectRequest, InspectResponse, RequestContext, SanitizeResponse, Signal, Span, Status,
 )
 
 _SIGNAL = {Decision.ALLOW: Signal.GREEN, Decision.WARN: Signal.YELLOW, Decision.BLOCK: Signal.RED}
@@ -43,7 +44,6 @@ class Analysis:
     signal: Signal
     merged: list[Merged]
     notices: list[str]
-    tier: Tier
 
 
 @dataclass(frozen=True)
@@ -84,8 +84,9 @@ class Pipeline:
     def __init__(self, settings: Settings, policy: Policy, audit: AuditStore,
                  rules: RuleDetector | None = None, model: ContextModelDetector | None = None,
                  today: Callable[[], date] = date.today, ruleset_source=None,
-                 org: OrgService | None = None) -> None:
+                 org: OrgService | None = None, runtime: RuntimeState | None = None) -> None:
         self.settings = settings
+        self.runtime = runtime or RuntimeState(settings)
         self.base_policy = policy
         self.audit = audit
         self.rules = rules or RuleDetector()
@@ -111,9 +112,51 @@ class Pipeline:
         """내장 유형 + 현재 ruleset 의 사용자 유형을 합친 정책."""
         return self.compiled.policy
 
+    async def runtime_status(self) -> dict:
+        mode = self.runtime.model_mode
+        ready = None
+        if not self.runtime.endpoint_set:
+            model_status = "endpoint_unset"
+        elif mode is ModelMode.DISABLED:
+            model_status = "disabled"
+        else:
+            ready = await self.model.ready() if self.model else False
+            model_status = "active" if ready else "unavailable"
+        return {"model_mode": mode.value, "model_status": model_status,
+                "model_endpoint_set": self.runtime.endpoint_set, "model_ready": ready,
+                "modules": self.compiled.ruleset.modules.model_dump(),
+                "policy_version": self.policy.version, "ruleset_version": self.compiled.ruleset.version,
+                "org": self.org.status() if self.org else {"managed": False}}
+
+    async def report_files(self, req: FileReportRequest, person_id: str | None) -> FileReportResponse:
+        if self.org is None or not person_id:
+            return FileReportResponse(recorded=False, reason="not_managed")
+        org = self.org
+        if org.settings.report_text == "off":
+            return FileReportResponse(recorded=False, reason="report_off")
+        files, images = file_attachments(req)
+        ctx = RequestContext(client_type="ai_proxy", destination=req.destination)
+        dest, notices = self.resolve_destination(InspectRequest(
+            request_id=req.request_id, input_version=req.input_version, text="", context=ctx))
+        response = InspectResponse(
+            request_id=req.request_id, input_version=req.input_version, status=Status.COMPLETE,
+            decision=Decision.ALLOW, signal=Signal.GREEN, findings=[], policy_version=self.policy.version,
+            destination=_dest_out(dest), detector_versions=self.detector_versions(), notices=notices)
+
+        def build(rules: OrgRules) -> dict:
+            return build_event(rules=rules, settings=org.settings, person_id=person_id, text="",
+                               response=response.model_dump(mode="json"), merged=[],
+                               token_of=lambda t: self.policy.for_type(t).token,
+                               finding_of=lambda c: {}, send_action=req.send_action,
+                               files=files, images=images)
+
+        recorded = await org.report(build, set(self.policy.types))
+        return FileReportResponse(recorded=recorded, reason=None if recorded else "dashboard_unavailable")
+
     def detector_versions(self, r: RequestRules | None = None) -> dict[str, str]:
         v = {"rules": self.rules.version, "ruleset": f"rs-{self.compiled.ruleset.version}"}
-        if self.model is not None and self.settings.model_mode is not ModelMode.DISABLED:
+        if (self.runtime.endpoint_set and self.model is not None
+                and self.runtime.model_mode is not ModelMode.DISABLED):
             v["model"] = self.model.version
         if r is not None and r.org is not None:
             v["org"] = f"{r.org.version_id}@{r.org.revision}"
@@ -138,18 +181,20 @@ class Pipeline:
         return self.policy.destinations.resolve(d.provider if d else None, d.channel if d else None,
                                                 today=self.today())
 
-    async def analyze(self, text: str, tier: Tier, r: RequestRules | None = None) -> Analysis:
+    async def analyze(self, text: str, r: RequestRules | None = None) -> Analysis:
         r = r or RequestRules(self.policy)
         policy = r.policy
         c = self.compiled
         candidates: list[Candidate] = self.rules.detect(text) + c.custom.detect(text)
         notices: list[str] = []
         status = Status.COMPLETE
-        min_decision = tier.min_decision
-        mode = self.settings.model_mode
+        unlocated = False
+        mode = self.runtime.model_mode
         model_mandatory = mode is ModelMode.REQUIRED or policy.model_required
 
-        if mode is ModelMode.DISABLED or self.model is None or not c.context:
+        if not self.runtime.endpoint_set:
+            notices.append("model_endpoint_unset")
+        elif mode is ModelMode.DISABLED or self.model is None or not c.context:
             if policy.model_required:
                 status = Status.INCOMPLETE
                 notices.append("model_check_required_but_disabled")
@@ -170,22 +215,23 @@ class Pipeline:
             notices += od.notices
             if od.incomplete:
                 status = _worst(status, Status.ERROR if od.error else Status.INCOMPLETE)
-            if od.unlocated:  # 위치 없는 Jev 판정: 치환할 수 없으니 최소 확인 필요
-                min_decision = max(min_decision, Decision.WARN, key=[Decision.ALLOW, Decision.WARN,
-                                                                     Decision.BLOCK].index)
+            unlocated = od.unlocated
 
         merged = merge(candidates, policy.priority)
-        decision = decide([policy.action_for(m.primary.type, tier) for m in merged], min_decision)
+        notices = list(dict.fromkeys(notices))
+        decision = decide([policy.action_for(m.primary.type) for m in merged])
+        if unlocated and decision is Decision.ALLOW:
+            decision = Decision.WARN
         if status is not Status.COMPLETE:
             # 회색: 검사 미완료. 규칙상 통과여도 allow 로 내보내지 않는다.
             if decision is Decision.ALLOW:
                 decision = Decision.WARN
-            return Analysis(status, decision, Signal.GRAY, merged, notices, tier)
-        return Analysis(status, decision, _SIGNAL[decision], merged, notices, tier)
+            return Analysis(status, decision, Signal.GRAY, merged, notices)
+        return Analysis(status, decision, _SIGNAL[decision], merged, notices)
 
-    def to_finding(self, text: str, i: int, c: Candidate, tier: Tier, policy: Policy) -> Finding:
+    def to_finding(self, text: str, i: int, c: Candidate, policy: Policy) -> Finding:
         tp = policy.for_type(c.type)
-        action = policy.action_for(c.type, tier)
+        action = policy.action_for(c.type)
         return Finding(
             finding_id=f"f{i}", type=c.type, category=tp.category, rule_id=c.rule_id,
             detector="model" if c.detector == "model" else "rule",
@@ -196,10 +242,10 @@ class Pipeline:
             replacement=None if action in (Action.ALLOW, Action.BLOCK) else f"[{tp.token}_n]",
         )
 
-    def to_findings(self, text: str, merged: list[Merged], tier: Tier,
+    def to_findings(self, text: str, merged: list[Merged],
                     policy: Policy | None = None) -> list[Finding]:
         policy = policy or self.policy
-        return [self.to_finding(text, i, m.primary, tier, policy) for i, m in enumerate(merged, start=1)]
+        return [self.to_finding(text, i, m.primary, policy) for i, m in enumerate(merged, start=1)]
 
     async def inspect(self, req: InspectRequest, client_id: str | None = None, person_id: str | None = None,
                       schedule: Schedule | None = None) -> InspectResponse:
@@ -207,21 +253,21 @@ class Pipeline:
         t0 = time.perf_counter()
         r = await self.request_rules()
         dest, dest_notices = self.resolve_destination(req)
-        a = await self.analyze(req.text, dest.tier, r)
+        a = await self.analyze(req.text, r)
         resp = InspectResponse(
             request_id=req.request_id, input_version=req.input_version, status=a.status,
             decision=a.decision, signal=a.signal,
-            findings=self.to_findings(req.text, a.merged, dest.tier, r.policy),
+            findings=self.to_findings(req.text, a.merged, r.policy),
             policy_version=self.policy.version, destination=_dest_out(dest),
             detector_versions=self.detector_versions(r), notices=dest_notices + a.notices,
         )
         self._record("inspect", req, a, dest, masked=0, t0=t0, client_id=client_id, policy=r.policy)
         if (schedule and person_id and self.org is not None and req.context.stage != "draft"
                 and self.org.settings.report_text != "off"):
-            schedule(self._report_job(req, resp, a, dest.tier, r.policy, person_id))
+            schedule(self._report_job(req, resp, a, r.policy, person_id))
         return resp
 
-    def _report_job(self, req: InspectRequest, resp: InspectResponse, a: Analysis, tier: Tier,
+    def _report_job(self, req: InspectRequest, resp: InspectResponse, a: Analysis,
                     policy: Policy, person_id: str) -> Callable[[], Awaitable[None]]:
         org = self.org
         assert org is not None
@@ -231,7 +277,9 @@ class Pipeline:
             return build_event(
                 rules=rules, settings=org.settings, person_id=person_id, text=req.text, response=response,
                 merged=a.merged, token_of=lambda t: policy.for_type(t).token,
-                finding_of=lambda c: self.to_finding(req.text, 0, c, tier, policy).model_dump(mode="json"))
+                finding_of=lambda c: self.to_finding(req.text, 0, c, policy).model_dump(mode="json"),
+                send_action=req.context.send_action,
+                files=[f.model_dump() for f in req.context.files])
 
         async def job() -> None:
             await org.report(build, set(self.policy.types))
@@ -243,17 +291,17 @@ class Pipeline:
         rq = await self.request_rules()
         policy = rq.policy
         dest, dest_notices = self.resolve_destination(req)
-        first = await self.analyze(req.text, dest.tier, rq)
+        first = await self.analyze(req.text, rq)
         targets = [
             Replacement(m.primary.start, m.primary.end, m.primary.type,
                         policy.for_type(m.primary.type).token)
             for m in first.merged
-            if policy.action_for(m.primary.type, dest.tier) in (Action.MASK, Action.WARN)
+            if policy.action_for(m.primary.type) in (Action.MASK, Action.WARN)
         ]
         tokens = assign_tokens(req.text, targets)
         sanitized = apply(req.text, tokens)
 
-        second = await self.analyze(sanitized, dest.tier, rq)
+        second = await self.analyze(sanitized, rq)
         status = _worst(first.status, second.status)
         decision, signal = second.decision, second.signal
         if status is not Status.COMPLETE:
@@ -268,12 +316,12 @@ class Pipeline:
             request_id=req.request_id, input_version=req.input_version, status=status,
             sanitized_text=sanitized, decision=decision, signal=signal,
             changes=[Change(type=t, token=tok, count=n) for (t, tok), n in changes_by_token.items()],
-            remaining_findings=self.to_findings(sanitized, second.merged, dest.tier, policy),
+            remaining_findings=self.to_findings(sanitized, second.merged, policy),
             policy_version=self.policy.version, destination=_dest_out(dest),
             detector_versions=self.detector_versions(rq),
             notices=dest_notices + sorted(set(first.notices + second.notices)),
         )
-        final = Analysis(status, decision, signal, second.merged, resp.notices, dest.tier)
+        final = Analysis(status, decision, signal, second.merged, resp.notices)
         self._record("sanitize", req, final, dest, masked=len(tokens), t0=t0, client_id=client_id,
                      policy=policy)
         return resp
@@ -288,7 +336,7 @@ class Pipeline:
             request_id=req.request_id, input_version=str(req.input_version),
             status=a.status.value, decision=a.decision.value,
             finding_counts=count([m.primary.type for m in a.merged]),
-            actions=count([policy.action_for(m.primary.type, a.tier).value for m in a.merged]),
+            actions=count([policy.action_for(m.primary.type).value for m in a.merged]),
             rule_ids=sorted({c.rule_id for m in a.merged for c in m.members}),
             masked_count=masked, policy_version=self.policy.version,
             detector_versions=self.detector_versions(),
