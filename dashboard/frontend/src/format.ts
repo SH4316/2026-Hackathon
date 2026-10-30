@@ -1,9 +1,28 @@
 import type { DateRange, Detection, DetectionTag, Filters, Tag } from "./types";
 
+export const KNOWN_SERVICES = [
+  { id: "openai", label: "ChatGPT" },
+  { id: "anthropic", label: "Claude" },
+  { id: "google", label: "Gemini" },
+  { id: "microsoft", label: "Copilot" },
+  { id: "deepseek", label: "DeepSeek" },
+  { id: "moonshot", label: "Kimi" },
+  { id: "mistral", label: "Mistral" },
+  { id: "perplexity", label: "Perplexity" },
+  { id: "xai", label: "Grok" },
+  { id: "alibaba", label: "Qwen" },
+  { id: "meta", label: "Meta AI" },
+] as const;
+
+const providerLabels: Record<string, string> = Object.fromEntries(
+  KNOWN_SERVICES.map(({ id, label }) => [id, label]),
+);
+
 export const SERVICE_LABELS: Record<string, string> = {
-  chatgpt: "ChatGPT",
-  claude: "Claude",
-  gemini: "Gemini",
+  ...providerLabels,
+  chatgpt: providerLabels.openai,
+  claude: providerLabels.anthropic,
+  gemini: providerLabels.google,
 };
 
 const SEOUL_OFFSET_MS = 9 * 60 * 60 * 1000;

@@ -50,6 +50,7 @@ class OpenApiConfiguration {
     return api -> {
       detectorSchemas(api);
       configurationSchemas(api);
+      guardSchemas(api);
       var errorSchema =
           new ObjectSchema()
               .addProperty("code", new StringSchema().example("INVALID_INPUT"))
@@ -467,6 +468,123 @@ class OpenApiConfiguration {
     // OpenAPI 3.1 uses a type union for nullability. Required/optional presence stays unchanged.
     schemas.get("Destination").addProperty("basis", nullableString());
     schemas.get("Finding").addProperty("replacement", nullableString());
+  }
+
+  private static void guardSchemas(OpenAPI api) {
+    var sendAction =
+        new Schema<String>()
+            .types(new LinkedHashSet<>(List.of("string", "null")))
+            ._enum(java.util.Arrays.asList("normal", "confirmed", "forced", null))
+            .description("실제 전송 방식. forced는 강행 전송이며 이전 이벤트는 null입니다.");
+    api.getComponents().getSchemas().get("Event").addProperty("sendAction", sendAction);
+    api.getComponents()
+        .getSchemas()
+        .get("CreateDetectorEvent")
+        .addProperty("send_action", sendAction);
+    api.getComponents()
+        .getSchemas()
+        .get("StoredDetectorEvent")
+        .addProperty("send_action", sendAction);
+    api.getPaths().remove("/api/v1/guard/**");
+    for (String route :
+        List.of(
+            "ruleset",
+            "ruleset/history",
+            "runtime",
+            "modules",
+            "custom-rules/{id}",
+            "custom-rules/test",
+            "context-detectors/{id}",
+            "context-detectors/test",
+            "prompt",
+            "org/settings",
+            "org/status",
+            "org/refresh",
+            "enrollments",
+            "clients",
+            "clients/{id}",
+            "audit/events",
+            "audit/summary")) {
+      var item = new io.swagger.v3.oas.models.PathItem();
+      List<String> methods =
+          switch (route) {
+            case "modules", "custom-rules/{id}", "context-detectors/{id}" ->
+                route.equals("modules") ? List.of("put") : List.of("put", "delete");
+            case "custom-rules/test", "context-detectors/test", "org/refresh", "enrollments" ->
+                List.of("post");
+            case "runtime", "prompt", "org/settings" -> List.of("get", "put");
+            case "clients/{id}" -> List.of("patch", "delete");
+            default -> List.of("get");
+          };
+      for (String method : methods) {
+        var operation =
+            new Operation()
+                .summary("검사 서버 관리: " + route)
+                .operationId("guard_" + method + "_" + route.replaceAll("[^A-Za-z0-9]", "_"))
+                .description("검사 서버 /v1/admin/" + route + "로 전달합니다. 관리 키는 백엔드에만 보관합니다.")
+                .addTagsItem("검사 서버 관리")
+                .responses(
+                    new io.swagger.v3.oas.models.responses.ApiResponses()
+                        .addApiResponse(
+                            "200",
+                            new ApiResponse()
+                                .description("검사 서버의 응답 본문과 상태를 유지합니다.")
+                                .content(
+                                    new Content()
+                                        .addMediaType(
+                                            "application/json",
+                                            new MediaType().schema(new ObjectSchema())))
+                                .addHeaderObject(
+                                    "ETag",
+                                    new io.swagger.v3.oas.models.headers.Header()
+                                        .schema(new StringSchema())))
+                        .addApiResponse(
+                            "503",
+                            new ApiResponse()
+                                .description("GUARD_UNAVAILABLE: 검사 서버 설정 누락 또는 연결 실패"))
+                        .addApiResponse("412", new ApiResponse().description("검사 서버의 ETag 편집 충돌")));
+        if (route.equals("enrollments"))
+          operation
+              .getResponses()
+              .addApiResponse("201", new ApiResponse().description("일회용 등록 코드 발급"));
+        if (route.equals("clients/{id}") && method.equals("delete"))
+          operation.getResponses().addApiResponse("204", new ApiResponse().description("연결 해지 완료"));
+        operation.addParametersItem(
+            new Parameter()
+                .name("If-Match")
+                .in("header")
+                .schema(new StringSchema())
+                .description("조회한 ruleset ETag. 변경 요청의 동시 편집 충돌 검사에 사용합니다."));
+        if (route.contains("{id}"))
+          operation.addParametersItem(
+              new Parameter()
+                  .name("id")
+                  .in("path")
+                  .required(true)
+                  .schema(new StringSchema().pattern("^[A-Za-z0-9_-]{1,80}$")));
+        if (List.of("post", "put", "patch").contains(method) && !route.equals("org/refresh")) {
+          Schema<?> input = new ObjectSchema().additionalProperties(true);
+          if (route.equals("runtime"))
+            input =
+                new ObjectSchema()
+                    .addProperty(
+                        "model_mode",
+                        new StringSchema()._enum(List.of("disabled", "optional", "required")))
+                    .addRequiredItem("model_mode");
+          operation.requestBody(
+              new io.swagger.v3.oas.models.parameters.RequestBody()
+                  .required(true)
+                  .content(
+                      new Content()
+                          .addMediaType("application/json", new MediaType().schema(input))));
+        }
+        item.operation(
+            io.swagger.v3.oas.models.PathItem.HttpMethod.valueOf(
+                method.toUpperCase(java.util.Locale.ROOT)),
+            operation);
+      }
+      api.path("/api/v1/guard/" + route, item);
+    }
   }
 
   private static Schema<?> nullableString() {

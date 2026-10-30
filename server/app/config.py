@@ -28,11 +28,12 @@ class Settings:
     policy_path: Path = Path("policies/default.yaml")
     max_text_chars: int = 50_000
     max_body_bytes: int = 256 * 1024
+    max_report_body_bytes: int = 16 * 1024 * 1024
 
     model_mode: ModelMode = ModelMode.DISABLED
     model_api: str = "ollama"  # decider(확률 분류) | ollama | openai(OpenAI 호환 로컬 서버)
     model_api_key: str = ""    # OpenAI 호환 로컬 서버가 키를 요구할 때만
-    model_base_url: str = "http://model:11434"
+    model_base_url: str = ""
     model_name: str = ""
     model_timeout_s: float = 20.0
     model_max_concurrency: int = 2
@@ -60,10 +61,11 @@ class Settings:
             policy_path=Path(os.getenv("PG_POLICY_PATH", "policies/default.yaml")),
             max_text_chars=int(os.getenv("PG_MAX_TEXT_CHARS", "50000")),
             max_body_bytes=int(os.getenv("PG_MAX_BODY_BYTES", str(256 * 1024))),
+            max_report_body_bytes=int(os.getenv("PG_MAX_REPORT_BODY_BYTES", str(16 * 1024 * 1024))),
             model_mode=ModelMode(os.getenv("PG_MODEL_MODE", "disabled")),
             model_api=os.getenv("PG_MODEL_API", "ollama"),
             model_api_key=os.getenv("PG_MODEL_API_KEY", ""),
-            model_base_url=os.getenv("PG_MODEL_BASE_URL", "http://model:11434"),
+            model_base_url=os.getenv("PG_MODEL_BASE_URL", ""),
             model_name=os.getenv("PG_MODEL_NAME", ""),
             model_timeout_s=float(os.getenv("PG_MODEL_TIMEOUT_S", "20")),
             model_max_concurrency=int(os.getenv("PG_MODEL_MAX_CONCURRENCY", "2")),

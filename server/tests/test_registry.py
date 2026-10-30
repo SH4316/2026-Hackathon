@@ -92,6 +92,19 @@ def test_regex_rule_and_dry_run(client):
     assert client.get("/v1/admin/ruleset", headers=ADMIN).json()["version"] == 1  # 저장 안 됨
 
 
+@pytest.mark.parametrize("length,code", [(301, 200), (4000, 200), (4001, 422)])
+def test_custom_regex_length_limit_is_4000(client, length, code):
+    rule = {"id": "long_rule", "kind": "regex", "label": "긴 패턴", "token": "LONG",
+            "pattern": "x" * length}
+    assert put_rule(client, rule).status_code == code
+    from app.registry.validate import RegexRejected, check_custom_regex
+    if code == 200:
+        assert check_custom_regex(rule["pattern"]).fullmatch("x" * length)
+    else:
+        with pytest.raises(RegexRejected):
+            check_custom_regex(rule["pattern"])
+
+
 def test_if_match_conflict(client):
     assert put_rule(client, CODENAME, **{"If-Match": "1"}).status_code == 200
     r = put_rule(client, {**CODENAME, "keywords": ["다른값"]}, **{"If-Match": "1"})
@@ -147,7 +160,7 @@ class FakeModel:
 
 
 def model_client():
-    c = make_client(model_mode=ModelMode.OPTIONAL, model_name="fake")
+    c = make_client(model_mode=ModelMode.OPTIONAL, model_name="fake", model_base_url="http://model.invalid")
     fake = FakeModel()
     c.app.state.pipeline.model = fake
     return c, fake

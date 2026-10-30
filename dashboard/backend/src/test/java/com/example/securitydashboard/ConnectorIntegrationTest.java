@@ -45,8 +45,8 @@ class ConnectorIntegrationTest {
     jdbc.update("DELETE FROM people WHERE id LIKE 'enroll-test-%'");
     jdbc.update("DELETE FROM detector_connectors");
     jdbc.update(
-        "UPDATE detector_settings SET report_text='masked',tag_action='mask',jev_enabled=TRUE,"
-            + "tag_map=JSON_OBJECT(),revision=0,updated_at=NULL WHERE id=1");
+        "UPDATE detector_settings SET report_text='full',tag_action='mask',jev_enabled=TRUE,"
+            + "tag_map=JSON_OBJECT(),policy_state_map=JSON_OBJECT('allow',NULL,'warn',NULL,'block',NULL),revision=0,updated_at=NULL WHERE id=1");
     jdbc.update("UPDATE active_config SET version_id=NULL");
   }
 
@@ -90,6 +90,9 @@ class ConnectorIntegrationTest {
     call(get("/api/v1/classifier-config").header("Authorization", "Bearer sk_wrong"), null, 401);
     call(get("/api/v1/classifier-config").header("Authorization", bearer), null, 404);
     call(post("/api/v1/detector-events"), java.util.Map.of(), 401);
+    call(get("/api/v1/detector-events/987654321"), null, 401);
+    call(get("/api/v1/events/987654321/attachments"), null, 404);
+    call(get("/api/v1/events/987654321/attachments/images/1"), null, 404);
     // 연결 확인은 그 연결의 비밀값만 통과
     assertThat(call(get(url.substring("http://localhost".length(), url.indexOf('#')))
             .header("Authorization", bearer), null, 200).path("connected").asBoolean())
@@ -126,7 +129,7 @@ class ConnectorIntegrationTest {
   @Test
   void detectorSettingsAreRevisionedAndValidated() throws Exception {
     JsonNode initial = call(get("/api/v1/detector-settings"), null, 200);
-    assertThat(initial.path("reportText").asText()).isEqualTo("masked");
+    assertThat(initial.path("reportText").asText()).isEqualTo("full");
     assertThat(initial.path("tagAction").asText()).isEqualTo("mask");
     assertThat(initial.path("jevEnabled").asBoolean()).isTrue();
     assertThat(initial.path("revision").asInt()).isZero();
@@ -135,12 +138,15 @@ class ConnectorIntegrationTest {
     body.put("revision", 0);
     body.put("reportText", "full");
     body.put("tagAction", "warn");
+    body.put("policyStateMap", java.util.Map.of("warn", "review", "block", "blocked"));
     body.put("jevEnabled", false);
     body.put("tagMap", java.util.Map.of("email", "pii-3", "aws_access_key_id", "security-1"));
     JsonNode saved = call(put("/api/v1/detector-settings"), body, 200);
     assertThat(saved.path("revision").asInt()).isEqualTo(1);
     assertThat(saved.at("/tagMap/email").asText()).isEqualTo("pii-3");
     assertThat(saved.path("updatedAt").isNull()).isFalse();
+    assertThat(saved.at("/policyStateMap/warn").asText()).isEqualTo("review");
+    assertThat(saved.at("/policyStateMap/allow").isNull()).isTrue();
     assertThat(call(put("/api/v1/detector-settings"), body, 409).path("code").asText())
         .isEqualTo("REVISION_CONFLICT");
 

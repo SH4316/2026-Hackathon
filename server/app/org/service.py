@@ -18,6 +18,7 @@ from app.detection.model import ContextModelDetector, ModelUnavailable
 from app.org.dashboard import DashboardClient, DashboardUnavailable
 from app.org.rules import OrgRules, compile_org
 from app.org.settings import OrgSettings, OrgSettingsStore, from_dashboard
+from app.runtime import RuntimeState
 from app.schemas import Confidence
 
 log = logging.getLogger("prompt_guard.org")
@@ -34,11 +35,11 @@ class OrgDetection:
 
 class OrgService:
     def __init__(self, client: DashboardClient | None, settings: OrgSettingsStore,
-                 model: ContextModelDetector | None, model_mode: ModelMode) -> None:
+                 model: ContextModelDetector | None, runtime: RuntimeState) -> None:
         self.client = client
         self.settings_store = settings
         self.model = model
-        self.model_mode = model_mode
+        self.runtime = runtime
         self._compiled: tuple[tuple, OrgRules] | None = None
         self.reported = 0
         self.report_failures: dict[str, int] = {}
@@ -63,7 +64,11 @@ class OrgService:
     async def rules(self, reserved_types: set[str], force: bool = False) -> OrgRules:
         """대시보드 활성 설정을 컴파일한 조직 규칙. 받을 수 없으면 DashboardUnavailable."""
         assert self.client is not None
-        config = await self.client.config(force=force)
+        try:
+            config = await self.client.config(force=force)
+        except DashboardUnavailable:
+            self._compiled = None
+            raise
         s = self.settings
         key = (config.get("id"), config.get("revision"), s.key, frozenset(reserved_types))
         if self._compiled is None or self._compiled[0] != key:
@@ -77,7 +82,11 @@ class OrgService:
         out = OrgDetection(candidates=rules.detect_regex(text))
         if not rules.jev:
             return out
-        if self.model is None or self.model_mode is ModelMode.DISABLED:
+        if not self.runtime.endpoint_set:
+            out.notices.append("model_endpoint_unset")
+            return out
+        mode = self.runtime.model_mode
+        if self.model is None or mode is ModelMode.DISABLED:
             out.incomplete = True
             out.notices.append("org_jev_model_disabled")
             return out
@@ -86,7 +95,7 @@ class OrgService:
         for p, res in zip(rules.jev, results):
             if isinstance(res, ModelUnavailable):
                 out.incomplete = True
-                out.error = out.error or self.model_mode is ModelMode.REQUIRED
+                out.error = out.error or mode is ModelMode.REQUIRED
                 if "org_jev_failed" not in out.notices:
                     out.notices.append("org_jev_failed")
                 continue
@@ -113,7 +122,7 @@ class OrgService:
         self.report_failures[code] = self.report_failures.get(code, 0) + 1
         log.warning("dashboard report failed: %s", code)
 
-    async def report(self, build, reserved_types: set[str]) -> None:
+    async def report(self, build, reserved_types: set[str]) -> bool:
         """build(rules) → detector-events 본문. 활성 버전이 바뀌었으면(409) 설정을 다시 받아 한 번 재시도한다."""
         assert self.client is not None
         for attempt in range(2):
@@ -121,14 +130,15 @@ class OrgService:
                 rules = await self.rules(reserved_types, force=attempt > 0)
             except DashboardUnavailable as exc:
                 self._fail(str(exc))
-                return
+                return False
             res = await self.client.post_event(build(rules))
             if res.status in (200, 201):
                 self.reported += 1
-                return
+                return True
             if res.code != "VERSION_MISMATCH":
                 break
         self._fail(res.code or f"http_{res.status}")
+        return False
 
     def status(self) -> dict:
         if not self.enabled:

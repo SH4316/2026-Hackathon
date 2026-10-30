@@ -154,11 +154,14 @@ CASES: list[tuple[str, str, str | None]] = [
 def _strip(resp: dict) -> dict:
     resp.pop("request_id", None)
     resp.pop("input_version", None)
+    # 대시보드 기록 상태는 서버 전용이며 순수 JS 규칙 엔진의 비교 대상이 아니다.
+    resp.pop("report_status", None)
     return resp
 
 
 def _pipeline(ruleset_source=None) -> Pipeline:
-    settings = Settings(auth_disabled=True, policy_path=SERVER / "policies/default.yaml")
+    settings = Settings(auth_disabled=True, policy_path=SERVER / "policies/default.yaml",
+                        model_base_url="http://model.invalid", model_name="fixture")
     return Pipeline(settings, Policy.load(settings.policy_path), AuditStore(Path(":memory:")),
                     today=lambda: VECTOR_TODAY, ruleset_source=ruleset_source)
 

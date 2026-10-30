@@ -1,6 +1,6 @@
 # AI 보안 관제 대시보드 V2
 
-사람별 AI 사용 프롬프트와 감지 구간을 조회하고, 사용자 정의 태그 트리로 과거 기록을 다시 해석하는 한국어 로컬 시연 앱입니다. Spring Boot API와 React 화면을 하나의 JAR로 배포합니다. 외부 감지기와 확장 프로그램은 변경하지 않습니다.
+사람별 AI 사용 프롬프트와 감지 구간을 조회하고, 사용자 정의 태그 트리로 과거 기록을 다시 해석하며 검사 서버를 관리하는 한국어 로컬 시연 앱입니다. Spring Boot API와 React 화면을 하나의 JAR로 배포합니다. 검사·정제는 `server/`가 수행하고 확장프로그램·ai-proxy가 전송 전에 호출합니다.
 
 백엔드는 Java 21·Spring Boot 3.5.16·JDBC·Flyway, 화면은 React·TypeScript·Vite·Recharts, DB는 MySQL 8.4를 사용합니다. 인증 없이 로컬에서 사용하는 범위입니다. Docker 전체 실행에는 Docker Engine와 Compose v2가 필요하며, 호스트 Java·Node.js는 필요하지 않습니다. 직접 빌드할 때는 Java 21과 Node.js 24 LTS(24.15 이상, 검증 24.22.1) 또는 Node.js 22.22.2 이상을 사용합니다.
 
@@ -18,6 +18,7 @@
 | `query` | 검색 조건·페이지 해석, SQL 조회·집계와 스냅샷 멤버십 수집 |
 | `savedsearch` | 검색 조건과 결과 멤버십을 고정하는 저장 검색 |
 | `common` | 공통 입력 검증·안전한 오류와 JDBC 행 처리 |
+| `guard` | 검사 서버 관리 프록시·관리 키 보관, 태그 정규식 저장 전 원격 검증 |
 | `web` | 본문 제한·오류 응답, JSON·OpenAPI 설정, 상태 확인과 SPA 경로 |
 
 API 입출력 모델은 `person.model`, `configuration.model`, `event.model`, `detector.model`, `query.model`, `savedsearch.model`에 두고, 공통 페이지 응답만 `api.model`에서 공유합니다. 모든 Java `record`는 타입과 같은 이름의 파일로 분리합니다. SQL 조건을 담는 `DashboardQuery`, 행 매핑 결과 `DetectionRow`, 잠금 결과 `VersionState` 같은 내부 모델도 개별 파일로 두며 필요한 범위에서만 공개합니다.
@@ -40,6 +41,8 @@ docker compose up --build -d --wait
 <http://127.0.0.1:8080>에 접속합니다. 처음에는 태그·정책·버전·사람·이벤트가 모두 비어 있습니다. `/settings/metrics`에서 초안을 만들고 태그와 정책을 편집한 뒤 게시·활성화합니다. 사람을 등록하고 활성 버전 ID로 이벤트를 전송하면 집계가 시작됩니다. `/swagger-ui.html`에서 API 문서와 예시를 확인할 수 있습니다.
 
 일반 `compose.yaml`은 앱 `127.0.0.1:8080`, MySQL `127.0.0.1:3306`을 공개하고 `mysql-data`를 사용합니다. `.env`의 DB 계정은 MySQL 초기 계정과 백엔드에 함께 전달됩니다. 컨테이너의 DB 주소는 `mysql:3306`으로 고정되어 호스트 셸의 `DB_URL`에 영향받지 않습니다. `.env`는 Java 앱이 자동으로 읽지 않습니다. 초기화된 DB 계정은 `.env` 수정만으로 바뀌지 않습니다.
+
+> **경고:** 대시보드에는 인증이 없습니다. `GUARD_*`를 설정하면 백엔드가 보관한 관리 키로 `/api/v1/guard/**`에서 검사 서버 설정·규칙·사용자 연결을 변경할 수 있습니다. 루트 `compose.yml`과 대시보드 개발 `compose-dev.yml`은 기본 `0.0.0.0` 바인딩이므로 접근 가능한 다른 호스트도 대시보드와 관리 프록시를 사용할 수 있습니다. 루트·개발 구성의 `APP_BIND_IP=127.0.0.1` 또는 외부 인증·접근 제한을 적용하세요. 일반 `dashboard/compose.yaml`의 루프백 바인딩과 구분해야 합니다.
 
 V1에서 V2로 올릴 때는 `V2__versioned_prompt_dashboard.sql`이 기존 사람·이벤트·감지 데이터를 **한 번 삭제**하고 새 스키마를 만듭니다. 이는 승인된 V2 데이터 초기화이며 V1 마이그레이션은 유지했습니다. Flyway 이력이 적용된 다음 시작부터는 데이터를 삭제하지 않습니다. 일반 시작 경로에는 시드 SQL이 없습니다.
 
@@ -72,7 +75,7 @@ docker compose -f compose-dev.yml up --build --force-recreate -d --wait backend
 docker compose -f compose-dev.yml logs --tail=100 backend
 ```
 
-로그에서 `Successfully validated 8 migrations`와 V2·V3·V4·V5·V6·V7·V8 적용 또는 현재 스키마 버전 `8`을 확인합니다. V3는 탐지 결과 메타데이터·파일 이름·이미지 원본 바이트를 보관하는 테이블을 추가하고 기존 데이터를 보존합니다. V4는 태그별 Jev 판단 프롬프트, V5는 Python 정규식 저장 필드를 추가하며 기존 태그의 값은 각각 빈 문자열입니다. V6는 감지 태그에 수집 시점의 이름·색을 보관하고, 기존 감지에는 해당 수집 버전의 이름·색을 채워 이력을 유지합니다. V7은 기존 태그의 비어 있지 않은 Jev 프롬프트를 독립 설정으로 옮기고 태그 임계값을 `null`로 초기화하며, 태그·이벤트·정책을 보존합니다. V8은 태그와 독립 Jev 판단에 `enabled`를 추가하고 기존 값을 모두 `true`로 보존하며 이벤트·저장 검색을 유지합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
+로그에서 `Successfully validated 12 migrations`와 V2~V12 적용 또는 현재 스키마 버전 `12`를 확인합니다. V3는 탐지 결과 메타데이터·파일 이름·이미지 원본 바이트를 보관하는 테이블을 추가하고 기존 데이터를 보존합니다. V4는 태그별 Jev 판단 프롬프트, V5는 Python 정규식 저장 필드를 추가하며 기존 태그의 값은 각각 빈 문자열입니다. V6는 감지 태그에 수집 시점의 이름·색을 보관하고, 기존 감지에는 해당 수집 버전의 이름·색을 채워 이력을 유지합니다. V7은 기존 태그의 비어 있지 않은 Jev 프롬프트를 독립 설정으로 옮기고 태그 임계값을 `null`로 초기화하며, 태그·이벤트·정책을 보존합니다. V8은 태그와 독립 Jev 판단에 `enabled`를 추가하고 기존 값을 모두 `true`로 보존하며 이벤트·저장 검색을 유지합니다. V9·V10은 연결·설정·등록 코드 저장소를 추가하고, V11은 `security_events.send_action`을 nullable로 추가해 기존 기록을 보존하며, V12는 정책 상태 매핑을 추가합니다. 이 오류를 해결하기 위해 `down -v`로 DB를 지우거나 Flyway 이력을 삭제할 필요는 없습니다. V1에서 올라오는 경우에는 앞서 설명한 V2의 일회성 데이터 초기화가 적용됩니다.
 
 SQL은 게시 버전 `demo-v1`, `demo-v2`, 14개 원본 분류와 개인정보 하위 태그, 사용자 정의 정책 3종, 이름에 `데모`가 붙은 가상 사람 6명, 서울 기준 최근 완료된 30일의 이벤트를 만듭니다. V2는 같은 태그 ID를 기술정보·업무정보 묶음으로 재구성합니다. 각 분류의 하위 예시와 판단 지침을 포함하며 초안으로 복제한 뒤 모두 편집할 수 있습니다. 프롬프트는 합성 자료로 표시되고 이름·전화번호·이메일도 가상 값입니다. 시간대·날짜별 이벤트 수, 서비스, 정책, 감지 0건, 여러 태그를 가진 동일 구간과 같은 텍스트의 서로 다른 구간을 포함합니다.
 
@@ -128,6 +131,16 @@ java -jar build/libs/ai-security-dashboard.jar
 | `SERVER_ADDRESS` / `SERVER_PORT` | `127.0.0.1` / `8080` | `0.0.0.0` / `8080` |
 | `SPRING_FLYWAY_LOCATIONS` | 기본 `classpath:db/migration` | 개발용에만 SQL 경로 추가 |
 | `APP_BIND_IP` / `APP_PORT` | Java에 직접 적용하지 않음 | 개발 Compose의 호스트 공개 주소 |
+| `GUARD_SERVER_URL` | 기본 빈 값. 검사 서버 주소(예: `http://127.0.0.1:8000`) | 루트 Compose는 `http://server:8000` 고정. 대시보드 전용 Compose에는 전달 설정이 없어 별도 주입 필요 |
+| `GUARD_ADMIN_KEY` | 기본 빈 값. 서버 `PG_ADMIN_KEYS` 중 첫 관리 키 | 루트 Compose는 `PG_ADMIN_KEYS`를 이 변수로 전달하고 백엔드가 첫 키 사용. 대시보드 전용 Compose는 별도 주입 필요 |
+
+### 검사 서버 관리
+
+`/settings/guard`는 **상태·사용자 규칙·Jev 판단 기준·조직 설정·사용자 연결** 탭으로 구성됩니다. 상태에서 모델 모드·모듈 사용 여부를 저장하고 모델 연결·준비·비활성, 조직 설정과 건너뛴 정규식을 확인합니다. 사용자 키워드·정규식과 서버 Jev 기준은 저장·삭제·시험할 수 있고, 조직 설정에서 원문 기록 방식·태그 조치·`tag_map`·`policy_state_map`을 편집합니다. 사용자 연결에서 등록 코드 발급·이름 변경·해지를 수행합니다. 조직 트리의 독립 Jev 프롬프트는 기존 `/settings/jev`에서 관리하며 서버 Jev 기준(내부 `context_detectors`)과 별개입니다.
+
+브라우저는 같은 출처의 `/api/v1/guard/**`만 호출합니다. 백엔드가 `GUARD_ADMIN_KEY`를 `X-Admin-Key`로 붙여 `/v1/admin/**`에 메서드·본문·쿼리·`If-Match`를 전달하고 응답 상태·`ETag`를 돌려줍니다. 키는 브라우저 응답·로그에 노출하지 않습니다. 경로는 `ruleset`, `ruleset/history`, `modules`, `custom-rules`, `custom-rules/test`, `context-detectors`, `context-detectors/test`, `prompt`, `org/settings`, `org/status`, `org/refresh`, `org/regex/check`, `runtime`, `enrollments`, `clients`, `audit/events`, `audit/summary`와 허용된 규칙·Jev·클라이언트 ID 하위 경로로 제한합니다. 서버 주소·키 미설정 또는 연결 실패는 한국어 503 `GUARD_UNAVAILABLE`입니다.
+
+런타임 모델 모드·ruleset은 대시보드에서 저장하며 env·YAML은 초기값입니다. 모델 BASE_URL 또는 NAME 미설정은 `endpoint_unset`으로 표시되고 호출을 생략합니다. 원문 기록 기본값은 `full`이며 `masked`·`off`도 선택할 수 있습니다. `policy_state_map`은 판정 `allow`·`warn`·`block` → 활성 버전의 정책 상태 ID를 명시적으로 연결하고 기본은 모두 null입니다.
 
 ## 데이터와 조회 기준
 
@@ -141,11 +154,13 @@ java -jar build/libs/ai-security-dashboard.jar
 
 V7은 기존 태그의 비어 있지 않은 `jev_prompt`를 원문 그대로 독립 프롬프트로 옮겨 원래 태그에 연결합니다. 공백·탭·줄바꿈만 있는 기존 값도 원문을 보존하며, 길이가 0인 빈 값은 프롬프트를 만들지 않고 임계값은 모두 미설정으로 둡니다. 이전 DB 열은 이력으로 남지만 `tags[].jevPrompt`는 API에서 제거되어 해당 입력은 거부합니다.
 
-`/settings/metrics`의 **Python 정규식**은 태그별 `pythonRegex`로 저장하며 최대 4,000 Unicode 코드 포인트입니다. Python `re` 문법의 역슬래시·인라인 플래그·이름 있는 그룹·줄바꿈을 그대로 보존합니다. 예를 들어 `(?i)\b(?P<label>internal|confidential)\b`를 입력할 수 있습니다. JSON에서는 역슬래시를 `\\`로 인코딩합니다. 비워 두면 빈 문자열이며 상위 태그에서 자동으로 상속하지 않습니다. Jev 프롬프트와 독립적으로 편집·복제·게시합니다. 대시보드는 패턴을 실행하거나 Java·JavaScript 문법으로 검사하지 않고, Python 구문 검증과 실행은 연결된 탐지기에서 수행합니다.
+`/settings/metrics`의 **Python 정규식**은 태그별 `pythonRegex`로 저장하며 최대 4,000 Unicode 코드 포인트입니다. Python `re` 문법의 역슬래시·인라인 플래그·이름 있는 그룹·줄바꿈을 그대로 보존합니다. 예를 들어 `(?i)\b(?P<label>internal|confidential)\b`를 입력할 수 있습니다. JSON에서는 역슬래시를 `\\`로 인코딩합니다. 비워 두면 빈 문자열이며 상위 태그에서 자동으로 상속하지 않습니다. Jev 프롬프트와 독립적으로 편집·복제·게시합니다. 대시보드는 패턴을 직접 실행하지 않으며 검사 서버의 Python 검증 결과를 사용합니다.
+
+검사 서버 URL이 설정돼 있으면 **초안 저장·태그 세부 저장 전에 저장값과 달라진 비어 있지 않은 정규식만** `/v1/admin/org/regex/check`로 검증합니다. 길이 초과·중첩 수량자·문법 오류·빈 문자열 일치는 400 `INVALID_INPUT`과 `tags.<태그 ID>.pythonRegex`의 한국어 사유로 거부하며 부분 저장하지 않습니다. `GUARD_SERVER_URL`이 없으면 원격 검증 없이 저장하고, 설정됐는데 연결·검증 응답에 문제가 있으면 503 `GUARD_UNAVAILABLE`로 거부합니다. 활성 설정을 읽을 때 건너뛴 규칙(`skipped_regex`)은 메트릭 설정의 해당 태그, 검사 서버 관리 상태, 전체 현황 배너에 태그 이름과 사유를 표시합니다. 서버 사용자 규칙·확장 개인 규칙도 상한은 4,000자이지만 허용 문법은 조직 Python 정규식보다 좁습니다.
 
 태그의 ‘태그 사용’과 독립 Jev 판단의 ‘Jev 판단 사용’은 현재 선택한 버전에 저장합니다. 기존 ‘세부 정보 저장’·‘초안 저장’·‘판단 저장’으로 반영하며 게시 후에도 변경할 수 있습니다. 새 태그·판단과 V8 이전의 기존 항목은 기본적으로 사용합니다. API 응답의 `tags[].enabled`·`jevPrompts[].enabled`는 항상 boolean입니다. 요청에서 `enabled`를 생략하거나 `null`로 보내면 기존 항목은 유지하고 새 항목은 `true`로 만듭니다. 사용하지 않는 항목도 내용·출력 태그·임계값은 보존됩니다. 부모를 사용하지 않아도 자식의 사용 여부는 바뀌지 않습니다. Jev 결과 태그 영역의 ‘사용 안 함’ 표시는 태그 상태를 알려주며 연결 선택·임계값 편집은 계속 가능합니다.
 
-연결하는 쪽은 게시·활성화된 설정을 `GET /api/v1/classifier-config`로 읽어 독립 `jevPrompts`와 출력 태그의 `jevThreshold`, 각 태그의 `pythonRegex`를 사용합니다. 설정은 사용 여부와 관계없이 모든 태그·판단을 반환합니다. 소비자는 `tag.enabled`인 태그의 정규식만 실행하고, Jev 결과는 `prompt.enabled && outputTag.enabled`일 때만 사용해야 합니다. 사용할 출력 태그가 하나도 없는 Jev 판단은 건너뜁니다. 실제 `server`의 설정 조회·정규식/Jev 실행 연결은 이 변경에 포함하지 않습니다. 초안이나 비활성 버전을 저장해도 활성 설정은 바뀌지 않습니다. **활성 게시 버전의 태그 세부 정보나 Jev 설정을 저장하면 같은 버전 ID의 다음 설정 조회부터 즉시 반영되고 `revision`이 증가합니다.** 연결된 분류기는 설정을 다시 조회해 해당 revision을 적용해야 합니다. 대시보드는 설정을 저장·제공하며 외부 Jev·탐지기 실행 요청, 배포, 자동 재로딩은 수행하지 않습니다. 일반 DB를 처음 만들 때 태그나 프롬프트·정규식 예시를 자동 생성하지 않습니다.
+연결하는 쪽은 게시·활성화된 설정을 `GET /api/v1/classifier-config`로 읽어 독립 `jevPrompts`와 출력 태그의 `jevThreshold`, 각 태그의 `pythonRegex`를 사용합니다. 설정은 사용 여부와 관계없이 모든 태그·판단을 반환합니다. 소비자는 `tag.enabled`인 태그의 정규식만 실행하고, Jev 결과는 `prompt.enabled && outputTag.enabled`일 때만 사용해야 합니다. 사용할 출력 태그가 하나도 없는 Jev 판단은 건너뜁니다. 검사 서버는 이 설정으로 조직 태그 정규식과 Jev를 실행합니다. 초안이나 비활성 버전을 저장해도 활성 설정은 바뀌지 않습니다. **활성 게시 버전의 태그 세부 정보나 Jev 설정을 저장하면 같은 버전 ID의 다음 설정 조회부터 즉시 반영되고 `revision`이 증가합니다.** 연결된 분류기는 설정을 다시 조회해 해당 revision을 적용해야 합니다. 검사 서버는 기본 30초 간격으로 설정을 다시 확인하며, 관리 화면에서 조직 설정을 즉시 새로 받을 수 있습니다. 검사·정제와 규칙 묶음 배포는 서버가 담당하고 대시보드 백엔드는 관리·시험 요청을 프록시합니다. 일반 DB를 처음 만들 때 태그나 프롬프트·정규식 예시를 자동 생성하지 않습니다.
 
 이벤트는 원문 프롬프트와 감지 구간을 저장합니다. 구간은 Unicode 코드 포인트의 `[start,end)`이며 JavaScript 문자열 인덱스와 이모지에서 차이가 날 수 있습니다. 같은 범위의 입력은 태그 합집합을 가진 감지 한 건으로 합칩니다. 서로 다른 겹치는 범위는 별개입니다. 감지 없는 이벤트도 유효합니다. 등록된 사람과 현재 활성 버전이 필요합니다. `(sourceId,eventId)`가 같은 동일 요청은 `200`, 새 이벤트는 `201`, 다른 내용의 재사용은 `409`입니다. 같은 요청 재전송은 나중에 활성 버전이 바뀌어도 기존 이벤트를 반환합니다.
 
@@ -155,7 +170,7 @@ V7은 기존 태그의 비어 있지 않은 `jev_prompt`를 원문 그대로 독
 
 저장한 검색은 저장 시점의 절대 기간·게시 버전·전체 일치 이벤트 ID를 고정합니다. 새 이벤트 수집이나 활성 버전 변경으로 바뀌지 않습니다. 다시 조회는 저장 필터를 이력으로 가져오는 동작이며 기존 스냅샷을 덮어쓰지 않습니다. 저장 검색 삭제는 원본 이벤트를 삭제하지 않습니다.
 
-화면 경로는 `/`, `/events`, `/events/:id`, `/people`, `/people/:id`, `/settings/metrics`, `/settings/jev`, `/saved-searches`, `/saved-searches/:id`입니다. 기존 `/settings/monitoring` 주소는 쿼리를 유지한 채 `/settings/metrics`로 이동합니다. 자동 갱신 없이 진입·필터 변경·명시적 새로고침 때 조회합니다.
+화면 경로는 `/`, `/events`, `/events/:id`, `/people`, `/people/:id`, `/settings/metrics`, `/settings/jev`, `/settings/guard`, `/saved-searches`, `/saved-searches/:id`입니다. 기존 `/settings/monitoring` 주소는 쿼리를 유지한 채 `/settings/metrics`로 이동합니다. 자동 갱신 없이 진입·필터 변경·명시적 새로고침 때 조회합니다.
 
 ## API
 
@@ -166,6 +181,7 @@ V7은 기존 태그의 비어 있지 않은 `jev_prompt`를 원문 그대로 독
 | `/config-versions`·`/{id}`·`/{id}/publish`·`/{id}/activate` | 초안 생성·편집·게시·활성화 |
 | `/config-versions/{id}/tags/{tagId}` | 선택한 버전의 태그 세부 정보 저장, 게시 버전도 가능 |
 | `/config-versions/{id}/jev-prompts`·`/{promptId}` | 선택한 버전의 독립 Jev 프롬프트 생성·편집·삭제와 출력 태그 임계값 저장 |
+| `/guard/**` | 검사 서버 관리 프록시(허용 경로만), 관리 키는 백엔드에 보관 |
 | `/classifier-config` | 모든 `jevPrompts`·태그와 각 `enabled`, 예시·참고사항·태그별 `jevThreshold`·`pythonRegex`를 포함한 활성 설정, 없으면 `404 NO_ACTIVE_VERSION` |
 | `/people`·`/{id}` | 사람 등록과 필터별 통계 |
 | `/events`·`/{id}` | 이벤트 등록·페이지·원문 상세 |
@@ -177,9 +193,9 @@ V7은 기존 태그의 비어 있지 않은 `jev_prompt`를 원문 그대로 독
 
 ## 탐지기 HTTP 수집
 
-`POST /api/v1/detector-events`는 탐지기가 호출할 수집 엔드포인트입니다. `result`에는 기존 `InspectResponse` JSON을 그대로 넣고, `text`에 검사한 원문을 전달합니다. 기준은 `origin/main` 커밋 `e2021df`의 [탐지 룰 형식](https://github.com/SH4316/2026-Hackathon/blob/e2021dfc6f733a9b8b141c93557b5c8ddf02d60f/docs/rule-formats.md)과 [`server/app/schemas.py`](https://github.com/SH4316/2026-Hackathon/blob/e2021dfc6f733a9b8b141c93557b5c8ddf02d60f/server/app/schemas.py)입니다. 이 작업은 탐지기·확장프로그램의 호출 코드를 변경하지 않습니다.
+`POST /api/v1/detector-events`는 검사 서버가 호출하는 수집 엔드포인트입니다. `result`에는 검사 응답에서 클라이언트 전용 `report_status`를 제외한 JSON을 넣고, `text`에는 조직의 `report_text` 설정에 따라 원문(기본 `full`) 또는 치환문을 전달합니다. 현재 [서버 스키마](../server/app/schemas.py)와 [서버 API 계약](../server/docs/api-contract.md)을 기준으로 하며 대시보드는 알 수 없는 `result` 필드를 거부합니다.
 
-필수 봉투 필드는 `source_id`, `person_id`, `version_id`, `text`, `result`입니다. 사람은 먼저 등록하고, `version_id`는 대시보드의 현재 활성 게시 버전을 사용합니다. 탐지기의 `policy_version`·`detector_versions.ruleset`과 대시보드 설정 버전은 별개입니다. 수집은 초기 태그·정책·사용자·버전을 자동 생성하지 않습니다.
+필수 봉투 필드는 `source_id`, `person_id`, `version_id`, `text`, `result`입니다. 선택 필드 `send_action`은 `normal`·`confirmed`·`forced` 또는 null이며 V11의 nullable 열에 저장합니다. 목록·상세의 `Event`에는 `sendAction`·`fileCount`·`imageCount`를 반환하고 `forced`를 **강행 전송** 배지로 표시합니다. 상세에서는 파일 이름과 이미지 미리보기·다운로드를 제공합니다. 다운로드는 `application/octet-stream`이므로 프런트엔드는 저장된 `media_type`으로 blob을 만들어 미리보기합니다. 사람은 먼저 등록하고, `version_id`는 대시보드의 현재 활성 게시 버전을 사용합니다. 탐지기의 `policy_version`·`detector_versions.ruleset`과 대시보드 설정 버전은 별개입니다. 수집은 초기 태그·정책·사용자·버전을 자동 생성하지 않습니다.
 
 `finding.type`과 같은 ID의 태그가 활성 버전에 있으면 연결합니다. 다른 ID를 쓰려면 `tag_map: {"email":"my_email_tag"}`처럼 지정합니다. 연결할 태그가 없는 탐지도 구간과 메타데이터를 보존하고 미매핑으로 집계합니다. 명시한 매핑 대상이 활성 버전에 없으면 `422`입니다. `policy_state_id`도 명시한 경우에만 정책 목록과 연결하며, `decision`으로 사용자 정책 상태를 추론하지 않습니다.
 
@@ -224,7 +240,7 @@ curl --fail-with-body -sS "http://127.0.0.1:8080$image_path" \
 
 새 결과는 `201`, 같은 결과 재전송은 `200`, 같은 식별자에 다른 내용은 `409`입니다. `event_id`는 `source_id`·`result.request_id`·타입을 포함한 `result.input_version`으로 결정되므로 숫자 `3`과 문자열 `"3"`은 서로 다른 검사입니다. 같은 요청의 재전송은 활성 버전이 바뀌어도 기존 결과를 반환합니다. POST 응답은 상세 GET과 같은 봉투이며 숫자 `id`로 조회하고 `event` 안에 기존 대시보드 이벤트가 포함됩니다. 원문·결과 JSON·첨부는 함께 저장되고 결과의 신뢰도·위험도·조치·정책 버전을 유지합니다. `service`를 생략하면 `destination.provider`를 사용하고 목적지 LLM 모델명은 추론하지 않습니다.
 
-이 기록은 **검사 판정**입니다. 확장프로그램이나 외부 AI에서 실제 전송·차단이 일어났는지 나타내지 않습니다. 전체 필드와 검증 규칙은 [수집 계약](CONTRACT.md#detector-http-ingestion)을 참고하세요.
+이 기록은 **검사 판정과 전송 전 선택**입니다. `send_action`은 일반·확인·강행 전송의 선택을 나타내며 외부 AI의 수신 성공을 증명하지 않습니다. 조직 서버는 전송 시점 검사의 기록 응답을 기다리고, 확장프로그램은 기록 실패·응답 누락 시 전송·첨부를 보류합니다(`report_text=off` 등 기록 제외는 별도). 전체 필드와 검증 규칙은 [수집 계약](CONTRACT.md#detector-http-ingestion)을 참고하세요.
 
 ## 검사 서버 연결
 

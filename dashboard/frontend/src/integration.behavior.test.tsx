@@ -713,6 +713,7 @@ describe("snapshot event navigation", () => {
       policyStateName: null,
       detections: [],
       findingCount: 0,
+      sendAction: null, fileCount: 0, imageCount: 0,
     };
     function Harness() {
       const location = useLocation();

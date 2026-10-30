@@ -14,14 +14,15 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.schemas import Action
+from app.config import ModelMode
+from app.schemas import Action, Decision
 
 _DASHBOARD_ID = r"^[A-Za-z0-9_-]{1,80}$"
 
 
 class OrgSettingsBody(BaseModel):
     # full: 원문 그대로 / masked: 탐지 구간을 토큰으로 바꾼 문장 / off: 대시보드에 기록하지 않음
-    report_text: Literal["full", "masked", "off"] = "masked"
+    report_text: Literal["full", "masked", "off"] = "full"
     # 서버 탐지 유형(email, aws_access_key_id …) → 대시보드 태그 ID
     tag_map: dict[str, str] = Field(default_factory=dict, max_length=500)
     # 대시보드 태그(정규식·Jev)로 탐지됐을 때의 조치. 대시보드 태그에는 조치 개념이 없어 조직이 정한다.
@@ -30,6 +31,15 @@ class OrgSettingsBody(BaseModel):
     jev_enabled: bool = True
     # 대시보드 기록의 source_id(생산자 이름공간)
     source_id: str = Field(default="prompt-guard", pattern=_DASHBOARD_ID)
+    policy_state_map: dict[Decision, str | None] = Field(
+        default_factory=lambda: {d: None for d in Decision})
+
+    @field_validator("policy_state_map")
+    @classmethod
+    def _check_states(cls, v: dict[Decision, str | None]) -> dict[Decision, str | None]:
+        if any(state is not None and not re.fullmatch(_DASHBOARD_ID, state) for state in v.values()):
+            raise ValueError("policy_state_map 은 {판정값: 대시보드 정책 상태 ID 또는 null} 형식입니다")
+        return {d: v.get(d) for d in Decision}
 
     @field_validator("tag_map")
     @classmethod
@@ -55,6 +65,7 @@ def from_dashboard(data: dict, source_id: str) -> OrgSettings:
     """대시보드 GET /api/v1/detector-settings 응답(camelCase) → 조직 설정."""
     return OrgSettings(report_text=data["reportText"], tag_map=data.get("tagMap") or {},
                        tag_action=data["tagAction"], jev_enabled=bool(data["jevEnabled"]),
+                       policy_state_map=data.get("policyStateMap") or {d: None for d in Decision},
                        source_id=source_id, version=int(data["revision"]), updated_at=data.get("updatedAt"),
                        source="dashboard")
 
@@ -68,6 +79,9 @@ class OrgSettingsStore:
         self._conn.execute("CREATE TABLE IF NOT EXISTS org_settings ("
                            " version INTEGER PRIMARY KEY, updated_at TEXT NOT NULL, actor TEXT NOT NULL,"
                            " payload TEXT NOT NULL)")
+        self._conn.execute("CREATE TABLE IF NOT EXISTS runtime_settings ("
+                           " name TEXT PRIMARY KEY, value TEXT NOT NULL, actor TEXT NOT NULL,"
+                           " updated_at TEXT NOT NULL)")
         self._conn.commit()
         row = self._conn.execute("SELECT payload FROM org_settings ORDER BY version DESC LIMIT 1").fetchone()
         self._current = (OrgSettings.model_validate_json(row[0]) if row
@@ -75,6 +89,22 @@ class OrgSettingsStore:
 
     def current(self) -> OrgSettings:
         return self._current
+
+    def model_mode(self, initial: ModelMode) -> ModelMode:
+        with self._lock:
+            row = self._conn.execute("SELECT value FROM runtime_settings WHERE name = 'model_mode'").fetchone()
+            if row:
+                return ModelMode(row[0])
+            self._conn.execute("INSERT INTO runtime_settings VALUES (?, ?, ?, ?)",
+                               ("model_mode", initial.value, "env", datetime.now(UTC).isoformat()))
+            self._conn.commit()
+            return initial
+
+    def set_model_mode(self, mode: ModelMode, actor: str) -> None:
+        with self._lock:
+            self._conn.execute("INSERT OR REPLACE INTO runtime_settings VALUES (?, ?, ?, ?)",
+                               ("model_mode", mode.value, actor, datetime.now(UTC).isoformat()))
+            self._conn.commit()
 
     def update(self, body: OrgSettingsBody, actor: str) -> OrgSettings:
         with self._lock:

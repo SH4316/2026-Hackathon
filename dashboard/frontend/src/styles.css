@@ -911,6 +911,7 @@ select {
 .service-monogram {
   width: 27px;
   height: 27px;
+  flex-shrink: 0;
   display: grid;
   place-items: center;
   border-radius: 6px;
@@ -920,20 +921,39 @@ select {
   font-size: 13px;
   background: var(--bg-sub);
 }
-.service-chatgpt {
+.service-chatgpt,
+.service-openai {
   background: rgba(16,185,129,0.12);
   color: var(--signal-green);
   border-color: rgba(16,185,129,0.3);
 }
-.service-claude {
+.service-claude,
+.service-anthropic,
+.service-mistral,
+.service-alibaba {
   background: rgba(245,158,11,0.12);
   color: var(--signal-amber);
   border-color: rgba(245,158,11,0.3);
 }
-.service-gemini {
+.service-gemini,
+.service-google,
+.service-deepseek,
+.service-meta {
   background: rgba(59,130,246,0.12);
   color: var(--blue);
   border-color: rgba(59,130,246,0.3);
+}
+.service-microsoft,
+.service-perplexity {
+  background: rgba(6,182,212,0.12);
+  color: var(--cyan);
+  border-color: rgba(6,182,212,0.3);
+}
+.service-moonshot,
+.service-xai {
+  background: rgba(148,163,184,0.12);
+  color: var(--text-secondary);
+  border-color: rgba(148,163,184,0.3);
 }
 .cell-primary {
   display: block;
@@ -2103,14 +2123,25 @@ dd {
 }
 .service-bar-row {
   display: block;
+  min-width: 0;
 }
 .service-bar-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 15px;
 }
+.service-bar-head .service-cell {
+  max-width: 100%;
+}
+.service-bar-head .service-cell > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .service-bar-head strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: var(--text);
   font-size: 17px;
   font-variant-numeric: tabular-nums;
@@ -2137,6 +2168,8 @@ dd {
   border-radius: 3px;
 }
 .service-bar-note {
+  display: block;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 10px;
 }
@@ -3108,6 +3141,7 @@ textarea::placeholder {
     gap: 17px;
   }
   .service-bars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 15px;
     padding: 18px;
   }
@@ -3888,3 +3922,327 @@ label.detector-check {
   :is(.editor-bottom > span, .panel-header p, .api-links code) {
   color: var(--muted);
 }
+
+/* Guard administration extends the existing dark settings surfaces. */
+.guard-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.guard-tabs button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.guard-tabs button:hover {
+  background: var(--bg-sub);
+}
+.guard-tabs button[aria-selected="true"] {
+  background: var(--blue-wash);
+  color: #93c5fd;
+  font-weight: 650;
+}
+.guard-warning {
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--signal-amber-border);
+  border-radius: 8px;
+  background: var(--signal-amber-bg);
+  color: #fcd34d;
+  line-height: 1.7;
+}
+.guard-warning a {
+  color: #bfdbfe;
+  margin-left: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.guard-banner {
+  margin-bottom: 20px;
+}
+.guard-feedback {
+  margin: 0 0 20px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.guard-settings > .panel + .panel {
+  margin-top: 24px;
+}
+.guard-settings fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.guard-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0 0 18px;
+  color: var(--text);
+}
+.guard-field > span {
+  font-weight: 600;
+}
+.guard-field input,
+.guard-field select,
+.guard-field textarea {
+  width: 100%;
+  min-width: 0;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 9px 11px;
+}
+.guard-field input,
+.guard-field select {
+  min-height: 42px;
+}
+.guard-field textarea {
+  min-height: 128px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.guard-field small {
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.guard-field input::placeholder,
+.guard-field textarea::placeholder {
+  color: var(--muted);
+}
+.guard-field :is(input, textarea) {
+  caret-color: #93c5fd;
+}
+.guard-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 22px;
+}
+.guard-section {
+  border-top: 1px solid var(--border);
+  margin-top: 26px;
+  padding-top: 22px;
+}
+.guard-section h3 {
+  margin: 0 0 10px;
+}
+.guard-actions {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.guard-actions .guard-field {
+  margin-bottom: 0;
+  flex: 1;
+}
+.guard-actions + form {
+  margin-top: 20px;
+}
+.guard-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  padding-bottom: 24px;
+  margin: 0 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+.guard-status dt {
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.guard-status dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.guard-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 24px;
+  margin-bottom: 24px;
+  align-items: start;
+}
+.guard-editor-layout > *,
+.guard-settings,
+.guard-client-row {
+  min-width: 0;
+}
+.guard-list {
+  padding: 18px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: 12px;
+}
+.guard-list h2 {
+  font-size: 16px;
+  margin: 0 0 16px;
+}
+.guard-list > button {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 12px;
+  margin-top: 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.guard-list > button:first-of-type {
+  border-color: var(--border);
+  margin-bottom: 16px;
+}
+.guard-list > button:hover {
+  background: var(--bg-sub);
+}
+.guard-list > button.selected {
+  border-color: var(--blue);
+  background: var(--blue-wash);
+  color: #bfdbfe;
+}
+.guard-list small {
+  color: var(--muted);
+  margin-top: 5px;
+}
+.guard-settings button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.guard-test-result {
+  margin-top: 18px;
+}
+.guard-test-result pre,
+.guard-pre {
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  background: var(--bg-sub);
+  padding: 16px;
+  border-radius: 6px;
+}
+.guard-intro {
+  margin: 0 0 22px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.guard-client-row + .guard-client-row {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.guard-enrollment {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 0 0;
+  color: var(--text-secondary);
+}
+.guard-enrollment strong {
+  font-size: 24px;
+  color: var(--text);
+}
+.guard-send-info {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.send-action-badge,
+.event-attachment-badges > span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--bg-sub);
+}
+.send-action-badge.forced {
+  color: #fca5a5;
+  background: var(--signal-red-bg);
+}
+.event-attachment-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+.attachment-files {
+  margin: 0 0 22px;
+  padding-left: 22px;
+  overflow-wrap: anywhere;
+  line-height: 1.9;
+}
+.attachment-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 20px;
+}
+.attachment-image {
+  margin: 0;
+  min-width: 0;
+}
+.attachment-image img {
+  display: block;
+  width: 100%;
+  height: 220px;
+  object-fit: contain;
+  background: var(--bg-sub);
+  border-radius: 6px;
+}
+.attachment-image figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.attachment-image figcaption span {
+  color: var(--muted);
+}
+@media (max-width: 1000px) {
+  .guard-editor-layout {
+    grid-template-columns: 1fr;
+  }
+  .guard-list > button {
+    min-height: 44px;
+  }
+}
+@media (max-width: 760px) {
+  .guard-form-grid,
+  .guard-status {
+    grid-template-columns: 1fr;
+  }
+  .guard-tabs button {
+    flex: 1 0 auto;
+    padding: 8px 10px;
+  }
+  .guard-tabs {
+    gap: 4px;
+  }
+}
+
+.guard-settings .panel { padding: 0 22px 22px; }
+.guard-settings .panel > .panel-header { margin: 0 -22px; }
+.guard-settings .code-value { font-family: "SFMono-Regular", Consolas, "Noto Sans KR Variable", monospace; }
+.guard-settings a, .attachment-panel .text-link { color: #93c5fd; }
+.attachment-panel > .attachment-files { margin: 0 22px 22px; }
+.attachment-panel > .attachment-images { margin: 0 22px 22px; }
+.guard-send-info { margin: 0 22px 20px; }

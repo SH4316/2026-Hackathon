@@ -22,6 +22,22 @@ from app.services.pipeline import Pipeline, utf16_index
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
 
+class RuntimeBody(BaseModel):
+    model_mode: ModelMode
+
+
+@router.get("/runtime")
+async def get_runtime(_: str = Depends(require_admin), pipeline: Pipeline = Depends(get_pipeline)) -> dict:
+    return await pipeline.runtime_status()
+
+
+@router.put("/runtime")
+async def put_runtime(body: RuntimeBody, actor: str = Depends(require_admin),
+                      pipeline: Pipeline = Depends(get_pipeline)) -> dict:
+    pipeline.runtime.set_model_mode(body.model_mode, actor)
+    return await pipeline.runtime_status()
+
+
 def _update(store: RuleSetStore, actor: str, if_match: str | None,
             mutate: Callable[[RuleSetBody], RuleSetBody], response: Response) -> RuleSet:
     expected = None
@@ -150,8 +166,10 @@ async def test_context_detectors(body: ContextTest, request: Request, _: str = D
                                  pipeline: Pipeline = Depends(get_pipeline),
                                  store: RuleSetStore = Depends(get_store)) -> dict:
     _check_text(request, body.text)
-    if pipeline.model is None or pipeline.settings.model_mode is ModelMode.DISABLED:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "로컬 모델이 꺼져 있습니다(PG_MODEL_MODE)")
+    if not pipeline.runtime.endpoint_set:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Jev 모델 엔드포인트가 설정되지 않았습니다")
+    if pipeline.model is None or pipeline.runtime.model_mode is ModelMode.DISABLED:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Jev가 꺼져 있습니다")
     rs = store.current()
     detectors = body.detectors if body.detectors is not None else [d for d in rs.context_detectors if d.enabled]
     if not detectors:

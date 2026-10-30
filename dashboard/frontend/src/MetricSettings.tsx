@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api } from "./api";
+import { api, ApiError } from "./api";
+import { regexReason, useSkippedRegex } from "./SkippedRegex";
 import { EnabledSetting } from "./EnabledSetting";
 import { parseJevThreshold, jevThresholdError } from "./jev";
 import { useResource } from "./hooks";
@@ -87,9 +88,15 @@ export function MetricSettings() {
   const dirty = contentDirty || hasInvalidThresholds;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const skipped = useSkippedRegex(`${versionId}:${version?.revision ?? ""}`);
+  const skippedRules =
+    skipped.data?.status.version_id === versionId
+      ? skipped.data?.status.skipped_regex ?? {}
+      : {};
   useEffect(() => {
     setThresholdTexts({});
     setBadThresholds({});
@@ -98,6 +105,7 @@ export function MetricSettings() {
       setSavedVersion(r.data);
       setDirty(false);
       setError("");
+      setFieldErrors({});
       setSelected((previous) =>
         params.get("tagId") &&
         r.data!.tags.some((t) => t.id === params.get("tagId"))
@@ -156,6 +164,9 @@ export function MetricSettings() {
       ? "0~1 사이의 숫자를 입력하세요."
       : jevThresholdError(thresholdText);
   const pythonRegexLength = Array.from(tag?.pythonRegex || "").length;
+  const pythonRegexError = tag
+    ? fieldErrors[`tags.${tag.id}.pythonRegex`]
+    : undefined;
   const policy = version?.policyStates.find((p) => p.id === selected);
   const change = (value: ConfigVersion) => {
     setVersion(value);
@@ -164,6 +175,7 @@ export function MetricSettings() {
     );
     setNotice("");
     setError("");
+    setFieldErrors({});
   };
   const patchTag = (patch: Partial<Tag>) => {
     if (version && tag)
@@ -185,12 +197,26 @@ export function MetricSettings() {
   };
   const canLeave = () =>
     !dirty || window.confirm("저장하지 않은 변경을 버릴까요?");
+  function saveError(error: unknown, fallback: string) {
+    const fields = error instanceof ApiError ? error.fieldErrors ?? {} : {};
+    setFieldErrors(fields);
+    const details = Object.entries(fields).map(([field, message]) => {
+      const item = version?.tags.find(
+        (tag) => field === `tags.${tag.id}.pythonRegex`,
+      );
+      return `${item?.name ?? field}: ${message}`;
+    });
+    setError(
+      [error instanceof Error ? error.message : fallback, ...details].join(" · "),
+    );
+  }
   async function perform(
     action: () => Promise<ConfigVersion>,
     message: string,
   ) {
     setPending(true);
     setError("");
+    setFieldErrors({});
     try {
       const next = await action();
       setVersion(next);
@@ -202,7 +228,7 @@ export function MetricSettings() {
       ws.reload();
       if (next.id !== versionId) setParams({ versionId: next.id });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "요청을 처리하지 못했습니다.");
+      saveError(e, "요청을 처리하지 못했습니다.");
     } finally {
       setPending(false);
     }
@@ -212,6 +238,7 @@ export function MetricSettings() {
     if (!version || !tag || !savedTag || pending || thresholdError) return;
     setPending(true);
     setError("");
+    setFieldErrors({});
     setNotice("");
     try {
       const next = await api.saveTagDetails(version.id, tag.id, {
@@ -247,9 +274,7 @@ export function MetricSettings() {
       );
       ws.reload();
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "세부 정보를 저장하지 못했습니다.",
-      );
+      saveError(e, "세부 정보를 저장하지 못했습니다.");
     } finally {
       setPending(false);
     }
@@ -425,6 +450,9 @@ export function MetricSettings() {
         }
       />
       {ws.error && <ErrorState message={ws.error} retry={ws.reload} />}
+      {skipped.error && (
+        <ErrorState message={skipped.error} retry={skipped.refresh} />
+      )}
       <div className="version-workbar">
         <label>
           <span className="sr-only">설정 버전 선택</span>
@@ -691,6 +719,14 @@ export function MetricSettings() {
                               style={{ background: t.color }}
                             />
                             <span>{t.name || "이름 없는 태그"}</span>
+                            {skippedRules[t.id] && (
+                              <small
+                                className="usage-badge"
+                                title={regexReason(skippedRules[t.id])}
+                              >
+                                정규식 건너뜀
+                              </small>
+                            )}
                             {!t.enabled && (
                               <small className="usage-badge">사용 안 함</small>
                             )}
@@ -904,18 +940,27 @@ export function MetricSettings() {
                       </Link>
                     </div>
                     <div className="python-regex-field">
+                      {skippedRules[tag.id] && (
+                        <p className="guard-warning" role="alert">
+                          {tag.name} 정규식이 검사에서 건너뛰어졌습니다.{" "}
+                          {regexReason(skippedRules[tag.id])}
+                        </p>
+                      )}
                       <label>
                         <span>
                           Python 정규식 <small>선택</small>
                         </span>
                         <span className="tag-rule-hint" id="python-regex-help">
-                          Python re 문법으로 작성하세요. 구문 검증과 실행은
-                          연결된 탐지기에서 수행합니다.
+                          Python re 문법으로 작성하세요. 검사 서버가 연결되어
+                          있으면 저장 전에 서버 기준으로 검증합니다.
                         </span>
                         <textarea
                           aria-label="Python 정규식"
-                          aria-describedby="python-regex-help python-regex-scope python-regex-count"
-                          aria-invalid={pythonRegexLength > 4000}
+                          aria-describedby={
+                            "python-regex-help python-regex-scope python-regex-count" +
+                            (pythonRegexError ? " python-regex-error" : "")
+                          }
+                          aria-invalid={pythonRegexLength > 4000 || !!pythonRegexError}
                           rows={3}
                           spellCheck={false}
                           autoCapitalize="none"
@@ -926,6 +971,11 @@ export function MetricSettings() {
                             patchTag({ pythonRegex: e.target.value })
                           }
                         />
+                        {pythonRegexError && (
+                          <small id="python-regex-error" className="field-error">
+                            {pythonRegexError}
+                          </small>
+                        )}
                       </label>
                       <div className="tag-rule-footer">
                         <span id="python-regex-scope">

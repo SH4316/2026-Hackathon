@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-MAX_PATTERN_LEN = 300
+MAX_PATTERN_LEN = 4000
 
 # Python·JS 의미가 다르거나 한쪽에만 있는 문법
 _FORBIDDEN = [

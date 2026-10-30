@@ -11,7 +11,7 @@ import {
   Legend,
 } from "recharts";
 import type { Metrics } from "./types";
-import { formatNumber } from "./format";
+import { formatNumber, KNOWN_SERVICES } from "./format";
 import { Icon, ServiceLabel, EmptyState } from "./ui";
 
 export function Trend({
@@ -211,17 +211,30 @@ export function MetricTree({
 }
 export function ServiceChart({
   metrics,
+  serviceFilter,
   href,
 }: {
   metrics: Metrics;
+  serviceFilter?: string;
   href?: (service: string) => string;
 }) {
-  const max = Math.max(1, ...metrics.services.map((s) => s.findingCount));
-  if (!metrics.services.length)
+  const recorded = new Set(metrics.services.map((s) => s.service));
+  const services = serviceFilter
+    ? metrics.services
+    : [
+        ...metrics.services,
+        ...KNOWN_SERVICES.filter(({ id }) => !recorded.has(id)).map(({ id }) => ({
+          service: id,
+          eventCount: 0,
+          findingCount: 0,
+        })),
+      ].sort((a, b) => b.eventCount - a.eventCount);
+  const max = Math.max(1, ...services.map((s) => s.findingCount));
+  if (!services.length)
     return <div className="compact-empty">아직 기록된 서비스가 없습니다.</div>;
   return (
     <div className="service-bars">
-      {metrics.services.map((s) => {
+      {services.map((s) => {
         const body = (
           <>
             <div className="service-bar-head">

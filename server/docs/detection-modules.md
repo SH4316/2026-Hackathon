@@ -5,28 +5,33 @@
 ## 구조
 
 ```text
-                대시보드(웹) ── 관리 API(/v1/admin/*, X-Admin-Key)
+ 대시보드 검사 서버 관리(/settings/guard) ── 백엔드 /api/v1/guard/*
+                                  │ 관리 키를 보관하고 /v1/admin/*로 프록시
                                   │  규칙·탐지기·모듈·프롬프트 수정 → ruleset 버전 +1
                                   ▼
  ┌────────────── 검사 서버 ─────────────────────────────────────────┐
  │ ruleset 저장소(SQLite, 버전별 기록)                               │
  │   ├ 모듈 1 내장 규칙(rules.py)        항상 켜짐                    │
  │   ├ 모듈 2 사용자 규칙(키워드·정규식)  modules.custom_rules         │
- │   └ 모듈 3 문맥 탐지기(로컬 모델)      modules.context_model        │
+ │   └ 모듈 3 Jev(로컬 모델)             modules.context_model        │
  │        기준(criteria) + 탐지 예문(examples) + 제외 예문 → 프롬프트   │
- │        모델은 env 로 선택(PG_MODEL_API / PG_MODEL_NAME)              │
- │ → 병합 → 정책(유형별 조치 + 전송 목적지 등급) → /v1/inspect, /v1/sanitize │
+ │        모델 연결은 env 초기 구성, 모델 모드는 관리 화면에서 저장   │
+ │ 조직 규칙: 활성 태그 pythonRegex + 조직 Jev 프롬프트·임계값         │
+ │ → 병합 → 내용 기준 정책(유형별 조치) → /v1/inspect, /v1/sanitize     │
  └──────────────────────────────────────────────────────────────────┘
                                   │ GET /v1/rules/bundle (ETag)
                                   ▼
-        확장프로그램·CLI·@prompt-guard/rules — 바뀐 경우에만 받아 로컬 사전 검사에 사용
+        확장프로그램·@prompt-guard/rules — 변경된 묶음으로 로컬 사전 검사
+        ai-proxy — /v1/inspect·/v1/sanitize로 서버 검사 후 제공사에 전달
 ```
 
 - **내장 규칙은 끌 수 없습니다.** 주민번호·인증정보 같은 기본 보호가 대시보드 실수로 꺼지지 않게 하기 위함입니다.
 - **대시보드 항목의 id 가 탐지 유형**이며, 내장 유형(email, rrn …)과 같은 이름은 거부합니다. 내장 유형의 조치를 약하게 덮어쓸 수 없습니다.
 - 최종 판정은 항상 서버입니다. 클라이언트 배포는 빠른 사전 확인용입니다.
 
-## 정규식으로 판단할 수 없는 기준 = 문맥 탐지기
+## 정규식으로 판단할 수 없는 기준 = Jev
+
+검사 서버의 Jev 기준은 내부 필드 `context_detectors`와 `/v1/admin/context-detectors` API로 관리합니다. 조직 트리의 Jev 프롬프트와는 별도 기능입니다. 사용자 규칙·Jev·모듈·모델 모드는 대시보드에서 관리하며 env·YAML은 초기값입니다.
 
 ```json
 {
@@ -44,16 +49,17 @@
   응답 형식·문서 속 지시 무시 규칙은 서버가 덧붙입니다. 허용된 type 이고 원문에 실제로 있는 구간만 받아들입니다.
 - Decider 에서도 사용자 템플릿은 탐지 기준에 포함되며, 응답은 생성형 JSON 이 아닌 typed 확률입니다. 모델은 규칙 탐지 결과를 취소할 수 없습니다.
 - 모델 실패·시간 초과 시 `optional` 은 incomplete(회색), `required` 는 error 이며 allow 로 처리하지 않습니다.
+- 모델 엔드포인트(`PG_MODEL_BASE_URL` 또는 `PG_MODEL_NAME`) 미설정은 시작 시 한 번 경고하고 호출을 생략합니다. `model_endpoint_unset` 알림과 대시보드 비활성 표시를 제공하며 그 사유만으로 회색·`/readyz` 503이 되지 않습니다.
 - 기본 탐지기 5종은 `policies/detectors.yaml` 에 있고, 처음 실행 때 저장소에 들어갑니다.
 
 ## 로컬 모델 설정(env)
 
 | 변수 | 설명 |
 |---|---|
-| `PG_MODEL_MODE` | `disabled` \| `optional` \| `required` |
+| `PG_MODEL_MODE` | `disabled` \| `optional` \| `required` 초기값. 이후 `/v1/admin/runtime`에 저장한 모드가 우선 |
 | `PG_MODEL_API` | `decider`(`/v1/systemone`, Noul 확률) \| `ollama`(기본, `/api/chat`) \| `openai`(`/v1/chat/completions`) |
 | `PG_MODEL_BASE_URL` | 예: `http://decider:8000`(루트 Compose), `http://decider:11434`(기존 compose.local.yaml) |
-| `PG_MODEL_NAME` | 모델 이름. 정하지 않으면 모델 검사를 하지 않음 |
+| `PG_MODEL_NAME` | 모델 이름. BASE_URL 또는 NAME이 비어 있으면 모델 기능 비활성 |
 | `PG_MODEL_API_KEY` | OpenAI 호환 로컬 서버가 키를 요구할 때만 |
 | `PG_MODEL_TIMEOUT_S`, `PG_MODEL_MAX_CONCURRENCY` | 시간 초과, 동시 호출 수 |
 
@@ -78,9 +84,11 @@
 | `PUT /v1/admin/modules` | 모듈 조합 `{custom_rules, context_model}` |
 | `PUT·DELETE /v1/admin/custom-rules/{id}` | 사용자 규칙(키워드·정규식) |
 | `POST /v1/admin/custom-rules/test` | 저장 전 규칙을 샘플 텍스트에 시험(일치 위치만 반환) |
-| `PUT·DELETE /v1/admin/context-detectors/{id}` | 문맥 탐지기(기준·예문) |
+| `PUT·DELETE /v1/admin/context-detectors/{id}` | Jev(기준·예문) |
 | `POST /v1/admin/context-detectors/test` | 저장된 또는 초안 탐지기로 모델 시험 |
 | `GET·PUT /v1/admin/prompt` | 프롬프트 템플릿 조회·수정, 실제 시스템 프롬프트 미리보기 |
+| `GET·PUT /v1/admin/runtime` | 모델 모드·연결·준비 상태 조회, `{model_mode}` 저장 |
+| `POST /v1/admin/org/regex/check` | 조직 태그 정규식을 실제 실행과 같은 `check_regex`로 검증 |
 
 사용자 규칙 예:
 
@@ -88,30 +96,37 @@
 { "id": "project_codename", "kind": "keywords", "label": "프로젝트 코드명",
   "severity": "high", "action": "mask", "token": "PROJECT",
   "keywords": ["블루문", "Blue Moon"], "distribute": false }
+```
 
+```json
 { "id": "employee_id", "kind": "regex", "label": "사번", "action": "mask", "token": "EMP_ID",
   "pattern": "(?<![A-Z0-9])EMP-\\d{6}(?!\\d)", "case_sensitive": true }
 ```
 
-- 키워드는 경계 없이 찾습니다(한국어 조사가 붙어도 탐지: "블루문은").
+- 영문·숫자로 시작하는 키워드는 앞에, 영문·숫자로 끝나는 키워드는 뒤에 `[A-Za-z0-9]` 경계를 적용합니다. `Confidential`은 `confidentially`에 일치하지 않습니다. 한글로 끝나면 끝 경계를 두지 않아 조사가 붙은 "블루문은"도 탐지합니다. 기본은 대소문자를 구분하지 않습니다.
 - `distribute: false` — 키워드 자체가 기밀(코드명 목록 등)이면 클라이언트에 배포하지 않고 서버에서만 씁니다.
-- 정규식 제한: 300자 이하, 빈 문자열과 일치 금지, 중첩 수량자(`(a+)+` 등) 금지, Python·JS 의미가 다른 문법
+- 정규식 제한: 4,000자 이하, 빈 문자열과 일치 금지, 중첩 수량자(`(a+)+` 등) 금지, Python·JS 의미가 다른 문법
   (`(?P<..>)`, `(?<name>)`, `(?i)`, `\A \Z`, 역참조, 소유 수량자, `\p{..}`) 금지.
   중첩 수량자 검사는 보수적이라 `(?:[a-z]+\.)+corp` 처럼 안전한 패턴도 거부합니다. 반복 대신 `[a-z.]+\.corp` 등으로 바꿔 씁니다.
   휴리스틱이므로 모든 위험 패턴을 막지는 못합니다(장기적으로 RE2 같은 선형 시간 엔진 검토).
 
 ## 규칙 배포: `GET /v1/rules/bundle`
 
-일반 API 키로 받습니다. 대시보드에서 규칙을 바꾸면 ETag 가 바뀌고, 클라이언트는 `If-None-Match` 로 주기적으로 확인해 304 가 아닐 때만 받습니다.
+정적 API 키 또는 개인 토큰으로 받습니다. ETag는 묶음 전체의 해시이며 서버 ruleset뿐 아니라 조직 `version_id`·`revision`·규칙·목적지 안내 변경도 반영합니다. 클라이언트는 `If-None-Match`로 확인해 같으면 304를 받습니다.
 
 ```json
-{ "ruleset_version": 4, "policy_version": "2026-10-31.draft3", "updated_at": "…",
+{ "ruleset_version": 4, "policy_version": "2026-10-31.draft4", "updated_at": "…",
   "modules": {"custom_rules": true, "context_model": true},
-  "custom_rules": [ … distribute=true 인 규칙 … ],
-  "context_detectors": [ {"id", "label", "category", "severity", "action", "token", "enabled"} ] }
+  "custom_rules": [],
+  "context_detectors": [{"id": "internal_project", "label": "내부 프로젝트",
+    "category": "confidential", "severity": "high", "action": "mask", "token": "PROJECT", "enabled": true}],
+  "org_rules": {"version_id": "v1", "revision": 3, "tag_action": "mask",
+    "regex": [{"tag_id": "pii-1", "type": "pii-1", "name": "사번", "token": "ORG_PII_1", "pattern": "EMP-[0-9]{6}"}]},
+  "destinations": {"openai": {"consumer": {"tier": "elevated", "basis": "…", "verified_at": "2026-10-31"}}} }
 ```
 
-문맥 탐지기의 기준·예문·프롬프트는 서버 내부에서만 쓰므로 묶음에 넣지 않습니다.
+Jev의 기준·예문·프롬프트는 서버 내부에서만 쓰므로 묶음에 넣지 않습니다. `org_rules`는 조직 서버가 아니거나 대시보드 설정을 읽지 못하면 `null`입니다. `destinations`는 안내 모달용이며 판정에는 쓰지 않습니다.
+확장프로그램은 묶음을 받아 저장하고 5분 주기로 갱신하며, 배포 가능한 사용자 규칙·조직 정규식을 개인 규칙과 함께 로컬 사전 검사에 적용합니다. `distribute=false` 규칙은 계속 제외합니다. 최종 조직 검사는 서버가 수행합니다.
 
 `@prompt-guard/rules` 에서:
 
@@ -129,7 +144,6 @@ if (r.status === "updated") state = { etag: r.etag, guard: createGuard({ ruleset
 
 ## 남은 일
 
-- 대시보드 화면(규칙 편집·시험·이력)은 대시보드 파트에서 위 API 로 구현
-- 확장프로그램이 묶음을 받아 입력 중 로컬 사전 검사에 쓰는 연동(현재는 서버 검사만 사용)
+- 대시보드의 ruleset 변경 이력·감사 집계 전용 화면(API는 제공)
 - 실제 로컬 모델로 기본 탐지기 5종의 정확도 평가(합성 평가셋)
 - 관리 키 → 조직 SSO·역할 기반 권한

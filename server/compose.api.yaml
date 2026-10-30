@@ -11,6 +11,7 @@ services:
   api:
     build: .
     env_file: .env
+    extra_hosts: ["host.docker.internal:host-gateway"]
     ports:
       - "${PG_BIND:-127.0.0.1:8000}:8000"
     volumes:

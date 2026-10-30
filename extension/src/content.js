@@ -12,7 +12,8 @@
   // 그 사이에 대신 전송 버튼을 누르지 않도록 이 시간만큼 기다린다.
   const SETTLE_MS = 500;
 
-  let enabled = true;
+  let enabled = true, userEnabled = true, orgManaged = false, settingsReady = false;
+  let sending = false;
   let settingsVersion = 0;
   let editor = null;
   let version = 0;
@@ -45,11 +46,16 @@
   PG.hooks.localReady = () => { if (editor && getText(editor).trim()) scheduleInspect(editor); };
 
   chrome.runtime.sendMessage({ type: "settings" }).then((r) => {
-    enabled = r?.data?.enabled !== false;
+    orgManaged = !!(r?.data?.orgManaged || r?.data?.linkedClient?.managed);
+    userEnabled = r?.data?.enabled !== false;
+    enabled = userEnabled || orgManaged;
+    settingsReady = !!r?.ok;
   });
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.enabled) enabled = changes.enabled.newValue !== false;
-    if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "personalRules"].some((key) => changes[key])) {
+    if (changes.enabled) userEnabled = changes.enabled.newValue !== false;
+    if (changes.linkedClient) orgManaged = !!changes.linkedClient.newValue?.managed;
+    enabled = userEnabled || orgManaged;
+    if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "linkedClient", "personalRules", "ruleBundle"].some((key) => changes[key])) {
       settingsVersion++;
       version++;
       latest = null; bypass = null; prepared = null;
@@ -66,7 +72,6 @@
     settingsVersion++;
     version++;
     latest = null; localEntry = null; bypass = null; prepared = null;
-    PG.ui.closeModal();
     if (editor?.isConnected) scheduleInspect(editor);
     else refresh();
   });
@@ -146,12 +151,6 @@
     return [...counts].map(([l, n]) => `${l} ${n}건`).join(", ");
   }
 
-  function destinationText(dest) {
-    if (!dest) return "";
-    const name = PG.PROVIDER_LABELS[dest.provider] || dest.provider;
-    return `전송 대상: ${name} · ${PG.TIER_LABELS[dest.tier] || dest.tier} 기준`;
-  }
-
   function previewOf(p, text) {
     const parts = [];
     let last = 0;
@@ -197,15 +196,11 @@
       } else lamp = "checking";
     }
 
-    const siteContext = PG.siteContext.current();
-    const contextWarning = siteContext?.uncertain;
-    if (contextWarning && lamp === "idle") lamp = "yellow";
     const sum = summary(result?.findings);
     let chip = "";
     if (lamp === "checking") chip = "검사 중…";
     else if (lamp === "red") chip = `Tier 1 차단${sum ? ` · ${sum}` : ""}`;
-    else if (lamp === "yellow") chip = contextWarning && !sum && (!result?.ai_assessment || result.ai_assessment.decision === "allow")
-      ? "이용 환경 확인 필요" : `Tier 2 주의${sum ? ` · ${sum}` : ""}`;
+    else if (lamp === "yellow") chip = `Tier 2 주의${sum ? ` · ${sum}` : ""}`;
     else if (lamp === "green") chip = prep ? "안전: 정제 완료 (Safe to Send)" : "Tier 3 안전 · 검사 통과";
     else if (lamp === "gray") chip = latest?.error ? "검사 불가 · 전송 보류" : "검사 미완료 · 전송 보류";
     if (provisional) chip += " (검사 확인 중)";
@@ -220,14 +215,15 @@
       && findings.some((f) => f.action === "mask" || f.action === "warn");
 
     PG.ui.renderWidget({
-      visible: hasText || !!notice || !!contextWarning,
-      siteContext: PG.isTestHost() ? null : siteContext,
+      visible: hasText || !!notice,
+      siteContext: null,
       lamp,
       chip,
-      reason: lamp === "idle" ? "" : [destinationText(result?.destination),
+      reason: lamp === "idle" ? "" : [
         result?.ai_assessment?.decision !== "allow" && result?.ai_assessment
           ? "AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다." : "",
-        result?.notices?.includes("server_unavailable_local_check") ? "서버 연결 실패 · 기기 내 AI와 기본 규칙으로 검사했습니다." : "",
+        result?.notices?.includes("server_unavailable_local_check") ? "서버 연결 실패 · 기기 내 AI와 캐시된 규칙으로 검사했습니다." : "",
+        result?.notices?.includes("report_failed") ? PG.errorLabel("report_failed") : "",
       ].filter(Boolean).join(" "),
       // 정제 오버레이가 입력창에 표시된 동안 위젯 미리보기는 중복하지 않는다.
       preview: prep && text !== prep.sanitized ? previewOf(prep, text) : null,
@@ -253,17 +249,20 @@
   }
 
   // stage: draft(입력 중) | submit(전송 직전). 조직 서버는 submit 만 대시보드에 기록한다.
-  async function inspect(text, stage = "draft") {
+  async function inspect(text, stage = "draft", sendAction) {
     const context = PG.siteContext.read();
     const v = ++version;
     const res = await chrome.runtime.sendMessage({
-      type: "inspect", text, inputVersion: v, destination: PG.resolveDestination(), stage,
+      type: "inspect", text, inputVersion: v, destination: PG.resolveDestination(), stage, sendAction,
     }).catch(() => ({ ok: false, error: "network" }));
     PG.siteContext.read(); // Catch a page change even before the observer callback runs.
     const entry = { version: v, text, result: res?.ok ? PG.siteContext.apply(res.data, context) : null, error: res?.ok ? null : res?.error };
     // 응답이 늦게 와서 더 새로운 요청이 있으면 버린다
     if (v !== version) return null;
-    if (entry.result && String(entry.result.input_version) !== String(v)) return null;
+    if (entry.result && String(entry.result.input_version) !== String(v)) {
+      entry.result = null;
+      entry.error = "invalid_inspection";
+    }
     latest = entry;
     return entry;
   }
@@ -340,7 +339,12 @@
   // 승인된 전송은 짧은 시간 동안 같은 텍스트에 한해 유효하다.
   // 한 번의 전송이 click → submit 처럼 여러 이벤트를 거쳐도 다시 막지 않기 위해 즉시 지우지 않는다.
   function consumeBypass(text) {
-    return !!bypass && bypass.text === text && Date.now() < bypass.until;
+    const approved = !!bypass && bypass.text === text && Date.now() < bypass.until;
+    if (approved) {
+      const consumed = bypass;
+      setTimeout(() => { if (bypass === consumed) bypass = null; }, 0);
+    }
+    return approved;
   }
 
   // 사이트가 전송 후 입력창을 비우면(input 이벤트 없이) 위젯을 정리한다.
@@ -350,7 +354,7 @@
 
   function triggerSend(ed, text, approvedSettings = settingsVersion) {
     PG.siteContext.read();
-    if (approvedSettings !== settingsVersion) return;
+    if (approvedSettings !== settingsVersion || !ed.isConnected || getText(ed) !== text) return;
     const wait = SETTLE_MS - (Date.now() - lastProgrammaticSet);
     if (wait > 0) {
       setTimeout(() => { if (getText(ed) === text) triggerSend(ed, text, approvedSettings); }, wait);
@@ -373,9 +377,8 @@
       result: entry.result,
       error: entry.error,
       onRetry: () => { PG.ui.closeModal(); gate(ed, entry.text); },
-      onSendAnyway: () => {
-        if (getText(ed) === entry.text) triggerSend(ed, entry.text, approvedSettings);
-      },
+      onSendAnyway: () => approvedSend(ed, entry.text,
+        entry.result?.decision === "block" ? "forced" : "confirmed", approvedSettings),
       // 정제는 위젯의 '안전 다듬기' 한 경로로만 한다(경고 창 → 별도 정제 창 경로는 중복이라 제거).
       // 경고 창을 닫고 바로 입력창에 반영 → 오버레이로 바뀐 부분 표시 → 사용자가 직접 전송.
       onSanitize: () => {
@@ -459,7 +462,7 @@
       onConfirm: () => {
         if (getText(ed) !== text) return;
         stat("forced");
-        triggerSend(ed, text, approvedSettings);
+        void approvedSend(ed, text, "forced", approvedSettings);
       },
     });
   }
@@ -478,22 +481,49 @@
   // 전송 허용 여부. true 면 원래 이벤트를 그대로 둔다.
   function gateSync(ed, text) {
     PG.siteContext.read();
-    if (!enabled || !text.trim()) return true;
+    if (!enabled || (!text.trim() && !orgManaged)) return true;
     if (consumeBypass(text)) return true;
+    if (orgManaged || !settingsReady) return false;
     const ok = !!latest && latest.text === text && passed(latest.result);
     if (ok) afterSend(ed);
     return ok;
   }
 
   async function gate(ed, text) {
+    if (sending) return;
+    sending = true;
     clearTimeout(timer);
-    refresh();
-    const entry = await inspect(text, "submit");
-    if (!entry) return;
-    if (getText(ed) !== text) { scheduleInspect(ed); return; } // 검사 중 입력이 바뀜 → 보내지 않음
-    refresh();
-    if (passed(entry.result)) triggerSend(ed, text);
-    else openWarning(ed, entry);
+    try {
+      const entry = await inspect(text, "submit", "normal");
+      if (!entry) return;
+      if (!ed.isConnected || getText(ed) !== text) { scheduleInspect(ed); return; }
+      prepared = null;
+      refresh();
+      if (passed(entry.result)) triggerSend(ed, text);
+      else openWarning(ed, entry);
+    } finally { sending = false; }
+  }
+
+  // 관리 상태의 확인/강행 전송은 전송 직전에 실제 선택을 다시 기록한다.
+  async function approvedSend(ed, text, action, approvedSettings) {
+    PG.siteContext.read();
+    if (sending || approvedSettings !== settingsVersion || getText(ed) !== text) return;
+    if (!orgManaged) { triggerSend(ed, text, approvedSettings); return; }
+    sending = true;
+    clearTimeout(timer);
+    try {
+      const entry = await inspect(text, "submit", action);
+      PG.siteContext.read();
+      if (approvedSettings !== settingsVersion || !ed.isConnected || getText(ed) !== text || !entry) return;
+      refresh();
+      if (!entry.result || entry.result.status !== "complete") {
+        setNotice("기록 실패 · 전송을 보류했습니다.", "warn");
+        openWarning(ed, entry);
+        return;
+      }
+      if (action === "confirmed" && entry.result.decision === "block") { openWarning(ed, entry); return; }
+      triggerSend(ed, text, approvedSettings);
+    } finally { sending = false; }
   }
 
   function block(e) {
@@ -506,7 +536,7 @@
   // 전송 시도 공통 처리. kind: enter | click | submit
   function intercept(e, ed, kind) {
     const text = getText(ed);
-    if (!enabled || !text.trim()) return;
+    if (!enabled || (!text.trim() && !orgManaged)) return;
     if (gateSync(ed, text)) return; // 통과: 원래 이벤트 그대로
     block(e);
     gate(ed, text);

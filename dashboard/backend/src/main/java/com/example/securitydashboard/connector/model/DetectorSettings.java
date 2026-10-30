@@ -12,5 +12,6 @@ public record DetectorSettings(
     Map<String, String> tagMap,
     String tagAction,
     boolean jevEnabled,
+    Map<String, String> policyStateMap,
     int revision,
     Instant updatedAt) {}

@@ -35,6 +35,10 @@ class DetectorEventRepository {
         eventId,
         normalized.envelope(),
         normalized.contentHash());
+    jdbc.update(
+        "UPDATE security_events SET send_action=? WHERE id=?",
+        read(normalized.envelope()).path("send_action").asText(null),
+        eventId);
     for (var image : normalized.images()) {
       insertImage(eventId, image);
     }

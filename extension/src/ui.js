@@ -530,12 +530,6 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       h("div", null, h("p", { class: "title" }, title), sub && h("p", { class: "sub" }, sub)));
   }
 
-  function destinationLine(dest) {
-    if (!dest) return null;
-    const name = PG.PROVIDER_LABELS[dest.provider] || dest.provider;
-    return `대상: ${name} · ${PG.TIER_LABELS[dest.tier] || dest.tier} 기준 적용`;
-  }
-
   function preview(text, findings) {
     const box = h("div", { class: "preview" });
     let pos = 0;
@@ -591,19 +585,18 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
     const hasBlock = findings.some((f) => f.action === "block");
     const canSanitize = !hasBlock && findings.some((f) => f.action === "mask" || f.action === "warn");
     const incomplete = result.status !== "complete";
-    const canSendAnyway = !incomplete && result.decision === "warn";
+    const canSendAnyway = !incomplete && ["warn", "block"].includes(result.decision);
 
     let tone, icon, title;
     if (incomplete) [tone, icon, title] = ["gray", "!", "검사가 완료되지 않아 전송을 보류했습니다"];
-    else if (result.decision === "block") [tone, icon, title] = ["red", "✕", "민감정보가 있어 이대로 보낼 수 없습니다"];
+    else if (result.decision === "block") [tone, icon, title] = ["red", "✕", "민감정보 전송 여부를 확인해 주세요"];
     else [tone, icon, title] = ["yellow", "!", "보내기 전에 확인이 필요합니다"];
 
     const summary = relevant.length
       ? `${relevant.length}개 항목이 발견되었습니다.`
       : result.ai_assessment && result.ai_assessment.decision !== "allow"
         ? "기기 내 AI가 개인정보 가능성을 감지했습니다. 정확한 위치는 제공하지 않습니다."
-        : result.site_context?.uncertain ? "내용 검사는 통과했지만, 모델·계정 설정 또는 모델별 정책이 확인되지 않았습니다."
-        : "탐지된 항목은 없지만 전송 대상의 정책상 확인이 필요합니다.";
+        : "내용 검사 결과를 확인하고 전송 여부를 선택하세요.";
 
     const ack = canSendAnyway
       ? h("label", { class: "ack" },
@@ -612,20 +605,17 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       : null;
     const sendBtn = canSendAnyway
       ? h("button", { class: "danger", disabled: true, onclick: () => { closeModal(); opts.onSendAnyway(); } },
-          "확인 후 전송")
+          result.decision === "block" ? "그래도 전송" : "확인 후 전송")
       : null;
 
     openModal(h("div", { class: "card" },
-      header(tone, icon, title, [summary, destinationLine(result.destination)].filter(Boolean).join(" ")),
+      header(tone, icon, title, summary),
       h("div", { class: "body" },
-        contextDetails(result.site_context?.uncertain ? result.site_context : null),
         retentionNotice(),
         h("div", null, h("p", { class: "section-title" }, "입력 내용"), preview(text, findings)),
         findings.length ? h("div", null, h("p", { class: "section-title" }, "탐지 항목"), findingList(findings)) : null,
-        notices(result.notices,
+        notices(result.notices?.filter(code => !code.startsWith("destination_") && code !== "site_context_uncertain"),
           hasBlock ? "치환으로 해결되지 않는 항목이 있습니다. 해당 내용을 직접 지우거나 승인된 경로를 이용하세요." : null),
-        result.destination?.basis
-          ? h("p", { class: "sub" }, `대상 정책 근거: ${result.destination.basis}`) : null,
         ack),
       h("div", { class: "foot" },
         h("p", { class: "fine" }, FINE),
@@ -637,34 +627,15 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
 
   // 진입 안내는 전송 승인과 별개다. 닫아도 본문/파일 검사를 우회하지 않는다.
   function showEntryPolicy(policy) {
-    const training = policy.kind === "training-enabled";
-    const observedDate = new Date(policy.observedAt);
-    const evidence = training
-      ? h("div", null,
-          h("p", { class: "section-title" }, "화면에서 확인한 설정"),
-          h("p", { class: "entry-copy" }, "학습·모델 개선: ON"),
-          h("p", { class: "sub" }, "실제 학습 여부는 임시 대화·계정 정책에 따라 달라질 수 있습니다."),
-          Number.isFinite(observedDate.getTime())
-            ? h("p", { class: "fine" }, `확인 시각: ${observedDate.toLocaleString("ko-KR")}`) : null)
-      : h("div", null, h("p", { class: "section-title" }, "확인한 공식 정책"),
-          h("ul", { class: "policy-sources" }, policy.items.map(item =>
-            h("li", null, h("p", { class: "entry-copy" }, item.text),
-              h("a", { href: item.source, target: "_blank", rel: "noopener noreferrer" }, item.kind === "retention" ? "데이터 수집·보관 정책 원문" : "학습 정책 원문")))),
-          h("p", { class: "fine" }, `정책 확인일: ${policy.checkedAt} · 일반 소비자 서비스 기준`));
     const card = h("div", { class: "card entry-policy", "aria-labelledby": "pg-entry-title" },
-      header(training ? "yellow" : "red", "!", training
-        ? "모델 학습 옵션이 켜져 있습니다"
-        : "입력 데이터 수집을 거부할 수 없는 사이트입니다", policy.name),
+      header("gray", "i", "학습·데이터 이용 안내", policy.name),
       h("div", { class: "body" },
-        h("p", { class: "entry-copy" }, training
-          ? "이 페이지에서 학습·모델 개선 옵션이 ON인 것을 확인했습니다. 입력한 대화가 모델 학습에 사용될 수 있습니다."
-          : "이 사이트의 일반 소비자 서비스는 입력 데이터를 필수로 수집하며, 모델 학습에서 제외하는 선택권을 제공하지 않는 것으로 확인되었습니다."),
-        h("p", { class: "entry-copy" }, training
-          ? "학습을 원하지 않으면 사이트의 개인정보·데이터 설정에서 해당 옵션을 꺼 주세요."
-          : "개인정보나 회사 기밀을 입력하지 마세요. 다른 서비스를 이용하거나 조직에서 승인한 경로를 확인하세요."),
-        evidence, retentionNotice()),
+        h("p", { class: "entry-copy" }, "현재 화면에서 관측한 설정과 제공사·접근 경로 정책입니다. 실제 모델별 학습 여부는 확인한 범위에서만 안내합니다."),
+        h("dl", { class: "policy-sources" }, policy.items.map(item =>
+          h("div", null, h("dt", { class: "section-title" }, item.label), h("dd", { class: "entry-copy" }, item.text)))),
+        retentionNotice()),
       h("div", { class: "foot" },
-        h("p", { class: "fine" }, "이 안내를 닫아도 전송 전 개인정보 검사는 계속 적용됩니다."),
+        h("p", { class: "fine" }, "이 안내는 판정이나 전송 승인을 바꾸지 않습니다. 전송 전 개인정보 검사는 계속 적용됩니다."),
         h("button", { class: "primary", onclick: closeModal }, "확인하고 닫기")));
     card.querySelector(".title").id = "pg-entry-title";
     // 진입 직후 키보드 포커스가 뒤쪽 사이트로 빠지지 않도록 제한한다.
@@ -726,10 +697,8 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
         resolve(v);
       };
       const hasSensitive = files.some((f) => f.kind === "sensitive");
-      const hasContext = files.some((f) => f.kind === "context");
-      const needsAck = hasSensitive || hasContext;
+      const needsAck = hasSensitive;
       const unreadable = files.filter((f) => f.kind === "unreadable");
-      const contextOnly = hasContext && !unreadable.length;
 
       const blocks = files.map((f) => {
         if (f.kind === "unreadable") {
@@ -744,7 +713,7 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
           h("span", { class: "snippet" }, it.before, h("mark", { dataset: { action: it.action } }, it.value), it.after)));
         return h("div", { class: "fileblock" },
           h("h4", null, f.name),
-          h("p", { class: "why" }, f.kind === "context" ? "내용 검사는 통과했지만 전송 대상의 이용 환경을 확인해야 합니다." : `확인이 필요한 항목 ${f.total}건이 있습니다.${f.total > f.items.length ? ` (앞쪽 ${f.items.length}건만 표시)` : ""}`),
+          h("p", { class: "why" }, `확인이 필요한 항목 ${f.total}건이 있습니다.${f.total > f.items.length ? ` (앞쪽 ${f.items.length}건만 표시)` : ""}`),
           h("ul", { class: "hits" }, hits));
       });
 
@@ -752,15 +721,15 @@ ul.hits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; alig
       const ack = needsAck
         ? h("label", { class: "ack" },
             h("input", { type: "checkbox", onchange: (e) => { proceed.disabled = !e.target.checked; } }),
-            hasSensitive ? "민감정보가 든 파일이 외부 AI 서비스에 업로드되는 것을 이해했고, 그래도 진행하겠습니다." : "이용 환경이 확인되지 않은 외부 AI에 파일을 업로드하는 것을 이해했고, 진행하겠습니다.")
+            "민감정보가 든 파일이 외부 AI 서비스에 업로드되는 것을 이해했고, 그래도 진행하겠습니다.")
         : null;
 
-      const title = hasSensitive ? "첨부하려는 파일에 민감정보가 있습니다" : contextOnly ? "첨부 전에 이용 환경을 확인해 주세요" : "읽을 수 없는 파일이지만, 그래도 진행할까요?";
+      const title = hasSensitive ? "첨부하려는 파일에 민감정보가 있습니다" : "읽을 수 없는 파일이지만, 그래도 진행할까요?";
       const sub = hasSensitive
         ? "아래 위치를 확인하고, 그래도 올릴지 선택하세요."
-        : contextOnly ? "모델·계정 설정 또는 모델별 정책이 확인되지 않았습니다." : "내용을 분석할 수 없어 안전한지 알 수 없습니다.";
+        : "내용을 분석할 수 없어 안전한지 알 수 없습니다.";
       const card = h("div", { class: "card" },
-        header(hasSensitive ? "red" : contextOnly ? "yellow" : "gray", hasSensitive ? "✕" : "!", title, sub),
+        header(hasSensitive ? "red" : "gray", hasSensitive ? "✕" : "!", title, sub),
         h("div", { class: "body" }, retentionNotice(), blocks,
           hasSensitive && unreadable.length
             ? h("div", { class: "notice" }, h("p", null, "읽을 수 없는 파일은 안전한지 알 수 없습니다.")) : null,

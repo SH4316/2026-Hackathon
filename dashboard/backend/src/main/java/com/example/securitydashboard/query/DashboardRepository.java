@@ -10,6 +10,8 @@ import com.example.securitydashboard.query.model.ServiceMetric;
 import com.example.securitydashboard.query.model.Summary;
 import com.example.securitydashboard.query.model.TagMetric;
 import com.example.securitydashboard.query.model.Unmapped;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -28,9 +30,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 class DashboardRepository {
   private final NamedParameterJdbcTemplate jdbc;
+  private final ObjectMapper json;
 
-  DashboardRepository(NamedParameterJdbcTemplate jdbc) {
+  DashboardRepository(NamedParameterJdbcTemplate jdbc, ObjectMapper json) {
     this.jdbc = jdbc;
+    this.json = json;
   }
 
   long countEvents(DashboardQuery query) {
@@ -63,7 +67,10 @@ class DashboardRepository {
   }
 
   private String eventSelect(String table) {
-    return " SELECT e.*,p.name AS person_name,cp.name AS policy_state_name FROM "
+    return " SELECT e.*,p.name AS person_name,cp.name AS policy_state_name, (SELECT de.envelope"
+               + " FROM detector_events de WHERE de.event_id=e.id) AS detector_envelope, (SELECT"
+               + " COUNT(*) FROM detector_event_images di WHERE di.event_id=e.id) AS image_count"
+               + " FROM "
         + table
         + " e JOIN people p ON p.id=e.person_id LEFT JOIN config_version_policies cp ON"
         + " cp.version_id=e.version_id AND cp.id=e.policy_state_id ";
@@ -317,7 +324,21 @@ class DashboardRepository {
         rs.getString("policy_state_id"),
         rs.getString("policy_state_name"),
         List.of(),
-        0);
+        0,
+        rs.getString("send_action"),
+        fileCount(rs.getString("detector_envelope")),
+        rs.getInt("image_count"));
+  }
+
+  private int fileCount(String envelope) {
+    if (envelope == null) return 0;
+    try {
+      // Envelope stays LONGTEXT because MySQL JSON parsing rejects valid large input_version
+      // values.
+      return json.readTree(envelope).path("files").size();
+    } catch (JsonProcessingException exception) {
+      throw new IllegalStateException("Stored detector payload invalid");
+    }
   }
 
   List<DetectionRow> detections(List<Long> eventIds) {

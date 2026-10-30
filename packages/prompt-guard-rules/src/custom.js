@@ -6,6 +6,7 @@ import { pyRegExp } from "./pyre.js";
 const escapeLiteral = (s) => s.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&");
 const cpLength = (s) => [...s].length;
 const ASCII_WORD = /^[A-Za-z0-9]$/;
+const NESTED_QUANT = /\((?:[^()\\]|\\.)*(?:[*+]|\{\d*,\d*\})(?:[^()\\]|\\.)*\)(?:[*+]|\{\d*,\d*\})/;
 
 // 영문·숫자로 시작/끝나는 키워드는 영단어 경계를 둔다("Confidential" 이 "confidentially" 를 잡지 않게).
 // 한글로 끝나는 키워드는 조사가 붙어도 잡도록 경계를 두지 않는다("블루문은"). (custom.py keyword_pattern)
@@ -23,6 +24,8 @@ export function compileCustomRule(rule) {
     const words = [...rule.keywords].sort((a, b) => cpLength(b) - cpLength(a));
     return new RegExp(words.map(keywordPattern).join("|"), "gdu" + (rule.case_sensitive ? "" : "i"));
   }
+  if (cpLength(rule.pattern) > 4000) throw new Error("정규식은 4000자 이하만 허용합니다");
+  if (NESTED_QUANT.test(rule.pattern)) throw new Error("중첩 수량자는 허용하지 않습니다");
   return pyRegExp(rule.pattern, { ignoreCase: !rule.case_sensitive });
 }
 

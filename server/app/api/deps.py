@@ -52,6 +52,15 @@ def require_client(client: Client | None = Depends(require_api_key)) -> Client:
     return client
 
 
+def require_report_client(request: Request, x_api_key: str | None = Header(default=None),
+                          authorization: str | None = Header(default=None)) -> Client:
+    key = x_api_key or _bearer(authorization)
+    client = request.app.state.clients.authenticate(key) if key else None
+    if client is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "파일 기록에는 등록된 개인 토큰이 필요합니다")
+    return client
+
+
 def require_admin(request: Request, x_admin_key: str | None = Header(default=None)) -> str:
     """대시보드용 관리 키. 일반 API 키로는 규칙을 바꿀 수 없다. 반환값은 변경 기록용 행위자 지문."""
     settings = request.app.state.settings

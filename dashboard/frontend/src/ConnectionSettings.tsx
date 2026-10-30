@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { api, ApiError } from "./api";
 import { formatDateTime } from "./format";
 import { useResource } from "./hooks";
@@ -40,7 +41,7 @@ const REPORT_TEXT: { value: ReportText; label: string; description: string }[] =
 const TAG_ACTION: { value: TagAction; label: string }[] = [
   { value: "warn", label: "확인 필요" },
   { value: "mask", label: "치환 필요" },
-  { value: "block", label: "전송 불가" },
+  { value: "block", label: "강행 확인 필요" },
 ];
 
 function message(error: unknown, fallback: string) {
@@ -281,6 +282,7 @@ function DetectorSettingsPanel() {
         jevEnabled: current.jevEnabled,
         tagMap,
         revision: current.revision,
+        policyStateMap: current.policyStateMap,
       });
       setDraft(saved);
       setRows(
@@ -345,7 +347,7 @@ function DetectorSettingsPanel() {
               ))}
             </select>
             <small>
-              전송 대상 AI의 데이터 정책 등급에 따라 더 강해질 수 있습니다.
+              프롬프트 내용으로만 판정합니다. 빨강도 사용자 확인 후 강행 전송할 수 있습니다.
             </small>
           </label>
           <label className="detector-check">
@@ -432,6 +434,25 @@ function DetectorSettingsPanel() {
             매핑 추가
           </button>
         </div>
+        <div className="detector-map">
+          <h3>판정 → 정책 상태</h3>
+          <p className="setting-description">활성 버전의 정책 상태에 연결합니다. 연결하지 않거나 활성 버전에 없는 ID는 기록에 보내지 않습니다.</p>
+          {(["allow", "warn", "block"] as const).map((decision) => {
+            const selected = current.policyStateMap?.[decision] ?? "";
+            const policies = tags.data?.policyStates ?? [];
+            return (
+              <label key={decision} className="detector-map-row">
+                <span>{{ allow: "통과", warn: "확인 필요", block: "강행 확인 필요" }[decision]}</span>
+                <select aria-label={`${decision} 정책 상태`} value={selected} disabled={pending}
+                  onChange={(e) => setDraft({ ...current, policyStateMap: { ...current.policyStateMap, [decision]: e.target.value || null } })}>
+                  <option value="">연결하지 않음</option>
+                  {selected && !policies.some((p) => p.id === selected) && <option value={selected}>{selected} (활성 버전에 없음)</option>}
+                  {policies.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.id})</option>)}
+                </select>
+              </label>
+            );
+          })}
+        </div>
         <div className="settings-save">
           <span role="status">
             {error ? <span className="field-error">{error}</span> : notice}
@@ -459,6 +480,7 @@ export function ConnectionSettings() {
         title="검사 서버 연결"
         description="검사 서버를 이 대시보드에 연결하고, 연결된 서버가 따를 설정을 정합니다."
       />
+      <p><Link className="text-link" to="/settings/guard">검사 서버 실행 상태·규칙·연결 사용자 관리</Link></p>
       <Connectors />
       <DetectorSettingsPanel />
       {!active && (

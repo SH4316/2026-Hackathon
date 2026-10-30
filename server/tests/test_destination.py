@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 
 from app.policy.engine import DestinationPolicy, Policy
-from app.schemas import Action
 
 from tests.conftest import ROOT, body
 
@@ -24,25 +23,27 @@ def test_every_profile_tier_exists():
         assert all(tier in d.tiers for tier, _ in channels.values())
 
 
-@pytest.mark.parametrize("tier", ["standard", "elevated", "restricted"])
-def test_tiers_never_relax_base_actions(tier):
-    rank = [Action.ALLOW, Action.WARN, Action.MASK, Action.BLOCK]
-    t = POLICY.destinations.tiers[tier]
-    for name, tp in POLICY.types.items():
-        assert rank.index(POLICY.action_for(name, t)) >= rank.index(tp.action)
+@pytest.mark.parametrize("text", ["평범한 문장", "서버 10.1.2.3", "CVE-2024-12345", "kim@example.com"])
+def test_destination_never_changes_content_verdict(client, text):
+    baseline = client.post("/v1/inspect", json=body(text)).json()
+    for provider, channel in [("openai", "consumer"), ("openai", "api"), ("deepseek", "api"),
+                              ("moonshot", "consumer"), ("unknown", "unknown")]:
+        r = client.post("/v1/inspect", json=dest_body(text, provider, channel)).json()
+        for field in ("status", "decision", "signal", "findings"):
+            assert r[field] == baseline[field]
 
 
 def test_unknown_destination_uses_default_tier(client):
     r = client.post("/v1/inspect", json=body("서버 10.1.2.3")).json()
     assert r["destination"]["tier"] == "elevated" and "destination_unknown" in r["notices"]
-    assert r["findings"][0]["action"] == "mask" and r["decision"] == "block"
+    assert r["findings"][0]["action"] == "warn" and r["decision"] == "warn"
 
 
-def test_consumer_destination_escalates_internal_ip(client):
+def test_consumer_destination_preserves_internal_ip_action(client):
     r = client.post("/v1/inspect", json=dest_body("서버 10.1.2.3", "openai", "consumer")).json()
     assert r["destination"] == {"provider": "openai", "channel": "consumer", "tier": "elevated",
                                 "verified": False, "basis": r["destination"]["basis"]}
-    assert r["findings"][0]["action"] == "mask"
+    assert r["findings"][0]["action"] == "warn"
 
 
 def test_client_cannot_self_declare_lower_tier(client):
@@ -80,15 +81,15 @@ def test_stale_profile_is_escalated_to_default_tier(tmp_path: Path):
     assert dest.tier.name == "restricted"
 
 
-def test_restricted_requires_confirmation_even_for_clean_text(client):
+def test_restricted_clean_text_allows(client):
     r = client.post("/v1/inspect", json=dest_body("문장을 다듬어 줘", "deepseek", "consumer")).json()
     assert r["destination"]["tier"] == "restricted"
-    assert (r["decision"], r["signal"]) == ("warn", "yellow")
+    assert (r["decision"], r["signal"]) == ("allow", "green")
 
 
-def test_restricted_escalates_allow_to_warn(client):
+def test_restricted_preserves_allow_action(client):
     r = client.post("/v1/inspect", json=dest_body("CVE-2024-12345", "moonshot", "api")).json()
-    assert r["findings"][0]["action"] == "warn"
+    assert r["findings"][0]["action"] == "allow"
 
 
 def test_sanitize_uses_destination_tier(client):

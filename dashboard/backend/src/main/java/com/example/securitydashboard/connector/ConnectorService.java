@@ -133,6 +133,7 @@ public class ConnectorService {
     String action = choice(input.tagAction(), TAG_ACTIONS, "tagAction");
     if (input.jevEnabled() == null) throw ApiException.invalid("jevEnabled", "jevEnabled가 필요합니다.");
     Map<String, String> map = tagMap(input.tagMap());
+    Map<String, String> policies = input.policyStateMap() == null ? null : policyStateMap(input.policyStateMap());
     return transaction.execute(
         status -> {
           var current = repository.settings(true);
@@ -140,7 +141,9 @@ public class ConnectorService {
             throw new ApiException(
                 HttpStatus.CONFLICT, "REVISION_CONFLICT", "다른 변경이 저장되었습니다. 최신 설정을 불러와 주세요.");
           repository.updateSettings(
-              report, map, action, input.jevEnabled(), current.revision() + 1, clock.instant());
+              report, map, action, input.jevEnabled(),
+              policies == null ? current.policyStateMap() : policies,
+              current.revision() + 1, clock.instant());
           return repository.settings(false);
         });
   }
@@ -162,6 +165,19 @@ public class ConnectorService {
           InputValidation.validateId(tag, "tagMap");
           out.put(type, tag);
         });
+    return out;
+  }
+
+  private static Map<String, String> policyStateMap(Map<String, String> value) {
+    var decisions = Set.of("allow", "warn", "block");
+    if (!decisions.containsAll(value.keySet()))
+      throw ApiException.invalid("policyStateMap", "allow·warn·block만 사용할 수 있습니다.");
+    Map<String, String> out = new LinkedHashMap<>();
+    for (String decision : List.of("allow", "warn", "block")) {
+      String state = value.get(decision);
+      if (state != null) InputValidation.validateId(state, "policyStateMap." + decision);
+      out.put(decision, state);
+    }
     return out;
   }
 

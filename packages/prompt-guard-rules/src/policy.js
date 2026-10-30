@@ -1,11 +1,8 @@
 // 정책 → 위험도·조치 결정(server/app/policy/engine.py).
-// 전송 목적지 등급은 조치를 강화만 하고 완화하지 않는다.
+// 전송 목적지 등급은 안내용이며 판정에 영향을 주지 않는다.
 
 const SEVERITY_RANK = { info: 0, low: 1, medium: 2, high: 3, critical: 4 };
 const ACTION_RANK = { allow: 0, warn: 1, mask: 2, block: 3 };
-const DECISION_RANK = { allow: 0, warn: 1, block: 2 };
-
-const maxBy = (rank, a, b) => (rank[b] > rank[a] ? b : a);
 
 function typePolicy(name, spec = {}) {
   return {
@@ -33,8 +30,8 @@ export class Policy {
 
     const d = bundle.destinations;
     this.tiers = {};
-    Object.entries(d.tiers).forEach(([name, spec], rank) => {
-      this.tiers[name] = { name, rank, escalate: spec?.escalate ?? {}, minDecision: spec?.min_decision ?? "allow" };
+    Object.keys(d.tiers).forEach((name, rank) => {
+      this.tiers[name] = { name, rank };
     });
     if (!this.tiers[d.default_tier]) throw new Error("default_tier must be one of tiers");
     this.defaultTier = d.default_tier;
@@ -68,9 +65,8 @@ export class Policy {
     return this.types[type] ?? this.default;
   }
 
-  actionFor(type, tier) {
-    const base = this.forType(type).action;
-    return maxBy(ACTION_RANK, base, tier.escalate[base] ?? base);
+  actionFor(type) {
+    return this.forType(type).action;
   }
 
   priority(c) {
@@ -102,9 +98,9 @@ export class Policy {
 }
 
 /** 원문 기준 판단. mask 대상이 남아 있으면 원문은 전송할 수 없으므로 block. */
-export function decide(actions, minDecision = "allow") {
+export function decide(actions) {
   let decision = "allow";
   if (actions.some((a) => a === "block" || a === "mask")) decision = "block";
   else if (actions.includes("warn")) decision = "warn";
-  return maxBy(DECISION_RANK, decision, minDecision);
+  return decision;
 }

@@ -7,4 +7,5 @@ public record UpdateDetectorSettings(
     String reportText,
     Map<String, String> tagMap,
     String tagAction,
-    Boolean jevEnabled) {}
+    Boolean jevEnabled,
+    Map<String, String> policyStateMap) {}

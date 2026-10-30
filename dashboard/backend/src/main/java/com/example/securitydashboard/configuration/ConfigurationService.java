@@ -11,6 +11,7 @@ import com.example.securitydashboard.configuration.model.TagInput;
 import com.example.securitydashboard.configuration.model.UpdateTagDetails;
 import com.example.securitydashboard.configuration.model.UpdateVersion;
 import com.example.securitydashboard.configuration.model.VersionSummary;
+import com.example.securitydashboard.guard.TagRegexValidator;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -23,8 +24,10 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @Transactional(readOnly = true)
@@ -32,12 +35,20 @@ public class ConfigurationService {
   private final ConfigurationRepository repository;
   private final JevPromptRepository jevPrompts;
   private final Clock clock;
+  private final TagRegexValidator regexValidator;
+  private final TransactionTemplate transactions;
 
   ConfigurationService(
-      ConfigurationRepository repository, JevPromptRepository jevPrompts, Clock clock) {
+      ConfigurationRepository repository,
+      JevPromptRepository jevPrompts,
+      Clock clock,
+      TagRegexValidator regexValidator,
+      PlatformTransactionManager transactionManager) {
     this.repository = repository;
     this.jevPrompts = jevPrompts;
     this.clock = clock;
+    this.regexValidator = regexValidator;
+    this.transactions = new TransactionTemplate(transactionManager);
   }
 
   List<VersionSummary> list() {
@@ -99,27 +110,37 @@ public class ConfigurationService {
     return get(id);
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   ConfigVersion update(String id, UpdateVersion input) {
-    lockDraft(id, input.revision());
+    var before = get(id);
+    var state = new VersionState(before.status(), before.revision());
+    requireDraft(state);
+    requireRevision(state, input.revision());
     String name = InputValidation.name(input.name(), "name");
-    List<Tag> tags = normalizeTagInputs(input.tags(), tags(id));
+    List<Tag> tags = normalizeTagInputs(input.tags(), before.tags());
     List<PolicyDefinition> policies = normalizePolicies(input.policyStates());
-    var retainedPrompts = jevPrompts.list(id);
-    repository.replaceCatalog(id, tags, policies);
-    Set<String> retainedTagIds = new HashSet<>();
-    tags.forEach(tag -> retainedTagIds.add(tag.id()));
-    jevPrompts.restoreOutputs(id, retainedPrompts, retainedTagIds);
-    repository.updateVersionName(id, name);
-    return get(id);
+    // Validate before opening a write transaction; recheck the revision under lock below.
+    regexValidator.validateChanged(tags, before.tags());
+    return transactions.execute(
+        status -> {
+          lockDraft(id, input.revision());
+          var retainedPrompts = jevPrompts.list(id);
+          repository.replaceCatalog(id, tags, policies);
+          Set<String> retainedTagIds = new HashSet<>();
+          tags.forEach(tag -> retainedTagIds.add(tag.id()));
+          jevPrompts.restoreOutputs(id, retainedPrompts, retainedTagIds);
+          repository.updateVersionName(id, name);
+          return get(id);
+        });
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   ConfigVersion updateTagDetails(String id, String tagId, UpdateTagDetails input) {
     InputValidation.validateId(tagId, "tagId");
-    lockMetadataVersion(id, input.revision());
+    var before = get(id);
+    requireRevision(new VersionState(before.status(), before.revision()), input.revision());
     var existing =
-        tags(id).stream()
+        before.tags().stream()
             .filter(tag -> tag.id().equals(tagId))
             .findFirst()
             .orElseThrow(
@@ -138,8 +159,13 @@ public class ConfigurationService {
                 existing.parentId(),
                 existing.order(),
                 input.enabled() == null ? existing.enabled() : input.enabled()));
-    repository.updateTagDetails(id, updated);
-    return get(id);
+    regexValidator.validateChanged(List.of(updated), List.of(existing));
+    return transactions.execute(
+        status -> {
+          lockMetadataVersion(id, input.revision());
+          repository.updateTagDetails(id, updated);
+          return get(id);
+        });
   }
 
   @Transactional
@@ -171,10 +197,14 @@ public class ConfigurationService {
     InputValidation.validateId(id, "versionId");
     lockActiveId();
     var version = repository.lockVersion(id).orElseThrow(ConfigurationService::versionNotFound);
+    requireDraft(version);
+    if (revision != null) requireRevision(version, revision);
+  }
+
+  private static void requireDraft(VersionState version) {
     if (!version.status().equals("DRAFT"))
       throw new ApiException(
           HttpStatus.CONFLICT, "VERSION_IMMUTABLE", "게시한 버전은 수정하거나 삭제할 수 없습니다. 새 초안을 만들어 주세요.");
-    if (revision != null) requireRevision(version, revision);
   }
 
   /** Shared metadata lock order also used by Jev edits and event capture. */

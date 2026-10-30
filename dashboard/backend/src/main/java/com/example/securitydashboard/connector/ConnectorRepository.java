@@ -133,7 +133,7 @@ class ConnectorRepository {
 
   DetectorSettings settings(boolean forUpdate) {
     return jdbc.queryForObject(
-        "SELECT report_text,tag_map,tag_action,jev_enabled,revision,updated_at FROM detector_settings"
+        "SELECT report_text,tag_map,tag_action,jev_enabled,policy_state_map,revision,updated_at FROM detector_settings"
             + " WHERE id=1"
             + (forUpdate ? " FOR UPDATE" : ""),
         (rs, i) ->
@@ -142,6 +142,7 @@ class ConnectorRepository {
                 readMap(rs.getString("tag_map")),
                 rs.getString("tag_action"),
                 rs.getBoolean("jev_enabled"),
+                readMap(rs.getString("policy_state_map")),
                 rs.getInt("revision"),
                 JdbcRows.instant(rs, "updated_at")));
   }
@@ -151,15 +152,17 @@ class ConnectorRepository {
       Map<String, String> tagMap,
       String tagAction,
       boolean jevEnabled,
+      Map<String, String> policyStateMap,
       int revision,
       Instant at) {
     jdbc.update(
-        "UPDATE detector_settings SET report_text=?,tag_map=?,tag_action=?,jev_enabled=?,revision=?,"
+        "UPDATE detector_settings SET report_text=?,tag_map=?,tag_action=?,jev_enabled=?,policy_state_map=?,revision=?,"
             + "updated_at=? WHERE id=1",
         reportText,
         writeMap(tagMap),
         tagAction,
         jevEnabled,
+        writeMap(policyStateMap),
         revision,
         Timestamp.from(at));
   }

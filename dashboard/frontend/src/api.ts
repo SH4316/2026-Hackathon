@@ -1,5 +1,6 @@
 import type {
   ApiErrorResponse,
+  DetectorAttachments,
   ConfigVersion,
   Connector,
   CreatedConnector,
@@ -226,6 +227,9 @@ export const api = {
     return request(`/events${buildQuery(filters, { page, size: 20 })}`, {
       signal,
     });
+  },
+  detectorEvent(id: number, signal?: AbortSignal): Promise<DetectorAttachments> {
+    return request(`/events/${resourceId(id)}/attachments`, { signal });
   },
   event(id: number | string, signal?: AbortSignal): Promise<SecurityEvent> {
     return request(`/events/${resourceId(id)}`, { signal });

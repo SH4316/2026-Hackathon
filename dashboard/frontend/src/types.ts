@@ -147,6 +147,9 @@ export interface SecurityEvent {
   policyStateName: string | null;
   detections: Detection[];
   findingCount: number;
+  sendAction: "normal" | "confirmed" | "forced" | null;
+  fileCount: number;
+  imageCount: number;
 }
 
 export type Event = SecurityEvent;
@@ -213,6 +216,18 @@ export interface ApiErrorResponse {
   fieldErrors?: Record<string, string>;
 }
 
+export interface DetectorImage {
+  id: number;
+  name: string;
+  media_type: string;
+  size_bytes: number;
+  download_path: string;
+}
+export interface DetectorAttachments {
+  files: { name: string }[];
+  images: DetectorImage[];
+}
+
 /** 대시보드가 발급한 검사 서버 연결. 비밀값은 발급 응답의 connectionUrl에만 있습니다. */
 export interface Connector {
   id: string;
@@ -243,6 +258,7 @@ export type TagAction = "warn" | "mask" | "block";
 /** 연결된 검사 서버가 따르는 조직 설정. */
 export interface DetectorSettings {
   reportText: ReportText;
+  policyStateMap: Record<"allow" | "warn" | "block", string | null>;
   tagMap: Record<string, string>;
   tagAction: TagAction;
   jevEnabled: boolean;

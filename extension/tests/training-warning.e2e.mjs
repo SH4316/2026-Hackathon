@@ -31,11 +31,10 @@ const change = async (selector, attr, value) => {
 try {
   await page.goto('https://chatgpt.com/');
   await modal.waitFor();
-  assert.match(await modal.innerText(), /모델 학습 옵션이 켜져 있습니다/);
-  assert.equal(await modal.locator('.head').getAttribute('data-tone'), 'yellow');
-  assert.doesNotMatch(await modal.innerText(), /거부할 수 없는|필수로 수집/);
-  assert.equal(await modal.locator('.retention-notice').count(),1);
-  assert.match(await modal.locator('.retention-notice').innerText(), /제공사 서버에 보관될 수/);
+  assert.match(await modal.innerText(), /학습·데이터 이용 안내/);
+  assert.match(await modal.innerText(), /ON/);
+  assert.match(await modal.innerText(), /확인하지 못했습니다/);
+  assert.equal(await modal.locator('.retention-notice').count(), 1);
   const shots = path.join(extension, 'tests/shots/training-warning');
   mkdirSync(shots, { recursive: true });
   for (const [theme, width] of [['light', 1100], ['dark', 1100], ['light', 390]]) {
@@ -48,25 +47,19 @@ try {
   await page.locator('#prompt').focus();
   await pause();
   assert.equal(await modal.count(), 0, 'acknowledgement does not re-open the modal');
+  // OFF/unknown/organization states still receive guidance when the model changes.
+  for (const [model, state] of [['가상 모델 OFF', 'false'], ['가상 모델 ON', 'true']]) {
+    await change('#training', 'aria-checked', state);
+    assert.equal(await modal.count(), 0, 'settings alone do not repeat entry');
+    await page.locator('[data-testid="model-switcher-dropdown-button"]').evaluate((el, model) => el.textContent = model, model);
+    await modal.waitFor(); assert.match(await modal.innerText(), new RegExp(state === 'true' ? 'ON' : 'OFF'));
+    await page.keyboard.press('Escape');
+  }
   await change('#training', 'hidden', '');
-  await page.locator('#training').evaluate(el => el.removeAttribute('hidden'));
-  await pause();
-  assert.equal(await modal.count(), 0, 'unknown then visible ON does not re-arm');
-  await change('#training', 'aria-checked', 'false');
-  assert.equal(await modal.count(), 0);
-  await change('#training', 'aria-checked', 'true');
-  await modal.waitFor();
-  await change('#training', 'aria-checked', 'false');
-  assert.equal(await modal.count(), 0, 'turning OFF closes stale training warning');
   await change('#temporary', 'aria-pressed', 'true');
-  await change('#training', 'aria-checked', 'true');
-  assert.equal(await modal.count(), 0, 'temporary conversation excluded');
-  await change('#temporary', 'aria-pressed', 'false');
-  await modal.waitFor();
   await change('#account', 'aria-label', 'Current workspace: Enterprise');
-  assert.equal(await modal.count(), 0, 'organization exception remains uncertain');
-  await change('#account', 'aria-label', 'Current workspace: Personal');
-  await modal.waitFor();
+  await page.locator('[data-testid="model-switcher-dropdown-button"]').evaluate(el => el.textContent = '가상 조직 모델');
+  await modal.waitFor(); assert.match(await modal.innerText(), /Enterprise/); assert.match(await modal.innerText(), /확인하지 못했습니다/);
   await settings.evaluate(() => chrome.storage.local.set({ enabled: false }));
   await pause();
   assert.equal(await modal.count(), 0, 'master OFF closes modal');
@@ -80,5 +73,5 @@ try {
   assert.equal(await modal.count(), 0, 'SPA navigation does not repeat same warning');
   await page.reload(); await modal.waitFor();
   assert.deepEqual(errors, []);
-  console.log('PASS installed extension training ON entry, OFF/ON, unknown, temporary, organization, master switch, SPA, reload');
+  console.log('PASS installed extension ON/OFF/unknown, model change, organization/temporary, vendor fallback, master switch, SPA/reload');
 } finally { await context.close(); rmSync(profile, { recursive: true, force: true }); }

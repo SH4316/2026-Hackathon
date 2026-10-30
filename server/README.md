@@ -1,9 +1,9 @@
 # Prompt Guard 서버
 
 외부 생성형 AI로 보내기 전에 프롬프트를 검사·정제하는 온프레미스 서버입니다.
-브라우저 확장프로그램과 CLI가 같은 API·정책을 사용합니다.
+브라우저 확장프로그램과 [ai-proxy](../ai-proxy/README.md)가 같은 API·정책을 사용합니다.
 
-> 현재 상태: 규칙 기반 탐지·정제·재검사, API 초안, 원문 없는 감사 이벤트, CLI 초안까지 동작합니다.
+> 현재 상태: 규칙·Jev 검사, 정제·재검사, 조직 규칙 배포, 전송 전 대시보드 기록 확인과 관리 화면 연동이 동작합니다. 서버 감사 이벤트에는 원문이 없지만 조직 대시보드는 기본값 `report_text=full`로 원문을 저장합니다.
 > 대시보드·서버·실제 Mapika Decider 4B 를 함께 띄우는 기본 경로는 저장소 루트의 [Compose 안내](../README.md)입니다. 모델 정확도 평가는 아직 진행 전입니다.
 
 ## 구조
@@ -18,7 +18,7 @@ server/
 │  ├─ detection/
 │  │  ├─ rules.py         # 정규식·형식 규칙(한국 형식 우선)
 │  │  ├─ validators.py    # Luhn, 주민번호 날짜, IP 파서
-│  │  ├─ model.py         # 로컬 모델 문맥 탐지(후보만 제안, 출력 검증)
+│  │  ├─ model.py         # Jev 로컬 모델 호출·출력 검증
 │  │  └─ merge.py         # 겹치는 구간 병합
 │  ├─ policy/engine.py    # YAML 정책 → 위험도·조치·요청 판단
 │  ├─ sanitize/replacer.py# 일관 토큰 치환([EMAIL_1]), 뒤에서부터 적용
@@ -26,8 +26,7 @@ server/
 │  └─ services/pipeline.py# 검사 → 정제 → 재검사 오케스트레이션
 ├─ policies/
 │  ├─ default.yaml        # 유형별 category·severity·action·token
-│  └─ destinations.yaml   # 전송 목적지(AI 제공사·경로)별 강화 등급
-├─ cli/prompt_guard/      # 독립 검사 CLI
+│  └─ destinations.yaml   # 전송 목적지(AI 제공사·경로)별 안내 등급
 ├─ tests/
 ├─ docs/                  # API 계약·미결 사항
 ├─ Dockerfile, compose.local.yaml(API+4B 모델), compose.api.yaml(API 만), .env.example
@@ -72,27 +71,7 @@ API 문서: http://127.0.0.1:8000/docs
 
 ## CLI
 
-```bash
-cd server
-export PYTHONPATH=cli PG_SERVER_URL=http://127.0.0.1:8000 PG_API_KEY=...
-prompt_text | python -m prompt_guard inspect --stdin --json     # 판정 JSON → stdout
-prompt_text | python -m prompt_guard sanitize --stdin           # 정제문 → stdout
-prompt_text | python -m prompt_guard inspect --stdin --provider openai --channel consumer   # 목적지 지정
-python -m prompt_guard inspect                                  # 대화형 입력
-```
-
-| 종료 코드 | 의미 |
-|---|---|
-| 0 | 정책 통과 |
-| 2 | 사용자 확인 필요(또는 검사 미완료) |
-| 3 | 차단 |
-| 4 | 검사·연결 오류 |
-
-- 원문은 셸 인자로 받지 않습니다(셸 기록·프로세스 목록 노출 방지).
-- 경고는 stderr, JSON/정제문은 stdout. 원문은 다시 출력하지 않습니다.
-- 이 CLI는 **검사만** 합니다. 다른 AI 도구가 결과를 무시하고 보내는 것은 막지 못합니다.
-  `prompt-guard ... && ai-tool` 같은 파이프만으로 차단이 보장되지 않으며, 전송 통합 어댑터는 별도 작업입니다.
-- 컨테이너 안에서 실행하면 서버 주소가 `http://api:8000` 처럼 달라집니다.
+검사 CLI와 전송 프록시는 독립 패키지 [ai-proxy/](../ai-proxy/README.md)에서 설치·실행합니다. `ai-proxy inspect`·`sanitize`는 검사 전용이며, `ai-proxy serve`는 base URL을 바꿀 수 있는 AI 도구의 요청을 검사·정제·재검사한 뒤 제공사 API로 전달합니다. 설치·옵션·종료 코드·지원 API는 해당 README를 참고하세요.
 
 ## 판단 규칙
 
@@ -102,6 +81,8 @@ python -m prompt_guard inspect                                  # 대화형 입�
 | yellow | `decision=warn` — 사용자 확인 필요 |
 | green | `status=complete` 이고 `decision=allow`. 현재 정책 통과일 뿐 절대 안전 보장이 아님 |
 | gray | `status` 가 `incomplete`/`error` — 전송 보류. 이때 `decision` 은 절대 `allow` 가 아님 |
+
+판정은 프롬프트 내용만으로 정합니다. 목적지 등급·선택 모델·학습/opt-in 상태는 안내용이며 신호에 영향을 주지 않습니다. 확장프로그램은 접속·모델 변경 시 확인된 정보와 미확인 항목을 모달로 알립니다. 검사 완료된 빨강은 `block`을 포함해 사용자 확인 후 강행 전송할 수 있고, 조직 관리 상태에서는 그 선택도 대시보드에 기록합니다.
 
 ## 대시보드 ↔ 개인 연결
 
@@ -115,7 +96,7 @@ python -m prompt_guard inspect                                  # 대화형 입�
 | | 로컬 | 조직 관리 |
 |---|---|---|
 | 조건 | `PG_DASHBOARD_CONNECTION` 없음, 또는 확장이 등록 코드로 연결되지 않음 | 대시보드 연결 URL(`PG_DASHBOARD_CONNECTION`)이 있는 서버에 대시보드 사람 ID 로 등록 |
-| 자체 판단 | 내장 규칙 + 사용자 규칙 + 문맥 탐지기(서버), 기기 내 AI·개인 정규식(확장) | 같음 |
+| 자체 판단 | 내장 규칙 + 사용자 규칙 + Jev(서버), 기기 내 AI·개인 정규식(확장) | 같음 |
 | 대시보드 규칙 | 없음 | 대시보드 활성 설정의 태그 `pythonRegex`, Jev 프롬프트(`jevThreshold`)를 모든 검사에 적용 |
 | 기록 | 서버 감사 이벤트(원문 없음)만 | + 전송 시점 검사를 대시보드 `/api/v1/detector-events` 로 전송 |
 
@@ -130,18 +111,18 @@ python -m prompt_guard inspect                                  # 대화형 입�
 
 대시보드 기록의 `source_id` 는 연결 ID 입니다. `PG_DASHBOARD_URL`(주소만, 인증 없음)은 대시보드가 아직 연결을 발급하지 않았을 때만 동작하는 이전 방식입니다.
 
-- **태그 정규식:** Python `re` 로 실행합니다. 4000자 이하, 빈 문자열 일치·중첩 수량자(`(a+)+`)는 건너뜁니다(`/v1/admin/org/status` 의 `skipped_regex`).
+- **태그 정규식:** Python `re`로 실행하며 최대 4,000자입니다. 검사 서버가 설정된 대시보드는 초안·태그 세부 저장 전에 변경된 비어 있지 않은 패턴을 `/v1/admin/org/regex/check`로 검증하고, 길이 초과·문법 오류·빈 문자열 일치·중첩 수량자를 거부합니다. 연결 실패도 저장을 거부합니다(503). 검사 서버 URL이 없을 때는 원격 검증 없이 저장합니다. 기존에 실행에서 건너뛴 규칙은 `/v1/admin/org/status`의 `skipped_regex`에 남고 메트릭 설정·검사 서버 관리 상태·전체 현황 배너에서 태그 이름과 사유를 표시합니다.
 - **Jev:** 프롬프트마다 출력 태그별 점수(0~1)를 받고, 태그의 `jevThreshold` 가 설정된 경우에만 `점수 >= 임계값` 이면 탐지입니다.
   `PG_MODEL_API=decider` 는 Noul(참일 확률)을 쓰며 입력 전체가 분류 단위입니다. 응답의 전체 입력 span 은 근거 추출 위치가 아니고,
   이유에 `입력 전체 분류`로 표시됩니다. 임계값을 넘으면 입력 전체에 `tag_action` 을 적용하므로 기본 `mask` 는 입력 전체를 토큰 하나로 바꿉니다.
   기존 `ollama`·`openai` 모델은 근거 문구를 추출하고, 그 문구를 원문에서 찾지 못하면 최소 `warn` 입니다(`org_jev_unlocated`).
 - 태그·Jev 프롬프트의 `enabled=false` 는 실행에서 제외합니다(필드가 없는 이전 설정은 활성). 부모·자식 태그는 각각 독립적으로 적용하며,
   비활성 태그는 프롬프트의 출력 목록에서도 제외합니다. 출력이 하나도 없거나 프롬프트가 비활성이면 모델을 호출하지 않습니다.
-- 대시보드 태그 탐지의 조치는 조직 설정 `tag_action`(기본 `mask`, 토큰 `[ORG_<태그>_n]`)이며 목적지 등급으로 강화됩니다.
+- 대시보드 태그 탐지의 조치는 조직 설정 `tag_action`(기본 `mask`, 토큰 `[ORG_<태그>_n]`)이며 목적지 등급과 무관합니다.
   태그 ID 가 내장 유형과 같으면 유형 이름은 `org_<태그 ID>` 이고 기록할 때 원래 태그로 되돌립니다.
 - 기존 규칙 결과는 취소하지 않고 합쳐서 더 엄격한 쪽을 적용합니다.
 - **대시보드에 연결할 수 없거나 활성 버전이 없으면** 조직 규칙을 적용하지 못했으므로 회색(`org_config_unavailable`)입니다.
-  Jev 모델이 꺼져 있거나 실패해도 회색(`org_jev_model_disabled`, `org_jev_failed`, 모델 필수면 error)이며 allow 하지 않습니다.
+  모델 엔드포인트가 설정된 상태에서 실행할 조직 Jev가 있는데 모델을 끄거나 호출이 실패하면 회색(`org_jev_model_disabled`, `org_jev_failed`, 모델 필수면 error)입니다. 엔드포인트 미설정은 아래 비활성 동작을 따릅니다.
 - 활성 설정은 `PG_DASHBOARD_REFRESH_S`(기본 30초)마다 다시 받습니다. 바로 반영하려면 `POST /v1/admin/org/refresh`.
 
 ### 조직 설정
@@ -151,24 +132,27 @@ python -m prompt_guard inspect                                  # 대화형 입�
 대시보드 설정을 따르는 중에는 서버 PUT 이 409 입니다. 항목은 같습니다.
 
 ```json
-{ "report_text": "masked", "tag_map": {"email": "pii-3", "phone": "pii-2"},
-  "tag_action": "mask", "jev_enabled": true, "source_id": "prompt-guard" }
+{ "report_text": "full", "tag_map": {"email": "pii-3", "phone": "pii-2"},
+  "tag_action": "mask", "jev_enabled": true, "source_id": "prompt-guard",
+  "policy_state_map": {"allow": null, "warn": null, "block": null} }
 ```
 
 | 항목 | 의미 |
 |---|---|
-| `report_text` | 대시보드로 보내는 원문 처리. `masked`(기본): 탐지 구간을 모두 `[TOKEN_n]` 으로 바꾼 문장 / `full`: 원문 그대로 / `off`: 기록 안 함 |
+| `report_text` | 대시보드로 보내는 원문 처리. `full`(기본): 원문 그대로 / `masked`: 탐지 구간을 모두 `[TOKEN_n]`으로 바꾼 문장 / `off`: 기록 안 함 |
 | `tag_map` | 서버 탐지 유형 → 대시보드 태그 ID. 현재 활성 버전에 없는 태그는 빼고 보냄 |
 | `tag_action` | 대시보드 태그 탐지 시 조치(`warn`·`mask`·`block`) |
 | `jev_enabled` | 끄면 태그 정규식만 적용 |
 | `source_id` | 대시보드 기록의 생산자 이름공간 |
+| `policy_state_map` | `allow`·`warn`·`block` → 활성 대시보드 정책 상태 ID. 기본 모두 null이며 활성 버전에 없는 ID는 보내지 않음 |
 
 ### 대시보드에 기록되는 것
 
 - 대시보드 사람 ID 로 등록한 개인 토큰의 **전송 시점** 검사(`context.stage` 가 `draft` 가 아닌 것)만 보냅니다.
   확장은 입력 중 검사를 `draft`, 전송·파일 첨부 직전 검사를 `submit` 으로 보냅니다. 정적 API 키 요청은 보내지 않습니다.
-- 응답을 돌려준 뒤 보내므로 검사 시간에 영향이 없습니다. 활성 버전이 바뀌었으면(409) 설정을 다시 받아 한 번 재시도하고,
-  실패 건수는 `/v1/admin/org/status` 의 `report_failures` 에 오류 코드별로 남습니다(원문은 로그에 남기지 않음).
+- `/v1/inspect`는 `report_text != off`인 기록 대상 요청의 **기록 완료를 기다린 뒤** 응답합니다. 따라서 기록 통신 시간이 응답 시간에 포함됩니다. `report_status`는 `recorded`(성공)·`failed`(실패)·`skipped`(기록 제외)입니다. 관리 상태 확장프로그램은 실패 또는 값 누락 시 전송을 회색 보류합니다. 활성 버전이 바뀌었으면(409) 설정을 다시 받아 한 번 재시도하고, 실패는 `/v1/admin/org/status`의 `report_failures`에 코드별로 남습니다.
+- `context.send_action`으로 일반(`normal`)·확인(`confirmed`)·강행(`forced`) 전송을 기록합니다. `report_status`는 클라이언트 응답 전용이며 대시보드로 보내는 `result`에는 넣지 않습니다. 이 기록은 전송 전 선택이며 외부 AI 수신 성공의 증거는 아닙니다.
+- 첨부 텍스트 검사에는 `context.files:[{name}]`을 붙입니다. 파일 이름·이미지 원본은 개인 토큰 전용 `POST /v1/files/report`로 수집하며, `dashboard_unavailable`로 기록하지 못하면 관리 상태 클라이언트는 첨부를 보류합니다. 이미지 개별 5MiB·합계 10MiB·최대 20개, 초과분은 이름만 기록합니다. `report_text=off`는 텍스트·첨부 기록을 모두 제외합니다.
 - 겹쳐서 하나로 병합된 탐지도 병합 전 후보마다 보내 각 태그가 집계되게 합니다.
 
 ### 사용자 등록
@@ -189,27 +173,28 @@ curl -X POST $SERVER/v1/admin/enrollments -H "X-Admin-Key: $ADMIN" -H "Content-T
 
 ## 탐지 모듈·대시보드 규칙 관리
 
-내장 규칙 외에 대시보드에서 **사용자 규칙(키워드·정규식)**과 **문맥 탐지기(정규식으로 판단할 수 없는 기준을 로컬 모델로 판단)**를
+내장 규칙 외에 대시보드 **검사 서버 관리**(`/settings/guard`)에서 **사용자 규칙(키워드·정규식)**과 **Jev(정규식으로 판단할 수 없는 기준을 로컬 모델로 판단)**를
 추가·조합하고, 바뀐 규칙은 `/v1/rules/bundle` 로 각 클라이언트에 배포합니다. 관리 API, 프롬프트 설정, 모델 env 는
 [docs/detection-modules.md](docs/detection-modules.md) 를 보세요. 전체 탐지 룰 형식은 [../docs/rule-formats.md](../docs/rule-formats.md), 정확도 평가는 [eval/README.md](eval/README.md).
+내부 API 이름 `context_detectors`·`/v1/admin/context-detectors`는 유지합니다. 대시보드 백엔드가 관리 키를 보관하고 `/api/v1/guard/**`를 서버 관리 API로 프록시합니다. 상태·규칙은 대시보드에서 관리하며 env·YAML은 초기값, 저장된 모델 모드·ruleset이 우선입니다. 내장 유형별 정책 편집은 현재 YAML 수정·재시작 경로입니다.
 
 ## 전송 목적지 등급
 
 `policies/destinations.yaml` 은 [AI 모델별 데이터 정책 정리](../docs/ai-model-data-policy.md)(정정판 JSON: `docs/ai-model-data-policy.json`)를 근거로
-목적지별 등급을 정합니다. 등급은 기본 정책을 **강화만** 합니다.
+목적지별 안내 등급을 정합니다. 등급은 `destination` 응답과 안내 알림에만 쓰며 조치·신호를 바꾸지 않습니다.
 
-| 등급 | 근거 | 효과 |
+| 등급 | 안내 근거 | 판정 영향 |
 |---|---|---|
-| standard | 상업 계약 경로에서 문서상 기본 학습 안 함 | 기본 정책 그대로 |
-| elevated | 기본 학습·opt-out 방식·장기 보관, 또는 학습 정책 확인 불가 | `warn` → `mask` (예: 내부 IP 치환 필요) |
-| restricted | 학습·보관·저장 국가가 문서 간 충돌, 또는 승인 범위 밖 국가 저장 명시 | `allow` → `warn`, `warn` → `mask`, 깨끗한 문장도 최소 `warn` |
+| standard | 상업 계약 경로에서 문서상 기본 학습 안 함 | 없음 |
+| elevated | 기본 학습·opt-out 방식·장기 보관, 또는 학습 정책 확인 불가 | 없음 |
+| restricted | 학습·보관·저장 국가가 문서 간 충돌, 또는 승인 범위 밖 국가 저장 명시 | 없음 |
 
 - 목적지를 모르거나 프로필에 없으면 `elevated` 입니다.
 - 브라우저·CLI 는 요금제·계약(ZDR 등)을 알 수 없으므로, `enterprise`·`api` 같은 낮은 등급은
   관리자가 `org_contracts` 에 등록한 목적지만 인정합니다.
 - standard 도 안전 보장이 아닙니다. 제공사 정책이 바뀌면 YAML 과 `version` 을 함께 갱신합니다.
 - 제공사마다 `verified_at`(근거 확인일)이 있고, `stale_after_days`(기본 90일)가 지나면 서버가 그 제공사를
-  기본 등급 이상으로 자동 강화합니다(`destination_policy_stale` 알림).
+  기본 등급보다 낮던 안내 등급을 기본값으로 돌립니다(`destination_policy_stale` 알림). 내용 판정에는 영향을 주지 않습니다.
 
 ### 제공사 정책 변경 감지
 
@@ -245,12 +230,14 @@ PG_MODEL_MODE=optional
 점수 누락·잘못된 형식·HTTP 오류·시간 초과는 `optional` 에서 `incomplete`, `required` 에서 `error` 이며 `allow` 하지 않습니다.
 빈 입력이나 빈 출력 목록은 호출하지 않습니다. `/readyz` 는 런타임의 `/health` 에서 `ok=true` 와 설정 모델 ID 가 일치하는지 확인합니다.
 
-로컬 문맥 탐지기(`context_detectors`)도 입력 전체를 분류하며 기본 임계값은 **0.5 이상**입니다. 이 값은 태그별 `jevThreshold` 와 별개입니다.
-`action=mask` 인 문맥 탐지기에 걸리면 입력 전체를 마스킹합니다. 모델이 정확한 민감 구간을 추출한다고 해석하면 안 됩니다.
+`PG_MODEL_BASE_URL` 기본값은 빈 문자열입니다. BASE_URL 또는 NAME이 비어 있으면 시작 시 한 번 경고하고, 저장된 모델 모드와 무관하게 모델·조직 Jev 호출을 생략합니다. 응답에 `model_endpoint_unset`, `/v1/admin/runtime`·`/readyz`에 `model_status=endpoint_unset`을 표시하며 이 사유만으로 회색이나 준비 상태 503이 되지 않습니다. 대시보드 **검사 서버 관리 > 상태**에도 비활성 사실을 표시합니다. `PUT /v1/admin/runtime`의 `{model_mode}` 저장값은 env 초기값보다 우선하고, 모듈은 `PUT /v1/admin/modules`로 관리합니다.
+
+서버 Jev(`context_detectors`)도 입력 전체를 분류하며 기본 임계값은 **0.5 이상**입니다. 이 값은 태그별 `jevThreshold`와 별개입니다.
+`action=mask`인 Jev 판단에 걸리면 입력 전체를 마스킹합니다. 모델이 정확한 민감 구간을 추출한다고 해석하면 안 됩니다.
 
 ## 기존 Ollama 모델 별도 실행
 
-`compose.local.yaml` 은 문맥 탐지기(정규식으로 판단할 수 없는 기준)를 판단하는 4B 모델을 함께 띄웁니다.
+`compose.local.yaml`은 Jev(정규식으로 판단할 수 없는 기준)에 쓰는 4B 모델을 함께 띄웁니다.
 
 | 서비스 | 네트워크 | 역할 |
 |---|---|---|
@@ -273,7 +260,7 @@ PG_MODEL_MODE=optional
 
 ## 개인정보·운영 원칙
 
-- 원문·탐지 값·위치는 저장하지 않습니다. 감사 이벤트에는 유형·건수·조치·규칙 ID·버전·처리 시간만 남습니다.
+- 서버 SQLite 감사 이벤트에는 원문·탐지 값·위치를 저장하지 않으며 유형·건수·조치·규칙 ID·버전·처리 시간만 남습니다. **조직 대시보드는 별도 MySQL에 원문·탐지 위치·파일 이름·이미지 원본을 저장합니다.** 원문 처리 기본값은 `full`이며 `masked`·`off`로 바꿀 수 있습니다. `masked`는 텍스트만 치환하며 첨부 이미지 자체를 가리지 않습니다.
 - uvicorn 액세스 로그를 끄고, 422 응답의 입력 에코와 예외 메시지 로깅을 제거했습니다.
 - 서버 판정 이벤트는 "검사 결과"이며 실제 전송 차단 수가 아닙니다(클라이언트 이벤트 합의 필요).
 - 테스트에는 합성 데이터만 사용합니다.

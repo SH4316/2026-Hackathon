@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/detector-events")
+@RequestMapping("/api/v1")
 @Tag(name = "탐지 서버 연동")
 class DetectorEventController {
   private final DetectorEventService service;
@@ -61,7 +61,7 @@ class DetectorEventController {
   @ApiResponse(responseCode = "201", description = "원본 결과와 첨부를 원자적으로 저장. Location 헤더에 상세 경로 반환")
   @ApiResponse(responseCode = "200", description = "동일한 이벤트 재전송. 기존 이벤트와 첨부 메타데이터 반환")
   @ApiResponse(responseCode = "413", description = "요청 본문이 16MiB 초과")
-  @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/detector-events", consumes = MediaType.APPLICATION_JSON_VALUE)
   ResponseEntity<StoredDetectorEvent> create(@Valid @RequestBody CreateDetectorEvent input) {
     var result = service.ingest(input);
     return result.created()
@@ -73,7 +73,7 @@ class DetectorEventController {
   @Operation(
       summary = "저장한 InspectResponse와 첨부 메타데이터",
       description = "이미지 원본은 download_path로 조회합니다. 응답에 Base64를 포함하지 않습니다.")
-  @GetMapping("/{id}")
+  @GetMapping({"/detector-events/{id}", "/events/{id}/attachments"})
   StoredDetectorEvent get(@PathVariable long id) {
     return service.get(id);
   }
@@ -83,7 +83,9 @@ class DetectorEventController {
       description =
           "제공한 media_type은 상세 메타데이터에 보존합니다. 다운로드는 application/octet-stream attachment와 nosniff로"
               + " 반환합니다.")
-  @GetMapping(value = "/{id}/images/{imageId}", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+  @GetMapping(
+      value = {"/detector-events/{id}/images/{imageId}", "/events/{id}/attachments/images/{imageId}"},
+      produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
   ResponseEntity<byte[]> image(@PathVariable long id, @PathVariable long imageId) {
     var image = service.image(id, imageId);
     return ResponseEntity.ok()

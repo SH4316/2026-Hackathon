@@ -1,6 +1,6 @@
 # V2 implementation contract
 
-Approved plan: user-defined tag tree + versioned policy catalog; Prompt/span ingestion, saved queries with immutable snapshots, graph-first overview, Swagger, dev-only SQL data. Preserve Spring Boot3.5/Java21/MySQL/React, local no-auth design. User authorized clearing all old people/events/findings in V2 migration. Normal fresh DB has NO tags, policy states, versions, people or events. Existing V1 migration is immutable; add V2. Do not change external extension.
+Approved plan: user-defined tag tree + versioned policy catalog; Prompt/span ingestion, saved queries with immutable snapshots, graph-first overview, Swagger, dev-only SQL data. Preserve Spring Boot3.5/Java21/MySQL/React, local no-auth design. User authorized clearing all old people/events/findings in V2 migration. Normal fresh DB has NO tags, policy states, versions, people or events. Existing V1 migration is immutable; add V2. Inspection runs in `server/`; the extension and ai-proxy call it before transmission.
 
 ## Configuration model
 
@@ -10,13 +10,13 @@ Jev prompts are independent version settings: `JevPrompt={id,name,enabled:boolea
 
 V7 adds independent prompt/output storage and nullable tag thresholds. It migrates each nonempty legacy V4 `jev_prompt` value to a standalone prompt linked to its original tag, preserving the exact text. It leaves thresholds null. Whitespace-only legacy values are preserved too; zero-byte empty legacy values create no prompt, and a fresh database remains empty. The legacy database column remains archived for migration history and is no longer part of API input/output. `jevPrompt` on tag input is now an unknown field and returns400 `INVALID_JSON`.
 
-`pythonRegex` is independent Python `re` pattern source for that tag, up to4000 Unicode code points. Omitted or null input defaults to `""`; responses always include a string. Preserve backslashes, inline flags, named groups, whitespace and newlines exactly. JSON encodes each pattern backslash as `\\`, for example `"pythonRegex":"(?i)\\b(?P<label>internal|confidential)\\b"`. The dashboard only stores the source; it does not execute it or validate Python syntax using Java or JavaScript regular-expression engines. The connected detector must validate and execute the pattern with its Python runtime. Parent/child patterns do not inherit, and changing `pythonRegex` does not change Jev prompt settings, `jevThreshold` or `guidance`. V5 adds pattern storage and initializes existing tags to `""` while preserving other data and the empty fresh-DB state.
+`pythonRegex` is independent Python `re` pattern source for that tag, up to4000 Unicode code points. Omitted or null input defaults to `""`; responses always include a string. Preserve backslashes, inline flags, named groups, whitespace and newlines exactly. JSON encodes each pattern backslash as `\\`, for example `"pythonRegex":"(?i)\\b(?P<label>internal|confidential)\\b"`. 대시보드는 정규식을 직접 실행하지 않습니다. `GUARD_SERVER_URL`이 설정되면 초안 PUT·태그 세부 저장 전에 저장값과 달라진 비어 있지 않은 패턴만 검사 서버 `POST /v1/admin/org/regex/check`로 검증합니다. 서버는 실행과 같은 Python `check_regex`를 사용합니다. `too_long`·`nested_quantifier`·`syntax_error`·`matches_empty`이면 400 `INVALID_INPUT`, `fieldErrors["tags.<id>.pythonRegex"]`에 한국어 사유를 반환하며 트랜잭션 전에 거부해 부분 저장하지 않습니다. URL 미설정은 원격 검증 없이 저장하며, URL 설정 후 연결 실패·잘못된 검증 응답은 503 `GUARD_UNAVAILABLE`입니다. 길이 상한은 4,000자입니다. `skipped_regex`는 해당 태그·검사 서버 상태·전체 현황 배너에 이름과 사유를 표시합니다. Parent/child patterns do not inherit, and changing `pythonRegex` does not change Jev prompt settings, `jevThreshold` or `guidance`. V5 adds pattern storage and initializes existing tags to `""` while preserving other data and the empty fresh-DB state.
 
 `Tag.enabled` and `JevPrompt.enabled` control future detection participation independently in each configuration version. Responses always include booleans. New tags and prompts default to `true`; existing records migrate to `true` in V8. On full draft tag saves, omitted/null `enabled` preserves each existing tag's value and defaults only new tag IDs to `true`. On tag-detail and Jev updates, omitted/null preserves the stored value; Jev creation defaults omitted/null to `true`. Only JSON booleans and null are accepted; strings and numbers return400 `INVALID_JSON`. Explicit `false` must survive reads, cloning, publication, activation and all other saves.
 
 A tag's flag applies only to that tag: parent and child values do not inherit or cascade. Changing either flag preserves regex text, prompt text, thresholds, output bindings and all other metadata. Disabled tags remain valid output bindings and remain visible/selectable in settings; their thresholds and deep links stay editable. Full catalog reads and classifier-config return all tags and prompts including disabled entries.
 
-Consumers fetch the complete active configuration, execute a tag's Python regex only when that tag is enabled, and use a Jev judgment only when `prompt.enabled && outputTag.enabled` for the relevant output. Skip a Jev judgment when none of its bound output tags are enabled. A disabled parent does not suppress an enabled child. These rules describe the consumer contract; this implementation does not change `server`, connect its runtime, execute rules/Jev, or add automatic configuration reload. Consumers must fetch a newer revision themselves.
+Consumers fetch the complete active configuration, execute a tag's Python regex only when that tag is enabled, and use a Jev judgment only when `prompt.enabled && outputTag.enabled` for the relevant output. Skip a Jev judgment when none of its bound output tags are enabled. A disabled parent does not suppress an enabled child. 검사 서버는 이 소비자 계약을 구현하며 활성 설정을 기본 30초 간격으로 다시 읽어 조직 정규식·Jev에 적용합니다. 검사 서버 관리에서 즉시 새로 받기도 가능합니다.
 
 Flags affect future execution only. Ingestion accepts existing version tag IDs regardless of enabled state; prior and new submitted event labels, historical browsing, filters, aggregates and saved-search membership/counts are not rewritten or hidden when a flag changes. V8 preserves all existing tags, prompts, bindings, events and saved searches; a fresh database remains empty.
 
@@ -37,20 +37,20 @@ Sibling tree order uses `order`, then stable ID in ASCII binary order when value
 
 Draft saves, tag-detail saves, version reads, clones, publish/activate responses and classifier configuration preserve independent Jev prompts, output bindings and each tag's `jevThreshold` and `pythonRegex`. The UI saves the selected tag's details separately and retains other unsaved tag, tree and policy changes. A new unsaved tag must first be included in a full draft save. All mutations use the latest version revision so stale full draft saves cannot overwrite a detail edit.
 
-Saving an inactive version or a draft does not change active configuration. Saving tag details or Jev settings in the active published version changes the next `GET /api/v1/classifier-config` response immediately, keeping the same version ID and returning a higher revision. Consumers must fetch configuration again and apply that revision. This dashboard only stores and serves configuration: it makes no Jev or detector execution request and does not deploy or reload an external runtime. No external Jev execution contract is defined here.
+Saving an inactive version or a draft does not change active configuration. Saving tag details or Jev settings in the active published version changes the next `GET /api/v1/classifier-config` response immediately, keeping the same version ID and returning a higher revision. Consumers must fetch configuration again and apply that revision. 대시보드는 설정을 저장·제공하고 관리·시험 요청을 검사 서버로 프록시합니다. 실제 Jev 실행·정제·규칙 배포는 검사 서버가 담당합니다. 서버 Jev 기준(`context_detectors`)과 조직 트리의 독립 Jev 프롬프트는 별도로 관리합니다.
 
 ## Ingestion
 
 POST /api/v1/events body {sourceId,eventId,personId,versionId,prompt,detections:[{start,end,text,tagIds:string[]}],occurredAt?,service?,model?,policyStateId?}.
 sourceId/eventId/personId/versionId mandatory, registered person required422. prompt nonblank, <=200000 Unicode code points; total body1MiB and matching parser string limits; detections max1000; each nonempty tagIds. Span units Unicode code points, start inclusive/end exclusive, exact substring equals text, don't trim/normalize prompt. Same [start,end] repeated input merged into one detection with union tagIds; order-independent canonical replay. Different overlapping intervals remain different detections. Empty detections allowed (0findingCount). Optional occurredAt uses server receivedAt; service defaults 'unspecified' (normalize supplied lowercase slug); model/policy null. Keep original UTC precision, future validation and safe input limits.
 Every new event requires active versionId; reject inactive/stale409; unknown tag/policy in that version422. Existing identical sourceId+eventId replay returns200 even after activation changed, different content409; omitted server-default timestamps must not make identical replay conflict. Creation201. Event writes atomic, concurrent idempotency preserved.
-Event={id:number,sourceId,eventId,versionId,personId,personName,prompt,occurredAt,receivedAt,service,model:string|null,policyStateId:string|null,policyStateName:string|null,detections:[{id:number,start,end,text,tags:[{id,name,color}]}],findingCount:number}. Event details use captured published-version labels; viewVersion metadata used separately by charts. Full prompt/detections available on list/detail for v2; no update/delete events.
+Event={id:number,sourceId,eventId,versionId,personId,personName,prompt,occurredAt,receivedAt,service,model:string|null,policyStateId:string|null,policyStateName:string|null,detections:[{id:number,start,end,text,tags:[{id,name,color}]}],findingCount:number,sendAction:"normal"|"confirmed"|"forced"|null,fileCount:number,imageCount:number}. Event details use captured published-version labels; viewVersion metadata used separately by charts. Full prompt/detections available on list/detail for v2; no update/delete events.
 V6 stores captured tag names/colors on detection-tag associations. It backfills existing rows from their event's configuration version without deleting events, saved searches or configuration; subsequent detail edits leave these captured labels unchanged. New event ingestion captures names/colors atomically with the selected active configuration's details. Ordinary and detector event list/detail and saved-search event responses use these snapshots; metric tag captions/colors still use current view-version details.
 GET /api/v1/events + filters/page -> Page<Event>; GET /events/{id} -> Event. Keep people POST{id,name},GET paginated,GET/{id}; Person={id,name,eventCount,findingCount,lastEventAt}. Page={items,page,size,totalElements,totalPages},0based,size20 default max100.
 
 ## Detector HTTP ingestion
 
-The detector adapter adds endpoints alongside the existing public API; `/events` and its camelCase request/response contract remain unchanged. Preserve the existing empty initial configuration, registered people, published tree structure and local no-auth runtime. The inspection server (`server/`) calls it when connected through a connection URL (see Detector connections and settings). Producer reference: `origin/main` commit `e2021df`, `docs/rule-formats.md`, `server/app/schemas.py` and `server/docs/api-contract.md`.
+The detector adapter adds endpoints alongside the existing public API; `/events` retains camelCase field names and includes the Event fields defined above. Preserve the existing empty initial configuration, registered people, published tree structure and local no-auth runtime. 검사 서버는 연결된 개인 토큰의 전송 시점 검사를 이 경로로 보냅니다. 현재 계약 기준은 `docs/rule-formats.md`, `server/app/schemas.py`, `server/docs/api-contract.md`입니다.
 
 `POST /api/v1/detector-events` accepts JSON with snake_case envelope fields:
 
@@ -59,12 +59,13 @@ The detector adapter adds endpoints alongside the existing public API; `/events`
 | `source_id` | yes | Existing dashboard ID syntax; stable producer namespace. |
 | `person_id` | yes | Already registered dashboard person. |
 | `version_id` | yes | Active published dashboard configuration for a new event. |
-| `text` | yes | Exact original inspected prompt; empty/blank text is valid, at most 200000 Unicode code points. Existing `/events` still requires nonblank text. |
-| `result` | yes | Unchanged detector `InspectResponse` JSON, retained with all metadata. |
+| `text` | yes | 조직 `report_text=full`(기본)은 원문, `masked`는 탐지 구간 치환문. `off`는 수집 요청을 보내지 않음. 빈 텍스트도 유효, 최대 200000 코드 포인트. 기존 `/events`는 비어 있지 않은 원문 필요. |
+| `result` | yes | 검사 응답에서 클라이언트 전용 `report_status`를 제외한 JSON. 대시보드는 이 필드를 포함한 알 수 없는 필드를 거부함. |
 | `occurred_at` | no | ISO 8601 timestamp with timezone; otherwise server receipt time. Existing event timestamp bounds apply. |
 | `service` | no | Existing service normalization; otherwise `result.destination.provider`. |
 | `model` | no | Explicit destination LLM model name; otherwise null. Detector model versions do not identify it. |
-| `policy_state_id` | no | Configured policy state in `version_id`; otherwise null. Do not infer it from `decision`. |
+| `policy_state_id` | no | `version_id`에 있는 정책 상태 ID. 검사 서버는 `policy_state_map`의 명시적 매핑만 사용하고 활성 버전에 없는 ID는 생략. 대시보드는 `decision`으로 추론하지 않음. |
+| `send_action` | no | `normal`·`confirmed`·`forced` 또는 null. V11 nullable 열에 저장하며 전송 전 선택을 나타냄. |
 | `tag_map` | no | Object mapping detector `finding.type` to an existing tag ID in `version_id`. |
 | `files` | no | At most 100 `{name}` entries; filename metadata only. |
 | `images` | no | At most 20 `{name,media_type,data_base64}` entries; `image/*` MIME type, canonical padded standard Base64 without whitespace or a data URI prefix. |
@@ -85,7 +86,7 @@ POST returns the same shape as `GET /api/v1/detector-events/{id}`:
 {
   id, event_id, event: Event,
   source_id, person_id, version_id, text, result,
-  occurred_at, service, model, policy_state_id, tag_map,
+  occurred_at, service, model, policy_state_id, send_action, tag_map,
   files: [{name}],
   images: [{id,name,media_type,size_bytes,download_path}]
 }
@@ -95,7 +96,19 @@ POST returns the same shape as `GET /api/v1/detector-events/{id}`:
 
 Invalid spans, Base64 or names return400 `INVALID_INPUT`; malformed JSON, unknown fields and invalid enum values return400 `INVALID_JSON`. Explicit unknown tag mappings return422 `TAG_NOT_IN_VERSION`, stale active versions return409 `VERSION_MISMATCH`, and changed replay metadata/files/image bytes return409 `EVENT_CONFLICT`. Existing safe error envelopes remain `{code,message,fieldErrors?}`.
 
-These records represent inspection decisions. They do not assert that a prompt was transmitted, blocked by a client, or accepted by an external AI. Confidence describes detection certainty; severity describes risk; action and decision are policy outcomes. Keep these values separate.
+이 기록은 검사 판정과 전송 전 선택을 나타냅니다. `send_action`은 외부 AI 수신 성공이나 클라이언트 최종 차단의 증거가 아닙니다. V11는 `security_events.send_action VARCHAR(16) NULL`을 추가하며 과거 이벤트는 null로 보존합니다. 이벤트 목록·상세·저장 검색의 `Event`는 `sendAction`·`fileCount`·`imageCount`를 반환합니다. 일반 이벤트의 첨부 수는 0이며 `forced`는 화면에서 "강행 전송" 배지로 표시합니다. 상세는 기존 detector 상세·이미지 API로 파일 이름과 미리보기·다운로드를 제공합니다. 다운로드가 `application/octet-stream`이므로 프런트엔드는 blob과 저장된 `media_type`으로 미리보기를 만듭니다. Confidence describes detection certainty; severity describes risk; action and decision are policy outcomes. Keep these values separate.
+
+## 검사 서버 관리 프록시
+
+`/settings/guard`는 상태·사용자 규칙·Jev 판단 기준·조직 설정·사용자 연결 화면입니다. 서버 Jev 내부 API 이름 `context_detectors`·`context-detectors`는 유지합니다. 조직 Jev 프롬프트 편집은 `/settings/jev`에서 별도로 수행합니다.
+
+백엔드 환경변수 `GUARD_SERVER_URL`, `GUARD_ADMIN_KEY`는 기본 빈 값입니다. 루트 Compose는 URL을 `http://server:8000`으로 고정하고 `PG_ADMIN_KEYS`를 `GUARD_ADMIN_KEY`로 전달하며 백엔드는 쉼표 목록의 첫 키를 사용합니다. 대시보드 전용 Compose에는 이 변수 전달이 없어 연동하려면 별도 주입이 필요합니다. 브라우저는 키를 받지 않습니다. 대시보드 자체는 인증이 없으므로 프록시 접근 제어는 배포 환경에서 수행해야 합니다.
+
+`/api/v1/guard/**` → `/v1/admin/**`로 HTTP 메서드·본문·쿼리·`If-Match`를 전달하고 상태·본문·`ETag`를 반환합니다. 허용 목록은 `ruleset`, `ruleset/history`, `modules`, `custom-rules`, `custom-rules/test`, `context-detectors`, `context-detectors/test`, `prompt`, `org/settings`, `org/status`, `org/refresh`, `org/regex/check`, `runtime`, `enrollments`, `clients`, `audit/events`, `audit/summary`입니다. `custom-rules/{id}`·`context-detectors/{id}`·`clients/{id}`도 허용합니다. 그 외 경로는 404이며 서버 URL·키 미설정 또는 연결 실패는 한국어 503 `GUARD_UNAVAILABLE`입니다. 키는 응답·로그에 넣지 않습니다.
+
+`GET runtime`은 모델 모드·`model_status`(`active|disabled|endpoint_unset|unavailable`)·연결·준비·모듈·정책/ruleset 버전·조직 상태를 반환합니다. `PUT runtime {model_mode}`와 `PUT modules`로 상태를 저장하며 env·YAML은 초기값입니다. 모델 BASE_URL 또는 NAME 미설정은 비활성 상태로 표시하고 검사에서 `model_endpoint_unset`을 알리며, 이 사유만으로 회색·준비 상태 503이 되지 않습니다.
+
+조직 설정의 `report_text` 기본은 `full`이며 `masked`·`off`를 지원합니다. `policy_state_map={allow:null,warn:null,block:null}`이 기본이며 판정 → 활성 정책 상태 ID를 명시적으로 매핑합니다. 조직 관리 전송은 `draft`를 제외한 검사 기록의 완료를 기다리고 검사 응답에 `report_status=recorded|failed|skipped`를 반환합니다. 이 필드는 수집 `result`에서 제외하며, 확장프로그램은 실패·필드 누락 시 전송을 보류합니다. 첨부 이름·이미지는 서버 `/v1/files/report`를 통해 수집하고 기록 통신 실패 시 첨부도 보류합니다. `off` 등 기록 제외는 별도입니다.
 
 ## Detector connections and settings
 
@@ -125,6 +138,7 @@ GET /saved-searches/{id}/events?page&size ->Page<Event>; GET /saved-searches/{id
 ## Swagger/errors/routes
 
 Add springdoc-openapi-starter-webmvc-ui2.10.0 compatibleBoot3.5. Swagger /swagger-ui.html redirect and /swagger-ui/index.html, JSON /v3/api-docs. Relative server '/' and all API groups/examples documented incl Unicode offsets, version mismatch, replay. Don't SPA-forward docs or missingAPI/assets. Errors {code,message,fieldErrors?}, Korean, no stack/prompt echo.
+SPA routes /,/events,/events/:id,/people,/people/:id,/settings/metrics,/settings/jev,/settings/guard,/saved-searches,/saved-searches/:id. The retired /settings/monitoring URL remains an SPA entry and redirects to /settings/metrics with its complete query string preserved; its navigation item and settings panel are removed.
 SPA routes /,/events,/events/:id,/people,/people/:id,/settings/metrics,/settings/jev,/settings/connections,/saved-searches,/saved-searches/:id. The retired /settings/monitoring URL remains an SPA entry and redirects to /settings/metrics with its complete query string preserved; its navigation item and settings panel are removed.
 
 ## Dev SQL
@@ -133,7 +147,7 @@ compose-dev.yml: retain APP_BIND_IP/APP_PORT, use dev-mysql-data volume replacin
 
 ## Ownership
 
-The root `DashboardApplication` remains the component-scan entry point. Backend packages are `api` (shared page response), `configuration` (catalog lifecycle), `person` (person registration and person-query coordination), `event` (event ingestion and atomic replay), `detector` (producer adapter), `query` (filters, reads and aggregates), `savedsearch` (immutable search snapshots), `common` (validation/errors/JDBC helpers), and `web` (HTTP infrastructure, JSON/OpenAPI settings and SPA routes). Controllers live with their feature, including `person.PersonController`; health and SPA controllers stay in `web`.
+The root `DashboardApplication` remains the component-scan entry point. Backend packages are `api` (shared page response), `configuration` (catalog lifecycle), `person` (person registration and person-query coordination), `event` (event ingestion and atomic replay), `detector` (producer adapter), `query` (filters, reads and aggregates), `savedsearch` (immutable search snapshots), `common` (validation/errors/JDBC helpers), `guard` (검사 서버 관리 프록시·태그 정규식 원격 검증), and `web` (HTTP infrastructure, JSON/OpenAPI settings and SPA routes). Controllers live with their feature, including `person.PersonController`; health and SPA controllers stay in `web`.
 
 Feature controllers own HTTP binding, request validation, response status and headers, and delegate business work to services. Services own business validation, orchestration and transaction boundaries. Repositories own SQL construction, JDBC access, persistence serialization and row mapping. Controllers must not depend on repositories, services must not contain SQL, and repositories must not depend on services or controllers. Cross-feature coordination uses service entry points; SQL query records and row-mapping results remain internal to their feature.
 
@@ -145,4 +159,4 @@ API models live in `person.model`, `configuration.model`, `event.model`, `detect
 
 `DashboardQueryService` resolves the interpretation version, checks tag membership, assembles events with detections, merges policy counts with the configured policy list and calculates time buckets. `DashboardRepository` owns the corresponding SQL, JDBC reads and aggregates. `SavedSearchService` controls snapshot creation in one transaction: `SavedSearchRepository` stores frozen filters and counts, while `DashboardQueryService.captureSnapshotMembers` requires that caller transaction and delegates complete matching-event membership insertion to `DashboardRepository`. Query SQL fragments stay inside the query feature.
 
-`InputValidation` centralizes the shared ID pattern and Unicode, text, time and service checks. `JdbcRows` owns shared JDBC row/time conversion. Unit tests live with feature internals; HTTP and migration integration tests remain in the root test package for Spring Boot discovery. The feature packages retain the controller/service/repository boundaries above. Existing V1..V6 migration files remain immutable; V7 adds the Jev configuration model and V8 adds enabled flags defaulting existing records to true. V9 adds detector connections/settings and V10 person enrollment codes. The external detector remains unchanged.
+`InputValidation` centralizes the shared ID pattern and Unicode, text, time and service checks. `JdbcRows` owns shared JDBC row/time conversion. Unit tests live with feature internals; HTTP and migration integration tests remain in the root test package for Spring Boot discovery. The feature packages retain the controller/service/repository boundaries above. Existing V1..V6 migration files remain immutable; V7 adds the Jev configuration model, V8 adds enabled flags defaulting existing records to true, V9 and V10 add connector, settings and enrollment storage, V11 adds nullable event `send_action`, and V12 adds the policy state map. 검사 서버·확장프로그램·ai-proxy와 현재 수집·관리 계약으로 연동합니다.

@@ -1,11 +1,12 @@
-import { createGuard } from "../vendor/prompt-guard-rules/src/index.js";
 import { runInspection } from "./inspection.js";
+import { BUNDLE_KEY, BUNDLE_ALARM, createBundleCache } from "./rules-cache.js";
+import { fileReportRequest } from "./file-report.js";
 
 // 서비스 워커: 서버 검사와 독립적인 기기 내 AI 검사를 조합한다.
 // content script 는 페이지 CORS 의 영향을 받으므로 서버 요청은 모두 여기서 보낸다.
 // 원문은 로그·저장소에 남기지 않는다.
 // 개인 정규식 규칙(설정 화면)은 서버가 모르므로 여기서 서버 판정에 더한다(강화만, src/personal.js).
-import { STORAGE_KEY as PERSONAL_KEY } from "./personal.js";
+import { STORAGE_KEY as PERSONAL_KEY, localGuard as buildGuard } from "./personal.js";
 
 const DEFAULTS = {
   serverUrl: "http://127.0.0.1:8000",
@@ -26,7 +27,7 @@ async function getSettings() {
   const stored = await chrome.storage.local.get(Object.keys(DEFAULTS));
   const s = { ...DEFAULTS, ...stored };
   s.orgManaged = !!s.linkedClient?.managed;
-  if (s.orgManaged) s.serverEnabled = true;
+  if (s.orgManaged) { s.serverEnabled = true; s.enabled = true; }
   return s;
 }
 
@@ -58,6 +59,8 @@ function checkRequest(msg) {
   if (msg.destination) context.destination = msg.destination;
   // draft: 입력 중 검사(조직 대시보드에 기록하지 않음) / submit: 전송·첨부 직전 검사
   if (msg.stage === "draft" || msg.stage === "submit") context.stage = msg.stage;
+  if (["normal", "confirmed", "forced"].includes(msg.sendAction)) context.send_action = msg.sendAction;
+  if (Array.isArray(msg.files)) context.files = msg.files.slice(0, 100).map(({ name }) => ({ name }));
   return {
     request_id: crypto.randomUUID(),
     input_version: msg.inputVersion,
@@ -100,7 +103,17 @@ async function personalRules() {
   return rules;
 }
 
-const localGuard = createGuard();
+const bundles = createBundleCache({
+  read: async () => (await chrome.storage.local.get(BUNDLE_KEY))[BUNDLE_KEY],
+  write: value => chrome.storage.local.set({ [BUNDLE_KEY]: value }),
+});
+let guardBundle = null, localGuard = buildGuard([]);
+async function refreshBundle() {
+  try { await bundles.refresh(await getSettings()); } catch { /* 이전 캐시로 표시하고 최종 검사는 서버에 맡긴다. */ }
+}
+chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === BUNDLE_ALARM) void refreshBundle(); });
+void chrome.alarms.create(BUNDLE_ALARM, { periodInMinutes: 5 });
+void refreshBundle();
 let settingsGeneration = 0;
 let lifecycle = Promise.resolve();
 
@@ -141,6 +154,11 @@ async function inspect(msg, sender) {
   const generation = settingsGeneration;
   const owner = `${sender.tab?.id ?? "extension"}:${sender.frameId ?? 0}:${String(msg.inputVersion).startsWith("file:") ? "file" : "prompt"}`;
   const rules = await personalRules();
+  const cached = await bundles.current(s);
+  if (guardBundle !== (cached?.bundle || null)) {
+    guardBundle = cached?.bundle || null;
+    localGuard = buildGuard([], guardBundle);
+  }
   const res = await runInspection({ kind: msg.type, request: checkRequest(msg), settings: s, personalRules: rules,
     server: (kind, req) => callServer("POST", `/v1/${kind}`, req, s),
     ai: async (text) => {
@@ -156,7 +174,9 @@ async function inspect(msg, sender) {
 }
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
-  if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "linkedClient", PERSONAL_KEY]
+  if (["serverUrl", "apiKey", "linkedClient"].some(key => changes[key])) bundles.invalidate();
+  if (["serverEnabled", "serverUrl", "apiKey", "linkedClient"].some(key => changes[key])) void refreshBundle();
+  if (["enabled", "serverEnabled", "localAiEnabled", "serverUrl", "apiKey", "linkedClient", PERSONAL_KEY, BUNDLE_KEY]
     .some((key) => changes[key])) {
     settingsGeneration++;
     // Release model memory and cancel in-flight work when the user turns AI off.
@@ -199,6 +219,19 @@ async function handle(msg, sender) {
       return { ok: true };
     case "settings":
       return { ok: true, data: await getSettings() };
+    case "rules:bundle": {
+      const s = await getSettings();
+      let cached = await bundles.current(s);
+      if (!cached && s.serverEnabled) {
+        try { cached = await bundles.refresh(s); } catch { /* vendor 정책으로 안내 */ }
+      }
+      return { ok: true, data: cached?.bundle || null };
+    }
+    case "files:report": {
+      const s = await getSettings();
+      if (!s.orgManaged) return { ok: true, data: { recorded: false, reason: "not_managed" } };
+      return callServer("POST", "/v1/files/report", fileReportRequest(msg), s);
+    }
     case "stat":
       return bumpStat(msg.name);
     case "enroll":

@@ -8,10 +8,37 @@ import {
   formatNumber,
   getDefaultDateRange,
   highlightSegments,
+  KNOWN_SERVICES,
+  SERVICE_LABELS,
 } from "./format";
 import type { Detection, Tag } from "./types";
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe("service labels", () => {
+  it("uses the supported site provider IDs and keeps legacy display aliases", () => {
+    expect(KNOWN_SERVICES).toEqual([
+      { id: "openai", label: "ChatGPT" },
+      { id: "anthropic", label: "Claude" },
+      { id: "google", label: "Gemini" },
+      { id: "microsoft", label: "Copilot" },
+      { id: "deepseek", label: "DeepSeek" },
+      { id: "moonshot", label: "Kimi" },
+      { id: "mistral", label: "Mistral" },
+      { id: "perplexity", label: "Perplexity" },
+      { id: "xai", label: "Grok" },
+      { id: "alibaba", label: "Qwen" },
+      { id: "meta", label: "Meta AI" },
+    ]);
+    for (const { id, label } of KNOWN_SERVICES) {
+      expect(SERVICE_LABELS[id]).toBe(label);
+    }
+    expect(SERVICE_LABELS).toMatchObject({
+      chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini",
+    });
+    expect(SERVICE_LABELS["internal-ai"]).toBeUndefined();
+  });
+});
 
 describe("Seoul calendar ranges", () => {
   it("includes Seoul today when UTC is still the preceding date", () => {

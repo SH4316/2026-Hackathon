@@ -87,6 +87,7 @@ class DetectorEventIntegrationTest {
     body.put("service", "prompt-guard");
     body.put("model", "local-model-v1");
     body.put("policy_state_id", "review");
+    body.put("send_action", "forced");
     body.putArray("files").addObject().put("name", "연구 자료 😀.pdf");
     addImage(body, "원본 😀.png", PNG);
     JsonNode result = body.path("result").deepCopy();
@@ -103,6 +104,26 @@ class DetectorEventIntegrationTest {
     assertThat(created.at("/event/id").asLong()).isEqualTo(id);
     assertThat(created.at("/event/eventId").asText()).isEqualTo(created.path("event_id").asText());
     assertThat(created.at("/event/findingCount").asInt()).isEqualTo(2);
+    assertThat(created.path("send_action").asText()).isEqualTo("forced");
+    JsonNode collectedEvent = call(get("/api/v1/events/" + id), null, 200);
+    assertThat(collectedEvent.path("sendAction").asText()).isEqualTo("forced");
+    assertThat(collectedEvent.path("fileCount").asInt()).isEqualTo(1);
+    assertThat(collectedEvent.path("imageCount").asInt()).isEqualTo(1);
+    JsonNode listed =
+        call(
+                get("/api/v1/events")
+                    .param("from", "2026-10-01T00:00:00Z")
+                    .param("to", "2026-11-01T00:00:00Z"),
+                null,
+                200)
+            .path("items")
+            .get(0);
+    assertThat(listed.path("sendAction").asText()).isEqualTo("forced");
+    assertThat(listed.path("fileCount").asInt()).isEqualTo(1);
+    assertThat(listed.path("imageCount").asInt()).isEqualTo(1);
+    ObjectNode changed = body.deepCopy().put("send_action", "normal");
+    call(post(ENDPOINT), changed, 409);
+
     assertThat(created.at("/event/detections/0/start").asInt()).isEqualTo(7);
     assertThat(created.at("/event/detections/0/end").asInt()).isEqualTo(23);
     assertThat(created.at("/event/detections/0/text").asText()).isEqualTo("hong@example.com");

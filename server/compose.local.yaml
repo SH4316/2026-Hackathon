@@ -11,6 +11,7 @@ services:
   api:
     build: .
     env_file: .env
+    extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
       # 모델 연결은 이 파일이 정한다(.env 의 PG_MODEL_API·BASE_URL·NAME 보다 우선).
       PG_MODEL_MODE: ${PG_MODEL_MODE:-optional}
