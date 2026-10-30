@@ -44,6 +44,9 @@
   --signal-red-bg:      rgba(239, 68, 68, 0.12);
   --signal-red-border:  rgba(239, 68, 68, 0.3);
 
+  --signal-amber:        #F59E0B;
+  --signal-amber-bg:     rgba(245, 158, 11, 0.12);
+  --signal-amber-border: rgba(245, 158, 11, 0.3);
   --signal-yellow:        #F59E0B;
   --signal-yellow-bg:     rgba(245, 158, 11, 0.12);
   --signal-yellow-border: rgba(245, 158, 11, 0.3);
