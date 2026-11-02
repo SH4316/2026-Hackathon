@@ -1,0 +1,23 @@
+Welcome to our Legal Center
+TermsAI ModelsAI Systems
+Terms
+At Mistral AI, transparency, trust, and clarity are at the core of our relationship with you, whether you're a customer, an end-user, a business partner, a researcher, or simply exploring our products. To ensure you have easy access to the information you're looking for, we've centralized our key legal documents in one place.
+Below, you'll find a quick overview of each document, so you can quickly locate what you need.
+If you're a consumer:
+Terms of Service for consumers in the European Union
+Terms of Service for consumers outside the European Union
+If you're a commercial customer:
+Commercial Terms of Service
+Additional Terms
+Partner-Served deployment terms
+Data Processing Addendum
+If you're a business partner:
+Connector Terms
+For everyone using our products:
+Privacy Policy
+Cookie Policy
+Usage Policy
+License Notice
+Need Help?
+If you have questions about which terms apply to you or need further clarification, feel free to contact us. We're here to help!
+On this page
