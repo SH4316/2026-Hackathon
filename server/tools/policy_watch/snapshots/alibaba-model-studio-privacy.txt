@@ -1,0 +1,16 @@
+Security certifications and privacy notice - Alibaba Cloud Model Studio - Alibaba Cloud Documentation Center
+Document Center
+All Products
+Search
+Document Center
+Alibaba Cloud Model Studio
+User Guide (Models)
+Security and Compliance
+Security certifications and privacy
+Compliance certifications
+Alibaba Cloud Model Studio has achieved SOC 2 compliance with an unqualified opinion, validating our rigorous controls for Security, Availability, and Confidentiality. This certification serves as a global "Trust Covenant," ensuring our platform meets the highest international standards for your mission-critical AI transformation.
+Reference: Compliance repository
+Privacy protection
+Alibaba Cloud strictly protects your data privacy and will never use your data for model training. All data transmitted during application building and model training is encrypted with AES-256 (Advanced Encryption Standard).
+In compliance with relevant laws and regulations, Alibaba Cloud Model Studio stores data generated from model and application calls. For more information, see the terms regarding data processing, privacy, and security in the Related agreements.
+Thank you! We've received your feedback.
